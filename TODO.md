@@ -34,6 +34,58 @@
 - **再做高亮/复制**：这是“好不好用”的分水岭，但不影响渲染正确性。
 - **最后才做流式/高 DPI/跨消息选区**：这些是体验优化，应该在基础管线稳定后做。
 
+## 当前优化决策（已定，暂不实施）
+
+当前 one-shot `qjs` 模型没有并发上限。实测 30 blocks 场景：
+
+- 峰值 qjs 进程数：**34–35**（包含启动时 sample 渲染未取消的 4–5 个进程）；
+- qjs 进程组 PSS 峰值：**280.8MB**；
+- qjs 进程组 RSS 峰值：**409.4MB**；
+- 主进程 PSS：**39.5MB**；
+- 主进程 RSS：**78.2MB**。
+
+修复 stale-render 取消 bug 后，30 blocks 峰值 qjs 进程数降到 **30**，但仍是 one-shot 模型，30 blocks 的 qjs PSS 仍约 **285–290MB**。
+
+400 个唯一 block 外推：
+
+- qjs PSS 约 **3.2GB**；
+- qjs RSS 约 **4.7GB**；
+- 若单进程更重，达到 6.6GB 也不奇怪。
+
+这是可用性问题，不是单纯性能优化。
+
+### 目标（验收口径）
+
+| 指标 | 目标 |
+|---|---|
+| qjs worker 数 | **≤2**（1 MathJax + 1 Mermaid） |
+| qjs 渲染器进程组 PSS 峰值 | **≤40MB** |
+| 总应用 PSS（Qt + worker） | 记录基线；目标 ≤100–120MB |
+| 400 个唯一 block 冷渲染 | 先测，再定；建议 ≤10s |
+| 单 block 热渲染 | MathJax <5ms；Mermaid <20ms（待实测） |
+| 空闲回收 | 60s 后退出 |
+| 队列上限 | 建议 64；可见内容优先 |
+
+> 40MB 指的是 **qjs 渲染器进程组 PSS**，不是整个应用。当前主进程本身已约 39.5MB PSS；要求“整个应用 ≤40MB”不现实。
+
+### 已定方案（未实施）
+
+- 不采用“给 one-shot 加 semaphore”；仍然每 block 付启动/解析成本；
+- 使用两个懒启动 worker：
+  - MathJax worker；
+  - Mermaid worker；
+- worker 使用 NDJSON 协议：
+  - `stdin: {"id","source","display","theme"}`
+  - `stdout: {"id","svg","error","ms"}`
+- cache hit 不进入 worker；
+- 每类 worker 串行处理，总并发天然 ≤2；
+- 空闲 60s 退出；
+- 队列有上限；当前消息/可见块优先；
+- 主题切换、重新渲染、文件切换时，用 generation 丢弃排队请求，并终止已过期的 one-shot 进程；
+- worker 超时/崩溃可重启；
+- worker 失败时回退 one-shot，但并发限制为 1；
+- worker 需要内存上限（`setrlimit`/`prlimit` 或 QuickJS memory limit）。
+
 ## P0：决定“是否好用”的核心缺口
 
 ### 1. 代码块语法高亮
@@ -184,16 +236,19 @@
 - [x] Markdown 占位符 + 异步嵌入
 - [x] 内容寻址文件缓存
 - [x] 深色/浅色主题切换
-- [x] 浅色模式显式白底黑字
 - [x] Mermaid 深色主题
 - [x] AppImage 打包与运行验证
 - [x] 30 blocks 冷/热基准
 - [x] 深色模式 TeX 融入背景修复
+- [x] 浅色模式显式白底黑字（不依赖系统 standardPalette）
+- [x] stale render 取消 bug：文件/主题切换时终止旧 qjs 进程
+- [x] 30-block 进程上限回归测试（`scripts/test-process-bound.sh`）
 
 ## 验证命令
 
 ```bash
 scripts/test.sh
+scripts/test-process-bound.sh
 scripts/bench.sh
 scripts/package-appimage.sh
 ```

@@ -1,9 +1,12 @@
 #pragma once
 
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <functional>
+
+class QProcess;
 
 struct RenderResult {
     QString svg;
@@ -28,6 +31,7 @@ public:
 
     void renderMath(const QString &tex, bool display, Callback callback);
     void renderMermaid(const QString &source, bool dark, Callback callback);
+    void cancelAll();
 
 private:
     void render(const QString &kind,
@@ -42,4 +46,6 @@ private:
     QString m_mermaidScript;
     QString m_cacheDir;
     QString m_version;
+    QSet<QProcess *> m_activeProcesses;
+    quint64 m_generation = 0;
 };

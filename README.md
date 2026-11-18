@@ -34,7 +34,7 @@
 - Mermaid v13 alpha 的 DOM-free 渲染在 QuickJS 中确实能跑，流程图、边、边标签、中文都正常；
 - 深色模式下数学公式使用系统前景色，不再融入背景；
 - Mermaid 深色主题会输出深色节点与浅色文字；
-- 30 个 block 冷启动约 433ms，热缓存约 29ms；
+- 30 个 block 冷启动约 400–430ms，热缓存约 30–50ms；
 - AppImage 没有 WebEngine 的体积负担。
 
 ### 还不够好的部分
@@ -224,6 +224,7 @@ QT_QPA_PLATFORM=offscreen ./build/rich-text-render --dark --screenshot out/app-d
 
 ```bash
 scripts/test.sh
+scripts/test-process-bound.sh
 scripts/bench.sh
 ```
 
@@ -323,8 +324,9 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 ### 进程与性能
 
 - 每个 block 启动一个一次性 `qjs` 进程；
-- 30 blocks 会形成 30 个进程峰值；
-- 冷启动 30 blocks 约 433ms，热缓存约 29ms；
+- 30 blocks 会形成 30 个进程峰值；实测 qjs PSS 约 285–290MB；
+- 文件/主题切换时的旧进程已能取消，但并发仍无上限（renderer service 待做）；
+- 冷启动 30 blocks 约 400–430ms，热缓存约 30–50ms；
 - 生产版应改成懒启动 renderer service/pool，空闲退出；
 - 没有内存上限/子进程隔离策略的正式实现。
 

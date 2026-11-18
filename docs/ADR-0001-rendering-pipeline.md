@@ -66,8 +66,8 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
 
 ### Positive
 
-- 5 blocks 冷启动约 109ms，30 blocks 约 433ms；
-- 30 blocks 缓存命中约 29ms；
+- 5 blocks 冷启动约 109ms，30 blocks 约 400–430ms；
+- 30 blocks 缓存命中约 30–50ms；
 - AppImage 约 73–76MB，渲染链增量约 2–3MB；
 - 无 WebEngine、无 Node 运行时；
 - MathJax SVG 在 QSvgRenderer 下工作良好；

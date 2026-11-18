@@ -170,6 +170,7 @@ void MainWindow::setDarkMode(bool dark)
 
 void MainWindow::renderNow()
 {
+    m_renderer->cancelAll();
     ++m_generation;
     const int generation = m_generation;
     const QString source = m_source->toPlainText();

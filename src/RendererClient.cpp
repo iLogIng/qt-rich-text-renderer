@@ -32,6 +32,18 @@ void RendererClient::configure(const QString &qjsPath,
     QDir().mkpath(m_cacheDir);
 }
 
+void RendererClient::cancelAll()
+{
+    ++m_generation;
+    const auto active = m_activeProcesses;
+    for (QProcess *process : active) {
+        process->setProperty("locvasCancelled", true);
+        if (process->state() != QProcess::NotRunning) {
+            process->kill();
+        }
+    }
+}
+
 void RendererClient::renderMath(const QString &tex, bool display, Callback callback)
 {
     render(QStringLiteral("math"), tex, m_mathScript,
@@ -67,6 +79,7 @@ void RendererClient::render(const QString &kind,
                             const QStringList &extraArgs,
                             Callback callback)
 {
+    const quint64 generation = m_generation;
     const QString key = cacheKey(kind, source, extraArgs);
     const QString cachePath = QDir(m_cacheDir).filePath(key + QStringLiteral(".svg"));
 
@@ -77,8 +90,10 @@ void RendererClient::render(const QString &kind,
             result.svg = QString::fromUtf8(cache.readAll());
             result.fromCache = true;
             if (!result.svg.isEmpty()) {
-                QTimer::singleShot(0, this, [callback = std::move(callback), result]() {
-                    callback(result);
+                QTimer::singleShot(0, this, [this, generation, callback = std::move(callback), result]() {
+                    if (generation == m_generation) {
+                        callback(result);
+                    }
                 });
                 return;
             }
@@ -102,6 +117,7 @@ void RendererClient::render(const QString &kind,
     temp->close();
 
     auto *process = new QProcess(this);
+    m_activeProcesses.insert(process);
     process->setProgram(m_qjsPath);
     QStringList args;
     args << QStringLiteral("--std") << script << temp->fileName();
@@ -113,26 +129,31 @@ void RendererClient::render(const QString &kind,
     QElapsedTimer timer;
     timer.start();
 
-    auto finish = [this, process, temp, cachePath, callback = std::move(callback), completed, timer](const RenderResult &result) mutable {
+    auto finish = [this, process, temp, cachePath, callback = std::move(callback), completed, timer, generation](const RenderResult &result) mutable {
         if (*completed) {
             return;
         }
         *completed = true;
-        RenderResult out = result;
-        if (out.error.isEmpty() && !out.svg.isEmpty()) {
-            QFile cache(cachePath);
-            if (cache.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-                cache.write(out.svg.toUtf8());
+        m_activeProcesses.remove(process);
+        const bool cancelled = process->property("locvasCancelled").toBool()
+                               || generation != m_generation;
+        if (!cancelled) {
+            RenderResult out = result;
+            if (out.error.isEmpty() && !out.svg.isEmpty()) {
+                QFile cache(cachePath);
+                if (cache.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                    cache.write(out.svg.toUtf8());
+                }
             }
+            out.elapsedMs = timer.elapsed();
+            callback(out);
         }
-        out.elapsedMs = timer.elapsed();
-        callback(out);
         process->deleteLater();
         temp->deleteLater();
     };
 
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
-            [process, finish](int code, QProcess::ExitStatus status) mutable {
+            [this, process, finish](int code, QProcess::ExitStatus status) mutable {
                 const QByteArray out = process->readAllStandardOutput();
                 const QByteArray err = process->readAllStandardError();
                 RenderResult result;

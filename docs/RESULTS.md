@@ -24,7 +24,7 @@
 | MathJax SVG → QSvgRenderer | ✅ | `svgcheck` 输出 PNG，公式正确 |
 | Mermaid SVG → QSvgRenderer | ⚠️ 需清洗 | 原始 SVG 出现黑块；归一化 CSS 变量/颜色后正常 |
 | `QTextDocument` 嵌入 SVG | ✅ | 通过 `QSvgRenderer` 栅格化 + `QTextDocument::ImageResource` |
-| 文件缓存 | ✅ | 二次渲染 30 blocks 约 29ms |
+| 文件缓存 | ✅ | 二次渲染 30 blocks 约 30–50ms |
 | AppImage | ✅ | 75.8MB，含 Qt + qjs + MathJax + Mermaid，无 WebEngine |
 
 ## 2. 体积
@@ -51,19 +51,41 @@
 
 30 blocks 基准（20 inline math + 10 mermaid）：
 
-- 冷缓存：**433ms**，`cacheHits=0`；
-- 热缓存：**29ms**，`cacheHits=30`。
+- 冷缓存：**404–433ms**，`cacheHits=0`；
+- 热缓存：**29–47ms**，`cacheHits=30`。
 
 冷缓存下每个 block 的耗时：
 
 - math：约 60–110ms（5 blocks 场景）；
 - mermaid：约 65–110ms；
-- 30 blocks 时由于同时启动 30 个 `qjs` 进程，单 block 涨到约 140–420ms，总耗时 433ms。
+- 30 blocks 时由于同时启动 30 个 `qjs` 进程，单 block 涨到约 140–420ms，总耗时约 404–433ms。
 
 这证明：
 
 - one-shot 进程可以工作；
 - 但 30 个 block 会形成进程峰值。生产版应使用 **懒启动 renderer service/pool**，空闲退出，避免进程风暴。
+
+### 3.1 内存基线与 stale-render bug
+
+30 blocks 冷缓存场景曾出现：
+
+- 峰值 qjs 进程数：**34–35**；
+- qjs 进程组 PSS 峰值：**280.8MB**；
+- qjs 进程组 RSS 峰值：**409.4MB**；
+- 主进程 PSS：39.5MB；
+- 主进程 RSS：78.2MB。
+
+多出来的 4–5 个进程来自启动时 sample 渲染未被取消：旧回调被 generation 忽略，但 qjs 进程仍在运行。
+
+已修复：
+
+- `RendererClient` 维护 active process 集合；
+- `cancelAll()` 在文件/主题/重新渲染时 kill 旧进程，并递增 generation；
+- 被取消的进程不再写缓存、不再回调。
+
+修复后回归测试 `scripts/test-process-bound.sh`：30-block 场景峰值 qjs 进程数为 **30**，测试通过。
+
+这仍然只是 bug fix；one-shot 模型的无界并发问题仍在，renderer service 优化见 `TODO.md`。
 
 ## 4. MathJax 结果
 
@@ -142,8 +164,8 @@ key = SHA256(
 
 实际效果：
 
-- 冷 30 blocks：433ms；
-- 热 30 blocks：29ms。
+- 冷 30 blocks：约 404–433ms；
+- 热 30 blocks：约 29–47ms。
 
 “渲染是纯函数”这个判断基本成立，但需要补充：
 
