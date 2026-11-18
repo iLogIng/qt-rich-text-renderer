@@ -1,0 +1,8 @@
+flowchart LR
+  A[Markdown] --> B{Math or Mermaid?}
+  B -- Math --> C[QuickJS + MathJax]
+  B -- Mermaid --> D[QuickJS + Mermaid 13]
+  C --> E[SVG]
+  D --> E
+  E --> F[QSvgRenderer]
+  F --> G[QTextDocument]

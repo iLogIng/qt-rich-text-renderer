@@ -1,0 +1,45 @@
+#pragma once
+
+#include <QObject>
+#include <QString>
+#include <QStringList>
+#include <functional>
+
+struct RenderResult {
+    QString svg;
+    QString error;
+    bool fromCache = false;
+    qint64 elapsedMs = 0;
+};
+
+class RendererClient : public QObject {
+    Q_OBJECT
+
+public:
+    using Callback = std::function<void(const RenderResult &)>;
+
+    explicit RendererClient(QObject *parent = nullptr);
+
+    void configure(const QString &qjsPath,
+                   const QString &mathScript,
+                   const QString &mermaidScript,
+                   const QString &cacheDir,
+                   const QString &version);
+
+    void renderMath(const QString &tex, bool display, Callback callback);
+    void renderMermaid(const QString &source, bool dark, Callback callback);
+
+private:
+    void render(const QString &kind,
+                const QString &source,
+                const QString &script,
+                const QStringList &extraArgs,
+                Callback callback);
+    QString cacheKey(const QString &kind, const QString &source, const QStringList &extraArgs) const;
+
+    QString m_qjsPath;
+    QString m_mathScript;
+    QString m_mermaidScript;
+    QString m_cacheDir;
+    QString m_version;
+};

@@ -1,0 +1,9 @@
+build/
+out/
+AppDir/
+AppDir-base/
+*.AppImage
+base-x86_64.AppImage
+renderer/node_modules/
+renderer/dist/
+third_party/quickjs-ng/build/
