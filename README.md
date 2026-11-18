@@ -88,7 +88,7 @@ flowchart LR
 
 ### 渲染链路
 
-```text
+````text
 Markdown
   → 扫描 $$...$$ / ```mermaid
   → 替换成唯一 token
@@ -100,7 +100,7 @@ Markdown
   → QSvgRenderer 栅格化为 QImage
   → QTextDocument::addResource + QTextImageFormat
   → token 被替换成图片
-```
+````
 
 ### 缓存
 
@@ -124,22 +124,22 @@ cache key = SHA256(
 
 ## 3. 模块划分
 
-| 模块 | 路径 | 职责 |
-|---|---|---|
-| 应用入口 | `src/main.cpp` | 命令行参数、主题初始值、截图模式 |
-| 主窗口 | `src/MainWindow.*` | 编辑器/预览 splitter、工具栏、主题切换、异步渲染编排 |
-| Markdown 处理 | `src/MarkdownRenderer.*` | 扫描 math/mermaid、生成 token、嵌入 SVG 图像 |
-| 渲染客户端 | `src/RendererClient.*` | 启动 qjs、缓存命中/写入、超时与错误处理 |
-| SVG 归一化 | `src/SvgSanitizer.*` | CSS 变量、颜色、尺寸、深色主题、基础安全清理 |
-| 主题 | `src/Theme.*` | 浅色/深色 QPalette |
-| MathJax 核心 | `renderer/src/mathjax-core.mjs` | `liteAdaptor` + TeX + SVG |
-| MathJax qjs 入口 | `renderer/src/mathjax-qjs.mjs` | stdin/文件输入、SVG 输出 |
-| Mermaid qjs 入口 | `renderer/src/mermaid-qjs.mjs` | `mermaid/slim` + flowchart/sequence/state |
-| JS 构建 | `renderer/build.mjs` | esbuild 打包为 QuickJS 可执行 bundle |
-| SVG 检查工具 | `tools/svgcheck.cpp` | SVG → PNG，验证 QtSvg 兼容性 |
-| 构建脚本 | `scripts/` | setup/build/test/bench/package |
-| 结果文档 | `docs/RESULTS.md` | 实测数据、限制、结论 |
-| 决策记录 | `docs/ADR-0001-rendering-pipeline.md` | 为什么采用这条渲染路线 |
+| 模块             | 路径                                  | 职责                                                 |
+| ---------------- | ------------------------------------- | ---------------------------------------------------- |
+| 应用入口         | `src/main.cpp`                        | 命令行参数、主题初始值、截图模式                     |
+| 主窗口           | `src/MainWindow.*`                    | 编辑器/预览 splitter、工具栏、主题切换、异步渲染编排 |
+| Markdown 处理    | `src/MarkdownRenderer.*`              | 扫描 math/mermaid、生成 token、嵌入 SVG 图像         |
+| 渲染客户端       | `src/RendererClient.*`                | 启动 qjs、缓存命中/写入、超时与错误处理              |
+| SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
+| 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
+| MathJax 核心     | `renderer/src/mathjax-core.mjs`       | `liteAdaptor` + TeX + SVG                            |
+| MathJax qjs 入口 | `renderer/src/mathjax-qjs.mjs`        | stdin/文件输入、SVG 输出                             |
+| Mermaid qjs 入口 | `renderer/src/mermaid-qjs.mjs`        | `mermaid/slim` + flowchart/sequence/state            |
+| JS 构建          | `renderer/build.mjs`                  | esbuild 打包为 QuickJS 可执行 bundle                 |
+| SVG 检查工具     | `tools/svgcheck.cpp`                  | SVG → PNG，验证 QtSvg 兼容性                         |
+| 构建脚本         | `scripts/`                            | setup/build/test/bench/package                       |
+| 结果文档         | `docs/RESULTS.md`                     | 实测数据、限制、结论                                 |
+| 决策记录         | `docs/ADR-0001-rendering-pipeline.md` | 为什么采用这条渲染路线                               |
 
 ## 4. 构建
 
@@ -277,14 +277,14 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 
 ### 体积
 
-| 项 | 大小 |
-|---|---:|
-| qjs | 1.5MB |
-| MathJax bundle | 1.8MB |
-| Mermaid bundle | 664KB |
-| AppImage | 约 73–76MB |
-| 去掉渲染链的 base AppImage | 73.1MB |
-| 渲染链增量 | 约 2–3MB |
+| 项                         |       大小 |
+| -------------------------- | ---------: |
+| qjs                        |      1.5MB |
+| MathJax bundle             |      1.8MB |
+| Mermaid bundle             |      664KB |
+| AppImage                   | 约 73–76MB |
+| 去掉渲染链的 base AppImage |     73.1MB |
+| 渲染链增量                 |   约 2–3MB |
 
 ### CI 建议
 
@@ -360,7 +360,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 1. **代码块语法高亮**：优先做，视觉差距最大；
 2. **每条消息复制 + 代码块复制**；
 3. **renderer service**：懒启动、复用、空闲退出，替代 one-shot qjs；
-4. **SVG sanitizer  hardening**：脚本/事件/外链白名单；
+4. **SVG sanitizer hardening**：脚本/事件/外链白名单；
 5. **SQLite/Blob 缓存**；
 6. **真实 AI 输出语料 + golden 测试**；
 7. **AppImage CI** 与干净环境验证；
@@ -379,6 +379,13 @@ packaging/              desktop/icon
 scripts/                构建、测试、基准、打包
 dist/                   生成的 AppImage
 ```
+
+**编写任务聚焦于**
+
+- `src/`
+- `renderer/src/`
+- `tools/`
+- `scripts/`
 
 ## 10. 第三方与许可证
 
