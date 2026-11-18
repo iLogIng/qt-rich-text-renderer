@@ -8,6 +8,8 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_executable(svgcheck
     tools/svgcheck.cpp
     src/SvgSanitizer.cpp
