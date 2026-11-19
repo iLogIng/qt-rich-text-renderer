@@ -12,6 +12,9 @@
 #include <QTimer>
 #include <QUrl>
 #include <QDebug>
+#include <qobject.h>
+#include <qprocess.h>
+#include <qtimer.h>
 
 RendererClient::RendererClient(QObject *parent)
     : QObject(parent)
@@ -179,16 +182,22 @@ void RendererClient::render(const QString &kind,
                 }
             });
 
-    QTimer::singleShot(15000, process, [process]() {
-        if (process->state() != QProcess::NotRunning) {
-            process->kill();
-        }
+    connect(process, &QProcess::started, process, [process]() {
+        QTimer::singleShot(15000, process, [process]() {
+            if (process->state() != QProcess::NotRunning) {
+                process->kill();
+            }
+        });
     });
 
     process->start();
-    if (!process->waitForStarted(3000)) {
-        RenderResult result;
-        result.error = QStringLiteral("renderer failed to start: %1").arg(process->errorString());
-        finish(result);
-    }
+
+    QTimer::singleShot(3000, process, [process, finish]() mutable {
+        if (process->state() != QProcess::Starting) {
+            process->kill();
+            RenderResult result;
+            result.error = QStringLiteral("render did not start within 3s");
+            finish(result);
+        }
+    });
 }
