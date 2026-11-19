@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-FILE="${1:-samples/bench.md}"
+FILE="${1:-tests/sources/bench.md}"
 LABEL="${2:-bench}"
 WARM="${WARM:-0}"
 MAX_TOTAL_MB="${MAX_TOTAL_MB:-128}"

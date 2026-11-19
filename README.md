@@ -169,6 +169,8 @@ scripts/mem-bench.sh
 QuickJS-ng：
 
 ```bash
+git submodule update --init --recursive third_party/quickjs-ng
+
 cmake -S third_party/quickjs-ng -B third_party/quickjs-ng/build \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
@@ -216,7 +218,7 @@ cmake --build build -j"$(nproc)"
 
 ```bash
 # 渲染指定 Markdown
-./build/rich-text-render --file samples/bench.md
+./build/rich-text-render --file tests/sources/bench.md
 
 # 以深色模式启动
 ./build/rich-text-render --dark
@@ -238,7 +240,7 @@ scripts/test.sh
 scripts/test-process-bound.sh
 scripts/test-idle.sh
 scripts/bench.sh
-scripts/mem-bench.sh samples/bench400.md bench400
+scripts/mem-bench.sh tests/sources/bench400.md bench400
 ```
 
 `mem-bench.sh` 会采样主进程与 qjs 进程的 PSS，并检查：
@@ -392,13 +394,15 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 ```text
 src/                    Qt Widgets 应用与渲染/缓存逻辑
 renderer/               MathJax/Mermaid 的 QuickJS bundle
-third_party/quickjs-ng  QuickJS-ng 源码与构建
-samples/                测试 Markdown / TeX / Mermaid
+third_party/quickjs-ng  QuickJS-ng submodule
+samples/                demo Markdown（sample.md）
+tests/sources/          测试输入：公式 / Mermaid / 基准 Markdown
 tools/svgcheck.cpp      SVG -> PNG 的 QtSvg 检查工具
-docs/                   spike 结果与 ADR
+docs/                   spike 结果、流程与 ADR
+docs/assets/            最终截图
 packaging/              desktop/icon
 scripts/                构建、测试、基准、打包
-dist/                   生成的 AppImage
+dist/                   生成的 AppImage（gitignored）
 ```
 
 **编写任务聚焦于**

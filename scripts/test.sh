@@ -7,8 +7,8 @@ mkdir -p out
 
 QJS="third_party/quickjs-ng/build/qjs"
 
-"$QJS" --std renderer/dist/mathjax-qjs.mjs samples/formula.tex display > out/test-math.svg
-"$QJS" --std renderer/dist/mermaid-qjs.mjs samples/diagram2.mmd > out/test-mermaid.svg
+"$QJS" --std renderer/dist/mathjax-qjs.mjs tests/sources/formula.tex display > out/test-math.svg
+"$QJS" --std renderer/dist/mermaid-qjs.mjs tests/sources/diagram2.mmd > out/test-mermaid.svg
 
 test -s out/test-math.svg
 test -s out/test-mermaid.svg

@@ -9,7 +9,7 @@ rm -rf "$CACHE"
 mkdir -p /tmp/opencode
 
 RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
-  --file samples/bench.md --screenshot /tmp/opencode/idle.png \
+  --file tests/sources/bench.md --screenshot /tmp/opencode/idle.png \
   >/tmp/opencode/idle.log 2>&1 &
 app_pid=$!
 

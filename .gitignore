@@ -1,6 +1,7 @@
 build/
 .cache/
 out/
+dist/
 AppDir/
 AppDir-base/
 *.AppImage

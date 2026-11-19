@@ -165,7 +165,7 @@ Mermaid v13 alpha 的关键性质：
 - 浅色模式改为显式 `#ffffff` 背景 + `#111111` 文字，不依赖系统 `standardPalette()`；
 - Mermaid 渲染器接收 `dark`/`default` 主题参数，主题进入 cache key；
 - `SvgSanitizer` 为 Mermaid 深色主题提供深色节点、浅色文字、浅色边；
-- 已验证：浅色截图 `out/app-light-fixed.png`，深色切换截图 `out/app-toggle-dark.png`，AppImage 浅色/切换截图 `out/appimage-light-fixed.png`、`out/appimage-toggle-fixed.png`。
+- 已验证：浅色截图 [docs/assets/app-light.png](assets/app-light.png)，深色截图 [docs/assets/app-dark.png](assets/app-dark.png)，AppImage 深色截图 [docs/assets/appimage-dark.png](assets/appimage-dark.png)。
 
 ## 7. 缓存与“渲染是纯函数”
 
@@ -217,7 +217,7 @@ key = SHA256(
 
 ```bash
 QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
-  --appimage-extract-and-run --screenshot out/appimage.png
+  --appimage-extract-and-run --screenshot /tmp/opencode/appimage.png
 ```
 
 输出正常。
