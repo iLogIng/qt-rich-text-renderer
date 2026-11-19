@@ -34,7 +34,7 @@
 - **再做高亮/复制**：这是“好不好用”的分水岭，但不影响渲染正确性。
 - **最后才做流式/高 DPI/跨消息选区**：这些是体验优化，应该在基础管线稳定后做。
 
-## 当前优化决策（已定，暂不实施）
+## 当前优化决策（已实施）
 
 当前 one-shot `qjs` 模型没有并发上限。实测 30 blocks 场景：
 
@@ -54,13 +54,21 @@
 
 这是可用性问题，不是单纯性能优化。
 
+### 优化后实测
+
+- 30 blocks：qjs 进程 **2**，qjs PSS **23.7MB**，主进程 PSS **21.1MB**，总 PSS **44.8MB**，冷启动约 **203ms**；
+- 400 blocks：qjs 进程 **2**，qjs PSS **29.9MB**，主进程 PSS **25.8MB**，总 PSS **55.7MB**，冷启动约 **1.6s**；
+- 400 blocks 热缓存：总 PSS 约 **48.4MB**，耗时约 **236ms**；
+- idle 2s 测试：qjs worker 已退出；
+- 自定义 `QTextObjectInterface` 不再为每个 block 常驻 QImage，主进程 PSS 从 400+MB 降到约 26MB。
+
 ### 目标（验收口径）
 
 | 指标 | 目标 |
 |---|---|
 | qjs worker 数 | **≤2**（1 MathJax + 1 Mermaid） |
 | qjs 渲染器进程组 PSS 峰值 | **≤40MB** |
-| 总应用 PSS（Qt + worker） | 记录基线；目标 ≤100–120MB |
+| 总应用 PSS（Qt + worker） | **≤128MB** |
 | 400 个唯一 block 冷渲染 | 先测，再定；建议 ≤10s |
 | 单 block 热渲染 | MathJax <5ms；Mermaid <20ms（待实测） |
 | 空闲回收 | 60s 后退出 |
@@ -68,23 +76,28 @@
 
 > 40MB 指的是 **qjs 渲染器进程组 PSS**，不是整个应用。当前主进程本身已约 39.5MB PSS；要求“整个应用 ≤40MB”不现实。
 
-### 已定方案（未实施）
+### 实施结果
 
-- 不采用“给 one-shot 加 semaphore”；仍然每 block 付启动/解析成本；
-- 使用两个懒启动 worker：
-  - MathJax worker；
-  - Mermaid worker；
-- worker 使用 NDJSON 协议：
+已实现：
+
+- 两个懒启动 worker：MathJax / Mermaid；
+- worker NDJSON 协议：
   - `stdin: {"id","source","display","theme"}`
   - `stdout: {"id","svg","error","ms"}`
 - cache hit 不进入 worker；
-- 每类 worker 串行处理，总并发天然 ≤2；
+- 每类 worker 串行处理，总并发 ≤2；
+- single-flight；
+- generation 取消；
 - 空闲 60s 退出；
-- 队列有上限；当前消息/可见块优先；
-- 主题切换、重新渲染、文件切换时，用 generation 丢弃排队请求，并终止已过期的 one-shot 进程；
-- worker 超时/崩溃可重启；
-- worker 失败时回退 one-shot，但并发限制为 1；
-- worker 需要内存上限（`setrlimit`/`prlimit` 或 QuickJS memory limit）。
+- 请求超时与 worker 重启路径；
+- worker `RLIMIT_AS` / `RLIMIT_CPU`；
+- 自定义 SVG 对象绘制，去掉 QImage 常驻。
+
+尚未实现：
+
+- 可见区域优先队列（当前 FIFO）；
+- worker 失败回退 one-shot（当前直接报错）；
+- worker 崩溃恢复的自动化测试。
 
 ## P0：决定“是否好用”的核心缺口
 
@@ -108,12 +121,14 @@
 
 ### 3. Renderer service / pool
 
-- [ ] 把 one-shot `qjs` 改成懒启动 renderer service
-- [ ] 多请求复用同一个 QuickJS runtime
-- [ ] 空闲 30–60s 退出
-- [ ] 请求队列、并发上限、超时、取消
-- [ ] 渲染进程崩溃后的恢复
-- 验收：30 blocks 冷启动不产生 30 个进程峰值；首屏耗时和当前 one-shot 接近或更好。
+- [x] 把 one-shot `qjs` 改成懒启动 renderer service
+- [x] 多请求复用同一个 QuickJS runtime
+- [x] 空闲 30–60s 退出
+- [x] 请求队列、并发上限、超时、取消
+- [x] SVG 对象绘制（QTextObjectInterface，避免 QImage 常驻）
+- [ ] 渲染进程崩溃后的自动恢复测试
+- [ ] 可见区域优先队列
+- 验收：30 blocks → 2 workers、总 PSS 44.8MB；400 blocks → 2 workers、总 PSS 55.7MB；已通过。
 
 ### 4. SVG / 输入安全加固
 
@@ -243,6 +258,11 @@
 - [x] 浅色模式显式白底黑字（不依赖系统 standardPalette）
 - [x] stale render 取消 bug：文件/主题切换时终止旧 qjs 进程
 - [x] 30-block 进程上限回归测试（`scripts/test-process-bound.sh`）
+- [x] renderer service：两个懒启动 qjs worker，max 2
+- [x] NDJSON worker 协议、single-flight、generation 取消、idle 回收
+- [x] 自定义 SVG 对象绘制，去掉 QImage 常驻
+- [x] 128MB 总应用 PSS 目标：30 blocks 44.8MB，400 blocks 55.7MB
+- [x] `scripts/mem-bench.sh`、`scripts/test-idle.sh`
 
 ## 验证命令
 

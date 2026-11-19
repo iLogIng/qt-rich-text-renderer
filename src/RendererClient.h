@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RenderTypes.h"
+
 #include <QObject>
 #include <QSet>
 #include <QString>
@@ -7,13 +9,6 @@
 #include <functional>
 
 class QProcess;
-
-struct RenderResult {
-    QString svg;
-    QString error;
-    bool fromCache = false;
-    qint64 elapsedMs = 0;
-};
 
 class RendererClient : public QObject {
     Q_OBJECT

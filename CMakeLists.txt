@@ -26,6 +26,13 @@ add_executable(rich-text-render
     src/MarkdownRenderer.h
     src/RendererClient.cpp
     src/RendererClient.h
+    src/RendererService.cpp
+    src/RendererService.h
+    src/RendererWorker.cpp
+    src/RendererWorker.h
+    src/RenderTypes.h
+    src/SvgObjectHandler.cpp
+    src/SvgObjectHandler.h
     src/SvgSanitizer.cpp
     src/SvgSanitizer.h
     src/Theme.cpp

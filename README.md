@@ -5,8 +5,8 @@
 - Qt Widgets + `QTextDocument` 渲染 Markdown；
 - QuickJS-ng 运行 MathJax，将 TeX 渲染成 SVG；
 - QuickJS-ng 运行 Mermaid v13 alpha，将图渲染成 SVG；
-- `QSvgRenderer` 把 SVG 栅格化后嵌入 `QTextDocument`；
-- 内容寻址缓存 + 异步渲染；
+- `QSvgRenderer` 通过自定义 `QTextObjectInterface` 直接绘制 SVG；
+- 两个懒启动 qjs worker + 内容寻址缓存 + 异步渲染；
 - 深色 / 浅色主题切换；
 - AppImage 打包与体积测量。
 
@@ -21,10 +21,12 @@
 - Markdown 表格、中文、emoji、代码块：可用；
 - 深色模式：可用，公式和 Mermaid 都会随主题重新渲染；
 - 缓存：可用，热缓存基本无感；
-- AppImage：可用，约 73–76MB，渲染链只增加约 2–3MB；
+- renderer service：两个 qjs worker，进程数上限 2；
+- 内存：30 blocks 总 PSS 约 44.8MB，400 blocks 约 55.7MB；
+- AppImage：可用，约 **34.6MB / 33MiB**，无需 WebEngine；
 - 不需要 QtWebEngine，不需要 Node 运行时。
 
-当前最大缺口是**代码块语法高亮**、**复制/选区**、**renderer service** 和**安全清洗**。
+当前最大缺口是**代码块语法高亮**、**复制/选区**和**安全清洗**。
 
 ## 1. 效果评估
 
@@ -34,15 +36,17 @@
 - Mermaid v13 alpha 的 DOM-free 渲染在 QuickJS 中确实能跑，流程图、边、边标签、中文都正常；
 - 深色模式下数学公式使用系统前景色，不再融入背景；
 - Mermaid 深色主题会输出深色节点与浅色文字；
-- 30 个 block 冷启动约 400–430ms，热缓存约 30–50ms；
+- 30 个 block 冷启动约 200–230ms，热缓存约 13–50ms；
+- 400 个 block 冷启动约 1.6s，总 PSS 约 55.7MB；
+- 两个 qjs worker 常驻上限，空闲 60s 自动退出；
 - AppImage 没有 WebEngine 的体积负担。
 
 ### 还不够好的部分
 
 - 代码块只是等宽文本，没有语法高亮；
 - 没有每条消息复制 / 代码块复制 / 跨消息选区；
-- 每个 block 一个一次性 `qjs` 进程，批量时会形成进程峰值；
 - Markdown 只覆盖常用子集，复杂 GFM 未验证；
+- Mermaid 仍是 alpha，升级需要回归；
 - 缓存是文件缓存，不是 SQLite/Blob；
 - SVG sanitizer 是 QtSvg 兼容层，不是完整安全清洗器；
 - Mermaid 版本是 alpha，升级需要回归测试。
@@ -59,30 +63,30 @@ flowchart LR
 
   subgraph Core["C++ core"]
     MD["MarkdownRenderer<br/>scan + placeholders"]
-    RC["RendererClient<br/>async + cache"]
+    RS["RendererService<br/>cache + queue + single-flight"]
     San["SvgSanitizer<br/>QtSvg normalization"]
-    Svg["QSvgRenderer"]
+    Obj["SvgObjectHandler<br/>QTextObjectInterface"]
     Doc["QTextDocument"]
   end
 
-  subgraph JS["QuickJS-ng helper (one-shot)"]
-    Math["MathJax 3.2.2"]
-    Mermaid["Mermaid 13 alpha"]
+  subgraph JS["QuickJS-ng workers (lazy, max 2)"]
+    MW["MathJax worker"]
+    DW["Mermaid worker"]
   end
 
   Editor --> MD
   MD --> Preview
-  MD --> RC
-  RC -->|"cache hit"| San
-  RC -->|"cache miss"| Math
-  RC -->|"cache miss"| Mermaid
-  Math --> SVGOut["SVG output"]
-  Mermaid --> SVGOut
+  MD --> RS
+  RS -->|"cache hit"| San
+  RS -->|"cache miss"| MW
+  RS -->|"cache miss"| DW
+  MW --> SVGOut["SVG output"]
+  DW --> SVGOut
   SVGOut --> San
-  San --> Svg
-  Svg --> Doc
+  San --> Obj
+  Obj --> Doc
   Doc --> Preview
-  Theme --> RC
+  Theme --> RS
   Theme --> San
 ```
 
@@ -93,13 +97,13 @@ Markdown
   → 扫描 $$...$$ / ```mermaid
   → 替换成唯一 token
   → QTextDocument::setMarkdown()
-  → 每个 token 异步调用 qjs
+  → RendererService 检查缓存 / single-flight
+  → cache miss 进入对应 worker
       → MathJax 或 Mermaid 输出 SVG
       → 写入内容寻址缓存
   → SvgSanitizer 归一化
-  → QSvgRenderer 栅格化为 QImage
-  → QTextDocument::addResource + QTextImageFormat
-  → token 被替换成图片
+  → token 被替换为自定义对象字符
+  → SvgObjectHandler 在绘制时用 QSvgRenderer 直接画 SVG
 ````
 
 ### 缓存
@@ -128,13 +132,17 @@ cache key = SHA256(
 | ---------------- | ------------------------------------- | ---------------------------------------------------- |
 | 应用入口         | `src/main.cpp`                        | 命令行参数、主题初始值、截图模式                     |
 | 主窗口           | `src/MainWindow.*`                    | 编辑器/预览 splitter、工具栏、主题切换、异步渲染编排 |
-| Markdown 处理    | `src/MarkdownRenderer.*`              | 扫描 math/mermaid、生成 token、嵌入 SVG 图像         |
-| 渲染客户端       | `src/RendererClient.*`                | 启动 qjs、缓存命中/写入、超时与错误处理              |
+| Markdown 处理    | `src/MarkdownRenderer.*`              | 扫描 math/mermaid、生成 token、插入 SVG 对象         |
+| 渲染服务         | `src/RendererService.*`               | 缓存、single-flight、队列、generation 取消           |
+| Worker 进程      | `src/RendererWorker.*`                | 懒启动 qjs、NDJSON、超时、idle、内存/CPU 限制        |
+| SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
+| 旧 one-shot 客户端 | `src/RendererClient.*`              | 保留为对照/降级参考，当前主路径不使用                 |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
 | MathJax 核心     | `renderer/src/mathjax-core.mjs`       | `liteAdaptor` + TeX + SVG                            |
-| MathJax qjs 入口 | `renderer/src/mathjax-qjs.mjs`        | stdin/文件输入、SVG 输出                             |
-| Mermaid qjs 入口 | `renderer/src/mermaid-qjs.mjs`        | `mermaid/slim` + flowchart/sequence/state            |
+| MathJax worker   | `renderer/src/mathjax-worker.mjs`     | NDJSON worker、常驻渲染 MathJax                       |
+| Mermaid worker   | `renderer/src/mermaid-worker.mjs`     | NDJSON worker、常驻渲染 Mermaid                       |
+| 旧 qjs 入口      | `renderer/src/mathjax-qjs.mjs` 等     | 一次性脚本，用于对照测试                             |
 | JS 构建          | `renderer/build.mjs`                  | esbuild 打包为 QuickJS 可执行 bundle                 |
 | SVG 检查工具     | `tools/svgcheck.cpp`                  | SVG → PNG，验证 QtSvg 兼容性                         |
 | 构建脚本         | `scripts/`                            | setup/build/test/bench/package                       |
@@ -150,7 +158,10 @@ scripts/setup-quickjs.sh
 scripts/setup-renderer.sh
 scripts/build.sh
 scripts/test.sh
+scripts/test-process-bound.sh
+scripts/test-idle.sh
 scripts/bench.sh
+scripts/mem-bench.sh
 ```
 
 ### 手动方式
@@ -225,10 +236,17 @@ QT_QPA_PLATFORM=offscreen ./build/rich-text-render --dark --screenshot out/app-d
 ```bash
 scripts/test.sh
 scripts/test-process-bound.sh
+scripts/test-idle.sh
 scripts/bench.sh
+scripts/mem-bench.sh samples/bench400.md bench400
 ```
 
-`bench.sh` 会清空缓存，跑一次冷缓存和一次热缓存，输出 SUMMARY。
+`mem-bench.sh` 会采样主进程与 qjs 进程的 PSS，并检查：
+
+- qjs worker 数 ≤2；
+- 总应用 PSS ≤128MB。
+
+`test-idle.sh` 使用 `RICH_TEXT_RENDER_IDLE_MS=2000` 验证 worker 空闲退出。
 
 ## 6. 打包与发布流水线
 
@@ -268,6 +286,9 @@ scripts/package-appimage.sh
 dist/rich-text-render-x86_64.AppImage
 ```
 
+> 当前 `dist/` 已包含 renderer service 和 worker 脚本；改动代码后需重新执行
+> `scripts/package-appimage.sh`。
+
 验证：
 
 ```bash
@@ -282,9 +303,9 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 | qjs                        |      1.5MB |
 | MathJax bundle             |      1.8MB |
 | Mermaid bundle             |      664KB |
-| AppImage                   | 约 73–76MB |
-| 去掉渲染链的 base AppImage |     73.1MB |
-| 渲染链增量                 |   约 2–3MB |
+| AppImage                   | **34.6MB / 33MiB** |
+| AppDir（未压缩）           |      约 85MB |
+| 渲染链（qjs + JS bundles） |      约 5MB |
 
 ### CI 建议
 
@@ -318,17 +339,17 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - 没有代码块复制；
 - 没有跨消息任意拖选；
 - 没有流式 token 增量渲染（当前是文档级重渲染）；
-- 没有取消正在进行的渲染请求；
-- 没有渲染队列/并发限制。
+- 取消/队列已实现，但可见区域优先尚未实现。
 
 ### 进程与性能
 
-- 每个 block 启动一个一次性 `qjs` 进程；
-- 30 blocks 会形成 30 个进程峰值；实测 qjs PSS 约 285–290MB；
-- 文件/主题切换时的旧进程已能取消，但并发仍无上限（renderer service 待做）；
-- 冷启动 30 blocks 约 400–430ms，热缓存约 30–50ms；
-- 生产版应改成懒启动 renderer service/pool，空闲退出；
-- 没有内存上限/子进程隔离策略的正式实现。
+- 已改为两个懒启动 qjs worker（MathJax / Mermaid），进程数上限 2；
+- 30 blocks：总 PSS 约 44.8MB，冷启动约 200–230ms；
+- 400 blocks：总 PSS 约 55.7MB，冷启动约 1.5–1.7s；
+- 空闲 60s 自动退出（测试可缩短到 2s）；
+- worker 有内存/CPU rlimit、请求超时、崩溃重启；
+- 当前是 FIFO 队列，可见区域优先尚未实现；
+- one-shot `RendererClient` 仅保留为对照/降级参考。
 
 ### 缓存与数据
 
@@ -359,7 +380,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 
 1. **代码块语法高亮**：优先做，视觉差距最大；
 2. **每条消息复制 + 代码块复制**；
-3. **renderer service**：懒启动、复用、空闲退出，替代 one-shot qjs；
+3. **renderer service 收尾**：可见区域优先、崩溃恢复测试；
 4. **SVG sanitizer hardening**：脚本/事件/外链白名单；
 5. **SQLite/Blob 缓存**；
 6. **真实 AI 输出语料 + golden 测试**；

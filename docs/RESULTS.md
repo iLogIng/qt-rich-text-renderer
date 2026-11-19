@@ -23,9 +23,9 @@
 | QuickJS-ng 运行 Mermaid v13 alpha | ✅ | `qjs --std mermaid-qjs.mjs diagram.mmd` 输出 SVG |
 | MathJax SVG → QSvgRenderer | ✅ | `svgcheck` 输出 PNG，公式正确 |
 | Mermaid SVG → QSvgRenderer | ⚠️ 需清洗 | 原始 SVG 出现黑块；归一化 CSS 变量/颜色后正常 |
-| `QTextDocument` 嵌入 SVG | ✅ | 通过 `QSvgRenderer` 栅格化 + `QTextDocument::ImageResource` |
+| `QTextDocument` 嵌入 SVG | ✅ | `SvgObjectHandler` + `QTextObjectInterface`，绘制时直接渲染 SVG |
 | 文件缓存 | ✅ | 二次渲染 30 blocks 约 30–50ms |
-| AppImage | ✅ | 75.8MB，含 Qt + qjs + MathJax + Mermaid，无 WebEngine |
+| AppImage | ✅ | 34.6MB，含 Qt + qjs + MathJax + Mermaid，无 WebEngine |
 
 ## 2. 体积
 
@@ -34,11 +34,10 @@
 | `qjs` 可执行文件 | 1.5MB |
 | MathJax QuickJS bundle | 1.8MB |
 | Mermaid QuickJS bundle (slim + flowchart/sequence/state) | 664KB |
-| Qt 应用二进制 | 3.7MB |
-| AppDir（含 Qt 依赖/插件） | 约 195MB |
-| AppImage（完整） | **约 73–76MB** |
-| AppImage（去掉 qjs/JS bundles） | 73.1MB |
-| **渲染链增量** | **约 2–3MB（AppImage）/ 4MB（AppDir）** |
+| Qt 应用二进制 | 6.7MB |
+| AppDir（含 Qt 依赖/插件） | 约 85MB |
+| AppImage（完整） | **34.6MB / 33MiB** |
+| qjs + 4 个 JS bundle | 约 5MB |
 
 对比：QtWebEngine 通常会带来 130–180MB 的额外体积。这个方案避开了它。
 
@@ -85,7 +84,27 @@
 
 修复后回归测试 `scripts/test-process-bound.sh`：30-block 场景峰值 qjs 进程数为 **30**，测试通过。
 
-这仍然只是 bug fix；one-shot 模型的无界并发问题仍在，renderer service 优化见 `TODO.md`。
+这仍然只是 bug fix；one-shot 模型的无界并发问题在当时仍在。
+
+### 3.2 Renderer service + 自定义 SVG 对象
+
+后续优化已实施：
+
+- 两个懒启动 qjs worker：MathJax / Mermaid；
+- NDJSON 协议、single-flight、generation 取消、idle 60s；
+- worker 端 `RLIMIT_AS` / `RLIMIT_CPU`；
+- 不再把每个 block 栅格化成 QImage，而是用 `QTextObjectInterface` 在绘制时直接渲染 SVG；
+- `SvgObjectHandler` 缓存少量 `QSvgRenderer`，不常驻 400 张大图。
+
+实测（PSS）：
+
+| 场景 | qjs 进程 | qjs PSS | 主进程 PSS | 总 PSS | 耗时 |
+|---|---:|---:|---:|---:|---:|
+| 30 blocks 冷 | 2 | 23.7MB | 21.1MB | **44.8MB** | 203ms |
+| 400 blocks 冷 | 2 | 29.9MB | 25.8MB | **55.7MB** | 1.6s |
+| 400 blocks 热 | 2 | 23.0MB | 25.4MB | **48.4MB** | 236ms |
+
+结论：**128MB 总应用 PSS 目标已达成**，而且 400 blocks 的 qjs 进程数稳定为 2。
 
 ## 4. MathJax 结果
 
@@ -123,15 +142,16 @@ Mermaid v13 alpha 的关键性质：
 - 中文、emoji：正常；
 - 复杂嵌套列表/脚注：未验证；
 - 需要占位符替换才能插入自定义 SVG 对象；
-- Qt 的 Markdown importer 不会自动保留占位符之外的自定义对象；本 spike 用 `QTextDocument::find(token)` + `insertImage`。
+- Qt 的 Markdown importer 不会自动保留自定义对象；本 spike 用 token + `QTextObjectInterface`。
 
 实现细节：
 
 - 先扫描 Markdown，把 `$$...$$` 和 ` ```mermaid ` 替换为唯一 token；
 - `QTextDocument::setMarkdown()` 渲染剩余 Markdown；
-- 异步渲染完成后，用 `QTextDocument::find(token)` 找到 token，**直接使用 find 返回的选区**替换成 `QTextImageFormat`；
-- 不能再次 `movePosition(..., token.size())`，否则会扩大选区并吞掉后续文本（spike 中实际踩过）。
-- 资源名使用 `locvas-render://<token>`，通过 `QTextDocument::addResource(ImageResource, ...)` 注入 QImage。
+- 异步渲染完成后，用 `QTextDocument::find(token)` 找到 token，替换为 `QChar::ObjectReplacementCharacter` + 自定义 `QTextCharFormat`；
+- 格式中保存归一化后的 SVG、宽度、高度；
+- `SvgObjectHandler` 在 `drawObject()` 时用 `QSvgRenderer` 直接绘制，只绘制可见对象；
+- 不再为每个 block 常驻 QImage；400 blocks 的主进程 PSS 从 420MB 降到约 26MB。
 
 ## 6.1 深色模式
 
@@ -177,6 +197,8 @@ key = SHA256(
 
 ## 8. AppImage
 
+> 当前 AppImage 已包含 renderer service 与 worker 脚本；代码改动后重新执行 `scripts/package-appimage.sh`。
+
 构建方式：
 
 1. `linuxdeploy` 部署 Qt 依赖到 `AppDir`；
@@ -186,9 +208,10 @@ key = SHA256(
 
 结果：
 
-- 完整 AppImage：**约 73–76MB**（不同打包运行略有差异）；
-- 去掉 qjs/JS bundles 的 base AppImage：**73.1MB**；
-- 渲染链增量：约 **2–3MB**（AppImage）/ **4MB**（AppDir）。
+- 完整 AppImage：**34.6MB / 33MiB**；
+- AppDir（未压缩）：约 85MB；
+- 渲染链（qjs + 4 个 JS bundle）：约 5MB；
+- 不再包含 WebEngine。
 
 运行验证：
 
@@ -210,7 +233,8 @@ QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
 - 跨消息任意拖选：未实现；
 - 每条消息复制/代码块复制：未实现；
 - SQLite/Blob 缓存：当前是文件缓存；
-- renderer service/pool：当前每个 block 一个 `qjs` 进程；
+- renderer service 的可见区域优先队列：未实现；
+- renderer worker 崩溃恢复的自动化测试：未完成；
 - QtSvg 全量语料：只测了公式、流程图、表格、中文/emoji；未测 RTL、复杂表格、SVG 滤镜、字体回退；
 - Mermaid 33 种图：只测 flowchart/sequence/state 的少量样例；
 - Mermaid v13 alpha 的升级稳定性：未验证；
@@ -221,7 +245,7 @@ QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
 ## 10. 建议
 
 1. **保留“渲染是纯函数 + 内容寻址缓存”这个架构**；
-2. 把 one-shot `qjs` 改成 **懒启动 renderer service**：启动后处理多个请求，空闲 30–60s 退出；
+2. renderer service 已实现；下一步补可见区域优先队列与崩溃恢复自动化测试；
 3. 对 Mermaid v13 alpha 做版本锁定和升级回归；
 4. 把 SVG sanitizer 做成独立、可测试的组件，覆盖 MathJax `<use>`、Mermaid CSS 变量、外部资源、脚本/事件属性；
 5. 用真实 AI 输出语料做 Markdown/公式/图表的视觉回归；

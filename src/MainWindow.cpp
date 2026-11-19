@@ -1,9 +1,11 @@
 #include "MainWindow.h"
 
 #include "MarkdownRenderer.h"
-#include "RendererClient.h"
+#include "RendererService.h"
+#include "SvgObjectHandler.h"
 #include "Theme.h"
 
+#include <QAbstractTextDocumentLayout>
 #include <QAction>
 #include <QCoreApplication>
 #include <QDir>
@@ -31,7 +33,7 @@ QString runtimeRoot()
 {
     const QString appDir = QCoreApplication::applicationDirPath();
     const QString appImageRoot = QDir(appDir).absoluteFilePath(QStringLiteral("../share/rich-text-render"));
-    if (QFileInfo::exists(appImageRoot + QStringLiteral("/renderer/dist/mathjax-qjs.mjs"))) {
+    if (QFileInfo::exists(appImageRoot + QStringLiteral("/renderer/dist/mathjax-worker.mjs"))) {
         return QDir(appImageRoot).absolutePath();
     }
     return QStringLiteral(RENDERER_ROOT);
@@ -88,6 +90,8 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_preview->setOpenExternalLinks(false);
     m_preview->setReadOnly(true);
     m_preview->document()->setDocumentMargin(12);
+    m_svgHandler = new SvgObjectHandler(this);
+    m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
 
     splitter->addWidget(m_source);
     splitter->addWidget(m_preview);
@@ -98,7 +102,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     setCentralWidget(central);
     statusBar()->showMessage(QStringLiteral("Spike: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
 
-    m_renderer = new RendererClient(this);
+    m_renderer = new RendererService(this);
     configureRenderer();
 
     connect(m_renderButton, &QPushButton::clicked, this, &MainWindow::renderNow);
@@ -114,16 +118,27 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     loadSample();
 }
 
+MainWindow::~MainWindow()
+{
+    if (m_renderer) {
+        m_renderer->shutdown();
+    }
+}
+
 void MainWindow::configureRenderer()
 {
     const QString root = runtimeRoot();
     const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
                              + QStringLiteral("/rich-text-render-spike");
+    bool idleOk = false;
+    const int idleEnv = qEnvironmentVariableIntValue("RICH_TEXT_RENDER_IDLE_MS", &idleOk);
+    const int idleMs = idleOk && idleEnv > 0 ? idleEnv : 60000;
     m_renderer->configure(qjsPath(),
-                          root + QStringLiteral("/renderer/dist/mathjax-qjs.mjs"),
-                          root + QStringLiteral("/renderer/dist/mermaid-qjs.mjs"),
+                          root + QStringLiteral("/renderer/dist/mathjax-worker.mjs"),
+                          root + QStringLiteral("/renderer/dist/mermaid-worker.mjs"),
                           cacheDir,
-                          QStringLiteral("mathjax-3.2.2;mermaid-13.0.0-alpha.3;qjs-0.18.0;sanitize-3"));
+                          QStringLiteral("mathjax-3.2.2;mermaid-13.0.0-alpha.3;qjs-0.18.0;service-v2"),
+                          idleMs);
 }
 
 void MainWindow::loadFile(const QString &path)

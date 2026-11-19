@@ -37,8 +37,7 @@ mkdir -p \
 
 cp third_party/quickjs-ng/build/qjs AppDir/usr/bin/qjs
 chmod +x AppDir/usr/bin/qjs
-cp renderer/dist/mathjax-qjs.mjs renderer/dist/mermaid-qjs.mjs \
-  AppDir/usr/share/rich-text-render/renderer/dist/
+cp renderer/dist/*.mjs AppDir/usr/share/rich-text-render/renderer/dist/
 cp samples/sample.md AppDir/usr/share/rich-text-render/samples/
 cp packaging/rich-text-render.desktop AppDir/rich-text-render.desktop
 cp packaging/rich-text-render.png AppDir/rich-text-render.png

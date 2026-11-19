@@ -25,3 +25,15 @@ await build({
   entryPoints: ['src/mermaid-qjs.mjs'],
   outfile: 'dist/mermaid-qjs.mjs',
 });
+
+await build({
+  ...common,
+  entryPoints: ['src/mathjax-worker.mjs'],
+  outfile: 'dist/mathjax-worker.mjs',
+});
+
+await build({
+  ...common,
+  entryPoints: ['src/mermaid-worker.mjs'],
+  outfile: 'dist/mermaid-worker.mjs',
+});

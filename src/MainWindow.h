@@ -7,13 +7,15 @@ class QLabel;
 class QPlainTextEdit;
 class QPushButton;
 class QTextBrowser;
-class RendererClient;
+class RendererService;
+class SvgObjectHandler;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
     explicit MainWindow(bool dark = false, QWidget *parent = nullptr);
+    ~MainWindow() override;
     void loadFile(const QString &path);
     void setDarkMode(bool dark);
 
@@ -32,7 +34,8 @@ private:
     QPushButton *m_renderButton = nullptr;
     QPushButton *m_loadButton = nullptr;
     QPushButton *m_themeButton = nullptr;
-    RendererClient *m_renderer = nullptr;
+    RendererService *m_renderer = nullptr;
+    SvgObjectHandler *m_svgHandler = nullptr;
     bool m_dark = false;
     QElapsedTimer m_renderTimer;
     int m_generation = 0;

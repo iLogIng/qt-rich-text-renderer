@@ -1,16 +1,14 @@
 #include "MarkdownRenderer.h"
 
+#include "SvgObjectHandler.h"
 #include "SvgSanitizer.h"
 
-#include <QImage>
-#include <QPainter>
 #include <QRegularExpression>
 #include <QSvgRenderer>
 #include <QTextCursor>
+#include <QTextCharFormat>
 #include <QTextDocument>
-#include <QTextImageFormat>
 #include <QUuid>
-#include <QUrl>
 
 namespace {
 
@@ -184,21 +182,6 @@ bool MarkdownRenderer::embedSvg(QTextDocument *document,
         size.setWidth(maxWidth);
     }
 
-    constexpr qreal dpr = 2.0;
-    QImage image(qRound(size.width() * dpr), qRound(size.height() * dpr),
-                 QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::transparent);
-    {
-        QPainter painter(&image);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        renderer.render(&painter, QRectF(0, 0, size.width() * dpr, size.height() * dpr));
-    }
-    image.setDevicePixelRatio(dpr);
-
-    const QUrl resourceUrl(QStringLiteral("locvas-render://") + token);
-    document->addResource(QTextDocument::ImageResource, resourceUrl, image);
-
     QTextCursor cursor = document->find(token);
     if (cursor.isNull()) {
         if (errorOut) {
@@ -210,10 +193,12 @@ bool MarkdownRenderer::embedSvg(QTextDocument *document,
         cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor, token.size());
     }
 
-    QTextImageFormat imageFormat;
-    imageFormat.setName(resourceUrl.toString());
-    imageFormat.setWidth(size.width());
-    imageFormat.setHeight(size.height());
-    cursor.insertImage(imageFormat);
+    QTextCharFormat objectFormat;
+    objectFormat.setObjectType(SvgObjectHandler::Type);
+    objectFormat.setProperty(SvgObjectHandler::SvgProperty, safeSvg);
+    objectFormat.setProperty(SvgObjectHandler::WidthProperty, size.width());
+    objectFormat.setProperty(SvgObjectHandler::HeightProperty, size.height());
+
+    cursor.insertText(QString(QChar::ObjectReplacementCharacter), objectFormat);
     return true;
 }
