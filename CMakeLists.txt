@@ -28,10 +28,13 @@ add_executable(rich-text-render
     src/LocalFileLoader.h
     src/MainWindow.cpp
     src/MainWindow.h
+    src/MarkdownDocumentBuilder.cpp
+    src/MarkdownDocumentBuilder.h
     src/MarkdownLinkHandler.cpp
     src/MarkdownLinkHandler.h
-    src/MarkdownRenderer.cpp
-    src/MarkdownRenderer.h
+    src/MarkdownPreprocessor.cpp
+    src/MarkdownPreprocessor.h
+    src/MarkdownTypes.h
     src/NavigationHistory.cpp
     src/NavigationHistory.h
     src/RendererService.cpp

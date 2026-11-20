@@ -2,8 +2,9 @@
 
 #include "CodeHighlighter.h"
 #include "LocalFileLoader.h"
+#include "MarkdownDocumentBuilder.h"
 #include "MarkdownLinkHandler.h"
-#include "MarkdownRenderer.h"
+#include "MarkdownPreprocessor.h"
 #include "RendererService.h"
 #include "SvgObjectHandler.h"
 #include "Theme.h"
@@ -375,7 +376,7 @@ void MainWindow::renderNow()
     ++m_generation;
     const int generation = m_generation;
     const QString source = m_source->toPlainText();
-    const PreparedMarkdown prepared = MarkdownRenderer::prepare(source);
+    const PreparedMarkdown prepared = MarkdownPreprocessor::prepare(source);
     const bool debug = qEnvironmentVariableIsSet("RICH_TEXT_RENDER_DEBUG");
     if (debug) {
         fprintf(stderr, "PREPARED MARKDOWN:\n%s\n", prepared.markdown.toUtf8().constData());
@@ -410,15 +411,16 @@ void MainWindow::renderNow()
                 ++m_cacheHits;
             }
             QString error;
-            const bool ok = MarkdownRenderer::embedSvg(m_preview->document(),
-                                                       block.token,
-                                                       result.svg,
-                                                       result.error,
-                                                       block.kind == RenderBlock::Kind::Mermaid,
-                                                       m_dark,
-                                                       m_preview->palette().color(QPalette::Text),
-                                                       860,
-                                                       &error);
+            const bool ok = MarkdownDocumentBuilder::embedSvg(
+                m_preview->document(),
+                block.token,
+                result.svg,
+                result.error,
+                block.kind == RenderBlock::Kind::Mermaid,
+                m_dark,
+                m_preview->palette().color(QPalette::Text),
+                860,
+                &error);
             if (!ok) {
                 qWarning() << "render failed for" << block.token << error;
             }
