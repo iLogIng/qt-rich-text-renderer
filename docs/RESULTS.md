@@ -255,7 +255,8 @@ key = SHA256(
 
 ```bash
 QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
-  --appimage-extract-and-run --screenshot /tmp/opencode/appimage.png
+  --appimage-extract-and-run --file samples/sample.md \
+  --screenshot /tmp/opencode/appimage.png
 ```
 
 输出正常。

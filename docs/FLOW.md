@@ -25,10 +25,7 @@ sequenceDiagram
     W->>S: new RendererService(this)
     W->>S: configure(qjs, math worker, mermaid worker, cacheDir, version, idleMs)
     W->>W: connect 信号槽 + Ctrl+Return
-    W->>W: updateHistoryUi()
-    W->>W: loadSample() → openLocalFile() → history.visit()
-    W->>S: cancelAll()
-    W->>W: renderNow()
+    W->>W: updateHistoryUi()（空历史）
     M->>W: show()
     opt 有 --file
         M->>W: loadFile(path) → openLocalFile()

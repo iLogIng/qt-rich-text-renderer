@@ -283,7 +283,8 @@
 - [x] 抽出独立 `LinkResolver` 和 `SvgCache`
 - [x] 建立 `rich-text-render-core`、`rich-text-render-document`、`rich-text-render-ui` 三个静态库
 - [x] 删除未参与构建的 `RendererClient`
-- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`markdown-preprocessor-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
+- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`markdown-preprocessor-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
+- [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
 - [x] 记录 KSyntaxHighlighting 的未来依赖和迁移边界；当前只使用 Qt `QSyntaxHighlighter`
 
 ## 验证命令

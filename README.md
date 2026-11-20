@@ -235,6 +235,7 @@ scripts/mem-bench.sh
 
 - `link-resolver-test`：scheme、base URL、本地路径和 canonical path；
 - `link-handler-test`：本地文件信号、标题锚点和 GitHub slug；
+- `main-window-startup-test`：空白启动、空历史和显式文件加载；
 - `markdown-preprocessor-test`：数学、Mermaid、fenced code 和货币误判；
 - `svg-cache-test`：cache key、display/theme 隔离和内容读写；
 - `svg-sanitizer-test`：CSS 变量、颜色、尺寸、脚本和事件属性清理；
@@ -293,10 +294,16 @@ cmake --build build -j"$(nproc)"
 
 - 左侧 Markdown 编辑器；
 - 右侧渲染预览；
-- `Load sample`；
+- `Load`：打开本地 Markdown 或文本文件；
 - `Render (Ctrl+Enter)`；
 - **`Dark mode` / `Light mode` 切换按钮**；
 - 右上角 `Back` / `Forward` 和本地文件历史下拉框。
+
+启动行为：
+
+- 默认不加载任何文档，编辑器和预览为空，历史也为空；
+- 使用 `Load` 或 `--file` 后才打开文件；
+- `sample.md` 保留在项目 `samples/` 目录中，但应用代码不硬编码该路径，不会自动加载，也不打包进 AppImage。
 
 链接行为：
 
@@ -334,13 +341,13 @@ cmake --build build -j"$(nproc)"
 ./build/rich-text-render --dark
 
 # 启动 1.5 秒后自动切换一次主题（用于截图/测试）
-./build/rich-text-render --toggle-theme --screenshot out/toggle.png
+./build/rich-text-render --file samples/sample.md --toggle-theme --screenshot out/toggle.png
 
 # 无头截图（8 秒后保存）
-QT_QPA_PLATFORM=offscreen ./build/rich-text-render --screenshot out/app.png
+QT_QPA_PLATFORM=offscreen ./build/rich-text-render --file samples/sample.md --screenshot out/app.png
 
 # 深色截图
-QT_QPA_PLATFORM=offscreen ./build/rich-text-render --dark --screenshot out/app-dark.png
+QT_QPA_PLATFORM=offscreen ./build/rich-text-render --file samples/sample.md --dark --screenshot out/app-dark.png
 ```
 
 ### 测试与基准
@@ -377,9 +384,8 @@ scripts/package-appimage.sh
 1. 用 `linuxdeploy --plugin qt` 把 Qt 依赖/插件部署到 `AppDir`；
 2. 复制 `qjs` 到 `AppDir/usr/bin/qjs`；
 3. 复制 `renderer/dist/*.mjs` 到 `AppDir/usr/share/rich-text-render/renderer/dist/`；
-4. 复制 sample；
-5. 写入 `AppRun`、desktop、icon；
-6. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
+4. 写入 `AppRun`、desktop、icon；
+5. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
 
 脚本默认使用：
 
@@ -409,7 +415,8 @@ dist/rich-text-render-x86_64.AppImage
 
 ```bash
 QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
-  --appimage-extract-and-run --dark --screenshot out/appimage-dark.png
+  --appimage-extract-and-run --file samples/sample.md --dark \
+  --screenshot out/appimage-dark.png
 ```
 
 ### 体积
@@ -430,7 +437,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 1. 固定 Qt、QuickJS、Node、linuxdeploy、appimagetool 版本；
 2. 在干净的 Fedora/Ubuntu 虚拟机跑 AppImage smoke test；
 3. 用真实 AI 输出语料做 Markdown/MathJax/Mermaid 回归；
-4. 校验 AppImage 内 `qjs`、JS bundles、sample 的路径；
+4. 校验 AppImage 内 `qjs` 和 JS bundles 的路径；
 5. 把 `scripts/package-appimage.sh` 拆成 CI job，产物上传到 release；
 6. 处理 `linuxdeploy` 在 Fedora `.relr.dyn` 上的 strip 报错（固定打包基础镜像或关闭 strip）。
 
