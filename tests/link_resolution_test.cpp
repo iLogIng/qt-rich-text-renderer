@@ -1,7 +1,6 @@
 #include "MarkdownLinkHandler.h"
 
 #include <QApplication>
-#include <QDir>
 #include <QFileInfo>
 #include <QScrollBar>
 #include <QTextBlock>
@@ -26,7 +25,8 @@ void expect(bool condition, const QString &message)
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
-    const QString sourceDir = QDir::currentPath() + QStringLiteral("/tests/sources/");
+    const QString sourceDir = QStringLiteral(TEST_SOURCE_DIR) + QLatin1Char('/');
+    const QString benchPath = sourceDir + QStringLiteral("bench.md");
     const QUrl base = QUrl::fromLocalFile(sourceDir);
 
     const auto relative = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("bench.md")), base);
@@ -61,9 +61,13 @@ int main(int argc, char **argv)
                          requestedPath = path;
                          requestedFragment = fragment;
                      });
-    handler.handleUrl(QUrl(QStringLiteral("bench.md#details")));
+    const QFileInfo benchInfo(benchPath);
+    expect(benchInfo.exists(), QStringLiteral("link fixture exists"));
+    if (benchInfo.exists()) {
+        handler.handleUrl(QUrl(QStringLiteral("bench.md#details")));
+    }
     expect(!requestedPath.isEmpty(), QStringLiteral("local link emits in-window request"));
-    expect(requestedPath == QFileInfo(sourceDir + QStringLiteral("bench.md")).canonicalFilePath(),
+    expect(requestedPath == benchInfo.canonicalFilePath(),
            QStringLiteral("local link request uses canonical path"));
     expect(requestedFragment == QStringLiteral("details"),
            QStringLiteral("local link request keeps fragment"));

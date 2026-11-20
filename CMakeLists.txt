@@ -56,6 +56,9 @@ add_executable(link-resolution-test
 )
 target_include_directories(link-resolution-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(link-resolution-test PRIVATE Qt6::Widgets)
+target_compile_definitions(link-resolution-test PRIVATE
+    TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/sources"
+)
 
 add_executable(navigation-history-test
     tests/navigation_history_test.cpp
