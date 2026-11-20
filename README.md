@@ -195,6 +195,13 @@ scripts/mem-bench.sh
 
 `tests/sources/link-source.md` 可用于手动验证本地文件、锚点、远程链接和危险 scheme。
 
+三个 C++ 测试也注册到了 CTest：
+
+```bash
+cmake --build build -j"$(nproc)"
+ctest --test-dir build --output-on-failure
+```
+
 ### 手动方式
 
 QuickJS-ng：

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.21)
 
 project(rich-text-render LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -75,3 +77,13 @@ add_executable(local-file-loader-test
 )
 target_include_directories(local-file-loader-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(local-file-loader-test PRIVATE Qt6::Core)
+
+if(BUILD_TESTING)
+    add_test(NAME link-resolution-test COMMAND link-resolution-test)
+    set_tests_properties(link-resolution-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    add_test(NAME navigation-history-test COMMAND navigation-history-test)
+    add_test(NAME local-file-loader-test COMMAND local-file-loader-test)
+endif()
