@@ -19,4 +19,16 @@ QT_QPA_PLATFORM=offscreen ./build/svgcheck out/test-mermaid.svg out/test-mermaid
 test -s out/test-math.png
 test -s out/test-mermaid.png
 
+if [[ -x ./build/link-resolution-test ]]; then
+  QT_QPA_PLATFORM=offscreen ./build/link-resolution-test
+fi
+
+if [[ -x ./build/navigation-history-test ]]; then
+  QT_QPA_PLATFORM=offscreen ./build/navigation-history-test
+fi
+
+if [[ -x ./build/local-file-loader-test ]]; then
+  QT_QPA_PLATFORM=offscreen ./build/local-file-loader-test
+fi
+
 echo "renderer smoke tests passed"

@@ -22,12 +22,16 @@ add_executable(rich-text-render
     src/main.cpp
     src/CodeHighlighter.cpp
     src/CodeHighlighter.h
+    src/LocalFileLoader.cpp
+    src/LocalFileLoader.h
     src/MainWindow.cpp
     src/MainWindow.h
+    src/MarkdownLinkHandler.cpp
+    src/MarkdownLinkHandler.h
     src/MarkdownRenderer.cpp
     src/MarkdownRenderer.h
-    src/RendererClient.cpp
-    src/RendererClient.h
+    src/NavigationHistory.cpp
+    src/NavigationHistory.h
     src/RendererService.cpp
     src/RendererService.h
     src/RendererWorker.cpp
@@ -44,3 +48,27 @@ target_link_libraries(rich-text-render PRIVATE Qt6::Widgets Qt6::Svg)
 target_compile_definitions(rich-text-render PRIVATE
     RENDERER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
 )
+
+add_executable(link-resolution-test
+    tests/link_resolution_test.cpp
+    src/MarkdownLinkHandler.cpp
+    src/MarkdownLinkHandler.h
+)
+target_include_directories(link-resolution-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(link-resolution-test PRIVATE Qt6::Widgets)
+
+add_executable(navigation-history-test
+    tests/navigation_history_test.cpp
+    src/NavigationHistory.cpp
+    src/NavigationHistory.h
+)
+target_include_directories(navigation-history-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(navigation-history-test PRIVATE Qt6::Core)
+
+add_executable(local-file-loader-test
+    tests/local_file_loader_test.cpp
+    src/LocalFileLoader.cpp
+    src/LocalFileLoader.h
+)
+target_include_directories(local-file-loader-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(local-file-loader-test PRIVATE Qt6::Core)

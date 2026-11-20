@@ -1,6 +1,6 @@
 # Spike Results: QuickJS + MathJax + Mermaid → SVG → QtSvg
 
-日期：2026-11-18
+日期：2026-11-18（链接与历史更新：2026-11-20）
 
 环境：
 
@@ -111,6 +111,10 @@
 
 Full Mermaid 图集比 slim 多约 18MB qjs PSS，但总应用仍有约 56MB 余量。
 
+> 早期曾为 qjs 设置 slim 40MB / full 50MB 的子目标，那是 full worker 完成前的预算。
+> 当前 full 图集约 41–46MB，30/400 blocks 总应用 62.2/72.0MB，已达到满意程度。
+> 后续保留 **总应用 PSS ≤128MB** 作为验收目标，不再严格限制 qjs 单项 PSS。
+
 ## 4. MathJax 结果
 
 MathJax SVG 的一些性质：
@@ -172,6 +176,33 @@ Mermaid v13 alpha 的关键性质：
 - Mermaid 渲染器接收 `dark`/`default` 主题参数，主题进入 cache key；
 - `SvgSanitizer` 为 Mermaid 深色主题提供深色节点、浅色文字、浅色边；
 - 已验证：浅色截图 [docs/assets/app-light.png](assets/app-light.png)，深色截图 [docs/assets/app-dark.png](assets/app-dark.png)，AppImage 深色截图 [docs/assets/appimage-dark.png](assets/appimage-dark.png)。
+
+## 6.2 本地链接
+
+Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**：
+
+- `QTextDocument::setBaseUrl()` 使用文件目录；
+- `QTextBrowser` 关闭自动打开，统一由 `MarkdownLinkHandler` 处理；
+- `#anchor` 在文档内跳转；Qt Markdown importer 不生成标题 anchor，因此额外按 GitHub 风格 slug 匹配标题；
+- 本机非二进制、非目录文件通过 `localFileRequested` 交给 `MainWindow`，在当前窗口内重新加载，**不再调用系统文本编辑器**；
+- `LocalFileLoader` 校验存在性、目录、大小（32MiB）、NUL/二进制内容，并支持 UTF-8 / UTF-16 BOM；
+- 远程链接、`mailto:` 仍需要确认；
+- `javascript:`、`data:` 等 scheme 拒绝；
+- `tests/link_resolution_test.cpp` 覆盖解析策略、本地链接信号和标题锚点滚动；
+- `tests/local_file_loader_test.cpp` 覆盖文本、二进制、目录、缺失文件和 UTF-16。
+
+## 6.3 本地文件历史
+
+新增 `NavigationHistory`：
+
+- `std::list` 双向链表，最多 64 条；
+- `visit()` 在当前节点之后插入，自动丢弃 forward 分支；
+- 超过上限时删除最旧记录；
+- `back()` / `forward()` 移动链表游标；
+- `entriesNewestFirst()` 供下拉框显示，最新在上、最远在下；
+- 下拉框只显示文件名，tooltip 显示完整路径；
+- 打开失败时回滚历史游标；
+- `tests/navigation_history_test.cpp` 覆盖 back/forward、forward 截断、选择、64 条上限和清空。
 
 ## 7. 缓存与“渲染是纯函数”
 
@@ -238,6 +269,8 @@ QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
 
 - 跨消息任意拖选：未实现；
 - 每条消息复制/代码块复制：未实现；
+- 本地历史只保存文件路径，不保存滚动位置、锚点或未保存编辑；
+- 本地链接没有 workspace allowlist；单文件上限 32MiB；
 - SQLite/Blob 缓存：当前是文件缓存；
 - renderer service 的可见区域优先队列：未实现；
 - renderer worker 崩溃恢复的自动化测试：未完成；

@@ -27,16 +27,16 @@
 
 ### 为什么是这个顺序
 
-- **先 renderer service**：当前 30 blocks 会起 30 个 qjs，先解决进程峰值，后面所有性能测试才有意义。
+- **先 renderer service**：当时 30 blocks 会起 30 个 qjs，先解决进程峰值，后面所有性能测试才有意义。
 - **再 tokenizer**：公式/图块如果被 Markdown 结构误判，后面所有渲染都不可信。
 - **再 sanitizer**：Mermaid/MathJax 输出是不可信内容，安全层必须早于产品化。
 - **再缓存**：缓存是“渲染是纯函数”的落点；没有版本失效的缓存比没有缓存更危险。
 - **再做高亮/复制**：这是“好不好用”的分水岭，但不影响渲染正确性。
 - **最后才做流式/高 DPI/跨消息选区**：这些是体验优化，应该在基础管线稳定后做。
 
-## 当前优化决策（已实施）
+## 渲染进程优化（已实施）
 
-当前 one-shot `qjs` 模型没有并发上限。实测 30 blocks 场景：
+优化前 one-shot `qjs` 模型没有并发上限。当时 30 blocks 场景：
 
 - 峰值 qjs 进程数：**34–35**（包含启动时 sample 渲染未取消的 4–5 个进程）；
 - qjs 进程组 PSS 峰值：**280.8MB**；
@@ -68,14 +68,16 @@
 | 指标 | 目标 |
 |---|---|
 | qjs worker 数 | **≤2**（1 MathJax + 1 Mermaid） |
-| qjs 渲染器进程组 PSS 峰值 | slim ≤40MB；full 图集 ≤50MB |
 | 总应用 PSS（Qt + worker） | **≤128MB** |
+| qjs 渲染器进程组 PSS | 观测值，不作为独立硬门槛 |
 | 400 个唯一 block 冷渲染 | 先测，再定；建议 ≤10s |
 | 单 block 热渲染 | MathJax <5ms；Mermaid <20ms（待实测） |
 | 空闲回收 | 60s 后退出 |
 | 队列上限 | 建议 64；可见内容优先 |
 
-> 40MB 指的是 **qjs 渲染器进程组 PSS**，不是整个应用。Full Mermaid 图集实测约 41–46MB；slim 3 图约 24–30MB。总应用目标仍是 ≤128MB。
+> 早期 slim ≤40MB / full ≤50MB 的 qjs 子目标已撤销：那是 full 图集实现前的预算。
+> 当前 full 图集约 41–46MB，30/400 blocks 总应用 62.2/72.0MB，已满足需求。
+> 后续只为 **总应用 ≤128MB** 负责，不再为压低 qjs 单项数字牺牲完整图集。
 
 ### 实施结果
 
@@ -108,6 +110,8 @@
 - [x] 用 `QSyntaxHighlighter` 实现 C++ / Python / JSON / JavaScript / Bash / LaTeX
 - [x] 代码块深/浅色主题高亮
 - [ ] 代码块背景、边框、等宽字体、行距精细调整
+- [ ] 高亮精确性：注释/字符串包含 `//`、`#`、引号时避免误着色
+- [ ] 中期评估用 KSyntaxHighlighting（KDE Frameworks 6）替换自研规则，保留现有接口
 - [ ] 代码块复制入口与高亮一起设计
 - [ ] 长代码块性能测试（1000 行以上）
 - 验收：代码块可读性接近常见 Markdown 阅读器；切换主题不破坏高亮。
@@ -135,6 +139,7 @@
 ### 4. SVG / 输入安全加固
 
 - [ ] `SvgSanitizer` 白名单：脚本、事件属性、外部链接、`foreignObject`
+- [ ] 本地链接 workspace allowlist（当前允许窗口内打开任意本机非二进制文件，单文件上限 32MiB）
 - [ ] MathJax/Mermaid 输入大小、嵌套深度、渲染时间限制
 - [ ] QuickJS 内存/栈/中断限制
 - [ ] 对恶意 SVG/TeX/Mermaid 的回归语料
@@ -178,10 +183,10 @@
 
 ### 9. Markdown 子集扩展
 
-- [ ] 用块级 tokenizer 替代逐行扫描：尊重 code span、围栏长度、引用、列表、表格
-- [ ] 占位符在嵌套结构中的稳定性测试
-- [ ] `\[...\]` 块级数学
-- [ ] `$...$` 行内数学（需避免货币误判）
+- [x] 块级 tokenizer：代码围栏、code span、`$...$`/`\[...\]` 数学
+- [x] 占位符在代码块/行内 code 中的隔离
+- [ ] blockquote / 嵌套列表中的 fence 识别
+- [ ] 占位符在表格等嵌套结构中的稳定性测试
 - [ ] 嵌套列表、脚注、任务列表
 - [ ] 明确并记录支持的 GFM 子集
 - 验收：真实 AI 输出中的常见 Markdown 不出现明显走形。
@@ -270,12 +275,20 @@
 - [x] `QTextFormat::BlockCodeLanguage` + `QSyntaxHighlighter` 代码高亮
 - [x] Mermaid full worker：常用 24 类 smoke test 通过
 - [x] `scripts/test-markdown.sh`、`scripts/test-mermaid-full.py`
+- [x] Markdown base URL + `MarkdownLinkHandler`（锚点/本地/远程/拒绝策略）
+- [x] 本地文件在窗口内导航；`LocalFileLoader` 拒绝目录/二进制/超大文件
+- [x] `NavigationHistory` 双向链表 + back/forward + 64 条上限
+- [x] 工具栏右侧历史下拉框：最新在上、显示文件名、tooltip 完整路径
+- [x] `link-resolution-test`、`navigation-history-test`、`local-file-loader-test`
 
 ## 验证命令
 
 ```bash
 scripts/test.sh
+scripts/test-markdown.sh
+scripts/test-mermaid-full.py
 scripts/test-process-bound.sh
+scripts/test-idle.sh
 scripts/bench.sh
 scripts/package-appimage.sh
 ```

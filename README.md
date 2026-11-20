@@ -7,6 +7,7 @@
 - QuickJS-ng 运行 Mermaid v13 alpha，将图渲染成 SVG；
 - `QSvgRenderer` 通过自定义 `QTextObjectInterface` 直接绘制 SVG；
 - 两个懒启动 qjs worker + 内容寻址缓存 + 异步渲染；
+- 本地文件链接在窗口内切换，带浏览器式 back/forward 历史；
 - 深色 / 浅色主题切换；
 - AppImage 打包与体积测量。
 
@@ -26,11 +27,13 @@
 - 缓存：可用，热缓存基本无感；
 - renderer service：两个 qjs worker，进程数上限 2；
 - Mermaid：full worker，常用图类型 24/24 smoke test 通过；
+- 本地链接：非二进制、非目录文件在当前窗口内打开，不再拉起系统编辑器；
+- 历史：双向链表记录最多 64 个本地文件，工具栏右侧提供 back/forward 和下拉列表；
 - 内存：30 blocks 总 PSS 约 62.2MB，400 blocks 约 72.0MB；
 - AppImage：可用，约 **35.3MB / 34MiB**，无需 WebEngine；
 - 不需要 QtWebEngine，不需要 Node 运行时。
 
-当前最大缺口是**复制/选区**、**安全清洗**和**可见区域优先队列**；代码块语法高亮已完成。
+当前最大缺口是**复制/选区**、**安全清洗**和**可见区域优先队列**；代码块语法高亮、本地链接与历史导航已完成。
 
 ## 1. 效果评估
 
@@ -63,6 +66,7 @@ flowchart LR
     Editor["Markdown editor"]
     Preview["QTextBrowser preview"]
     Theme["Theme / palette"]
+    Nav["Back / Forward<br/>history dropdown"]
   end
 
   subgraph Core["C++ core"]
@@ -71,6 +75,9 @@ flowchart LR
     San["SvgSanitizer<br/>QtSvg normalization"]
     Obj["SvgObjectHandler<br/>QTextObjectInterface"]
     Doc["QTextDocument"]
+    Link["MarkdownLinkHandler<br/>local / remote / anchor"]
+    Files["LocalFileLoader<br/>text validation"]
+    History["NavigationHistory<br/>max 64"]
   end
 
   subgraph JS["QuickJS-ng workers (lazy, max 2)"]
@@ -90,6 +97,12 @@ flowchart LR
   San --> Obj
   Obj --> Doc
   Doc --> Preview
+  Preview --> Link
+  Link -->|"local file"| Files
+  Link -->|"remote"| External["System browser / mail client"]
+  Files --> History
+  Nav --> History
+  History -->|"restore file"| Files
   Theme --> RS
   Theme --> San
 ```
@@ -139,9 +152,12 @@ cache key = SHA256(
 | Markdown 处理    | `src/MarkdownRenderer.*`              | 扫描 math/mermaid、生成 token、插入 SVG 对象         |
 | 渲染服务         | `src/RendererService.*`               | 缓存、single-flight、队列、generation 取消           |
 | Worker 进程      | `src/RendererWorker.*`                | 懒启动 qjs、NDJSON、超时、idle、内存/CPU 限制        |
+| 链接处理         | `src/MarkdownLinkHandler.*`           | base URL、标题锚点、本地/远程/邮件策略               |
+| 本地文件加载     | `src/LocalFileLoader.*`               | 存在性、目录、大小、二进制检测、UTF-8/UTF-16 解码    |
+| 本地历史         | `src/NavigationHistory.*`             | 双向链表、最多 64 条、back/forward、最新优先列表     |
 | 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
 | SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
-| 旧 one-shot 客户端 | `src/RendererClient.*`              | 保留为对照/降级参考，当前主路径不使用                 |
+| 旧 one-shot 客户端 | `src/RendererClient.*`              | 源码保留；未参与当前构建，仅作历史参考                |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
 | MathJax 核心     | `renderer/src/mathjax-core.mjs`       | `liteAdaptor` + TeX + SVG                            |
@@ -170,6 +186,14 @@ scripts/test-idle.sh
 scripts/bench.sh
 scripts/mem-bench.sh
 ```
+
+`scripts/test.sh` 也会运行三个 C++ 单元测试：
+
+- `build/link-resolution-test`：base URL、锚点、远程/危险 scheme、本地链接信号；
+- `build/navigation-history-test`：back/forward、forward 截断、64 条上限；
+- `build/local-file-loader-test`：文本/二进制/目录/缺失文件/UTF-16/大小限制。
+
+`tests/sources/link-source.md` 可用于手动验证本地文件、锚点、远程链接和危险 scheme。
 
 ### 手动方式
 
@@ -215,7 +239,29 @@ cmake --build build -j"$(nproc)"
 - 右侧渲染预览；
 - `Load sample`；
 - `Render (Ctrl+Enter)`；
-- **`Dark mode` / `Light mode` 切换按钮**。
+- **`Dark mode` / `Light mode` 切换按钮**；
+- 右上角 `Back` / `Forward` 和本地文件历史下拉框。
+
+链接行为：
+
+- 相对链接以当前 Markdown 文件所在目录为 base；
+- `#anchor` 在文档内跳转；没有显式 anchor 的 Markdown 标题按 GitHub 风格 slug 匹配；
+- 本机非二进制、非目录文件直接在窗口内加载并重新渲染，不调用系统文本编辑器；
+- 目录、二进制文件、超过 32MiB 的文件会提示并保留当前文档；
+- `http/https` 和 `mailto:` 打开前必须确认；
+- `javascript:`、`data:` 等 scheme 直接拒绝。
+
+历史行为：
+
+- 使用 `std::list` 双向链表，最多保存 64 条；
+- 新导航发生在历史中间时，forward 历史被丢弃；
+- `Back` / `Forward` 按浏览器语义移动；
+- 下拉列表最新记录在上、最远记录在下；
+- 列表只显示文件名，tooltip 显示完整路径；
+- 选中历史项会直接切换文件，不新增重复记录。
+
+> 本地历史目前只保存文件路径，不保存滚动位置、锚点或编辑器未保存内容。
+> 通过链接、Back/Forward 或下拉列表切换文件时，编辑器中的未保存修改会被替换。
 
 切换主题会重新渲染当前文档，MathJax 使用新的前景色，Mermaid 使用新的主题。
 
@@ -338,6 +384,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - Qt Markdown 只覆盖常用子集；复杂嵌套列表、脚注、部分 GFM 未验证；
 - 数学分隔符支持 `\(...\)`、`$...$`、`$$...$$`、`\[...\]`；
 - 代码块已支持 C++/Python/JS/JSON/Bash/LaTeX 高亮；
+- 当前高亮器是项目内 `CodeHighlighter`（正则近似），后续可评估 KSyntaxHighlighting；
 - 代码块背景、边框、行距仍可继续打磨；
 - Mermaid 不是生产版本，固定为 `13.0.0-alpha.3`；
 - Mermaid full worker 已启用；常用图 24/24 smoke test 通过，但 alpha 版本的全部 33 种图仍需完整回归；
@@ -351,7 +398,9 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - 没有代码块复制；
 - 没有跨消息任意拖选；
 - 没有流式 token 增量渲染（当前是文档级重渲染）；
-- 取消/队列已实现，但可见区域优先尚未实现。
+- 取消/队列已实现，但可见区域优先尚未实现；
+- 本地历史只记录文件路径，不记录滚动位置或锚点；
+- 本地文件加载没有 workspace allowlist。
 
 ### 进程与性能
 
@@ -361,7 +410,11 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - 空闲 60s 自动退出（测试可缩短到 2s）；
 - worker 有内存/CPU rlimit、请求超时、崩溃重启；
 - 当前是 FIFO 队列，可见区域优先尚未实现；
-- one-shot `RendererClient` 仅保留为对照/降级参考。
+- one-shot `RendererClient` 源码保留，但未参与当前构建。
+
+> 早期预留的 qjs 进程组 PSS 子目标（slim 40MB / full 50MB）已不再作为硬性验收口径。
+> full Mermaid 当前约 41–46MB，总应用约 62–72MB，满足使用需求。
+> 后续只为“总应用 PSS ≤128MB”负责，不再为压低 qjs 单项数字牺牲完整图集。
 
 ### 缓存与数据
 
@@ -376,6 +429,8 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - 没有对 MathJax/Mermaid 输入做严格的资源/复杂度限制；
 - qjs 运行受信任的 bundle；未来若允许第三方 JS，需要沙箱；
 - 没有对 SVG 外部资源、脚本、事件属性做完整白名单；
+- 本地链接可在窗口内读取任意非二进制文件（单文件上限 32MiB），尚未做 workspace allowlist；
+- 文本/二进制判断基于 NUL、MIME 和 UTF-8 有效性，是启发式检查，不是内容审计；
 - 没有安全审计。
 
 ### 打包

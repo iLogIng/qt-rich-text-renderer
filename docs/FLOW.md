@@ -21,15 +21,18 @@ sequenceDiagram
     M->>W: 构造 MainWindow(dark)
     W->>W: applyTheme() + 注册 SvgObjectHandler
     W->>W: 创建按钮 / 编辑器 / 预览 / splitter
+    W->>W: 创建 MarkdownLinkHandler、back/forward、历史下拉框
     W->>S: new RendererService(this)
     W->>S: configure(qjs, math worker, mermaid worker, cacheDir, version, idleMs)
     W->>W: connect 信号槽 + Ctrl+Return
-    W->>W: loadSample() → renderNow()
+    W->>W: updateHistoryUi()
+    W->>W: loadSample() → openLocalFile() → history.visit()
+    W->>S: cancelAll()
+    W->>W: renderNow()
     M->>W: show()
     opt 有 --file
-        M->>W: loadFile(path)
-        W->>S: cancelAll()
-        W->>W: renderNow()
+        M->>W: loadFile(path) → openLocalFile()
+        W->>W: history.visit() + renderNow()
     end
     opt 有 --toggle-theme
         M->>W: singleShot(1500) → toggleTheme()
@@ -56,7 +59,7 @@ sequenceDiagram
     participant Q as qjs worker
     participant TD as QTextDocument
 
-    U->>MW: loadFile / Ctrl+Enter / 切主题
+    U->>MW: 本地链接 / 历史切换 / Ctrl+Enter / 切主题
     MW->>RS: cancelAll()
     MW->>MW: ++m_generation
     MW->>MR: prepare(source)
@@ -164,6 +167,54 @@ flowchart TD
 
 ---
 
+## 4.2 链接处理
+
+```mermaid
+flowchart TD
+    A["anchorClicked(QUrl)"] --> B["MarkdownLinkHandler::resolve"]
+    B --> C{"类型"}
+    C -- "#anchor" --> D["标题 slug → setTextCursor/ensureCursorVisible"]
+    C -- "http/https" --> E["确认后系统浏览器"]
+    C -- "relative/file" --> F["按 Markdown 文件目录解析"]
+    F --> G["localFileRequested(path, fragment)"]
+    G --> H["LocalFileLoader::load"]
+    H --> I{"存在 / 非目录 / 非二进制 / ≤32MiB?"}
+    I -- 否 --> J["提示错误，保留当前文档"]
+    I -- 是 --> K["MainWindow::openLocalFile"]
+    K --> L["NavigationHistory::visit"]
+    K --> M["renderNow + applyPendingAnchor"]
+    C -- "mailto" --> N["确认后邮件客户端"]
+    C -- "javascript/data/..." --> O["拒绝"]
+```
+
+`QTextDocument::setBaseUrl()` 使用当前 Markdown 文件所在目录；没有 base 的相对链接会被拒绝。
+本地文件不再调用 `QDesktopServices`，只在当前窗口内重新加载。
+
+### 4.3 本地文件历史
+
+```mermaid
+flowchart LR
+    A["openLocalFile(HistoryMode::Record)"] --> B["NavigationHistory::visit"]
+    B --> C["丢弃 forward 分支"]
+    C --> D["push_back 新 entry"]
+    D --> E["超过 64 条时 erase 最旧"]
+    E --> F["updateHistoryUi()"]
+
+    G["Back / Forward"] --> H["list iterator -- / ++"]
+    H --> I["openLocalFile(HistoryMode::Restore)"]
+    I --> F
+
+    J["下拉列表选择"] --> K["setCurrentIndexNewestFirst()"]
+    K --> I
+```
+
+- 使用 `std::list` 双向链表，最多 64 条；
+- 最新记录在链表尾部；UI 反转后最新在上；
+- 下拉框只显示文件名，tooltip 保存完整路径；
+- 打开失败时回滚历史游标，不把坏记录留在当前位置。
+
+---
+
 ## 5. 取消、generation 与 idle
 
 ```mermaid
@@ -206,7 +257,7 @@ flowchart LR
 
     subgraph WORKERS["qjs workers（懒启动，最多 2 个）"]
         Q1["qjs + mathjax-worker.mjs"]
-        Q2["qjs + mermaid-worker.mjs"]
+        Q2["qjs + mermaid-full-worker.mjs"]
     end
 
     MW --> MR

@@ -1,6 +1,8 @@
 #include "MainWindow.h"
 
 #include "CodeHighlighter.h"
+#include "LocalFileLoader.h"
+#include "MarkdownLinkHandler.h"
 #include "MarkdownRenderer.h"
 #include "RendererService.h"
 #include "SvgObjectHandler.h"
@@ -8,22 +10,25 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QAction>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPalette>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSplitter>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStyle>
 #include <QTextBrowser>
 #include <QTextDocument>
-#include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QDebug>
 #include <cstdio>
@@ -73,11 +78,37 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     updateThemeButton();
     m_status = new QLabel(QStringLiteral("Ready"), central);
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_backButton = new QToolButton(central);
+    m_backButton->setObjectName(QStringLiteral("historyBackButton"));
+    m_backButton->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    m_backButton->setToolTip(QStringLiteral("Back"));
+    m_backButton->setAutoRaise(true);
+    m_forwardButton = new QToolButton(central);
+    m_forwardButton->setObjectName(QStringLiteral("historyForwardButton"));
+    m_forwardButton->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    m_forwardButton->setToolTip(QStringLiteral("Forward"));
+    m_forwardButton->setAutoRaise(true);
+    m_historyCombo = new QComboBox(central);
+    m_historyCombo->setObjectName(QStringLiteral("historyCombo"));
+    m_historyCombo->setPlaceholderText(QStringLiteral("History"));
+    m_historyCombo->setMinimumContentsLength(18);
+    m_historyCombo->setMaximumWidth(280);
+    m_historyCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    m_historyCombo->setMaxVisibleItems(16);
+    m_historyCombo->setToolTip(QStringLiteral("Local file history (newest first, max 64)"));
+    const int toolbarHeight = m_renderButton->sizeHint().height();
+    m_backButton->setFixedHeight(toolbarHeight);
+    m_forwardButton->setFixedHeight(toolbarHeight);
+    m_historyCombo->setFixedHeight(toolbarHeight);
+
     toolbar->addWidget(m_loadButton);
     toolbar->addWidget(m_renderButton);
     toolbar->addWidget(m_themeButton);
     toolbar->addSpacing(12);
     toolbar->addWidget(m_status, 1);
+    toolbar->addWidget(m_backButton);
+    toolbar->addWidget(m_forwardButton);
+    toolbar->addWidget(m_historyCombo);
     layout->addLayout(toolbar);
 
     auto *splitter = new QSplitter(Qt::Horizontal, central);
@@ -94,6 +125,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_svgHandler = new SvgObjectHandler(this);
     m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
     m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_dark, this);
+    m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
 
     splitter->addWidget(m_source);
     splitter->addWidget(m_preview);
@@ -110,6 +142,18 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     connect(m_renderButton, &QPushButton::clicked, this, &MainWindow::renderNow);
     connect(m_loadButton, &QPushButton::clicked, this, &MainWindow::loadSample);
     connect(m_themeButton, &QPushButton::clicked, this, &MainWindow::toggleTheme);
+    connect(m_backButton, &QToolButton::clicked, this, [this]() {
+        navigateHistory(HistoryDirection::Back);
+    });
+    connect(m_forwardButton, &QToolButton::clicked, this, [this]() {
+        navigateHistory(HistoryDirection::Forward);
+    });
+    connect(m_historyCombo, QOverload<int>::of(&QComboBox::activated),
+            this, &MainWindow::selectHistoryIndex);
+    connect(m_linkHandler, &MarkdownLinkHandler::localFileRequested,
+            this, [this](const QString &path, const QString &fragment) {
+                openLocalFile(path, fragment, HistoryMode::Record);
+            });
 
     auto *renderShortcut = new QAction(this);
     renderShortcut->setShortcut(QKeySequence(QStringLiteral("Ctrl+Return")));
@@ -117,6 +161,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     connect(renderShortcut, &QAction::triggered, this, &MainWindow::renderNow);
     addAction(renderShortcut);
 
+    updateHistoryUi();
     loadSample();
 }
 
@@ -145,18 +190,134 @@ void MainWindow::configureRenderer()
 
 void MainWindow::loadFile(const QString &path)
 {
-    QFile file(path);
-    if (file.open(QIODevice::ReadOnly)) {
-        m_source->setPlainText(QString::fromUtf8(file.readAll()));
-    } else {
-        m_source->setPlainText(QStringLiteral("# File not found\n\n%1").arg(path));
-    }
-    renderNow();
+    openLocalFile(path, QString(), HistoryMode::Record);
 }
 
 void MainWindow::loadSample()
 {
     loadFile(runtimeRoot() + QStringLiteral("/samples/sample.md"));
+}
+
+bool MainWindow::openLocalFile(const QString &path,
+                               const QString &fragment,
+                               HistoryMode mode)
+{
+    const LocalFileContent loaded = LocalFileLoader::load(path);
+    if (!loaded.ok) {
+        showLoadError(path, loaded.error);
+        return false;
+    }
+
+    const QFileInfo info(loaded.path);
+    const QString displayName = info.fileName().isEmpty() ? loaded.path : info.fileName();
+
+    QString directory = info.absolutePath();
+    if (!directory.endsWith(QLatin1Char('/'))) {
+        directory += QLatin1Char('/');
+    }
+    m_baseUrl = QUrl::fromLocalFile(directory);
+    if (m_linkHandler) {
+        m_linkHandler->setBaseUrl(m_baseUrl);
+    }
+
+    m_source->setPlainText(loaded.text);
+    m_pendingAnchor = fragment;
+
+    if (mode == HistoryMode::Record) {
+        m_history.visit(loaded.path, displayName);
+    }
+
+    renderNow();
+    updateHistoryUi();
+    return true;
+}
+
+void MainWindow::updateHistoryUi()
+{
+    if (!m_historyCombo) {
+        return;
+    }
+
+    const QVector<NavigationEntry> entries = m_history.entriesNewestFirst();
+    const QSignalBlocker blocker(m_historyCombo);
+    m_historyCombo->clear();
+    for (const NavigationEntry &entry : entries) {
+        m_historyCombo->addItem(entry.displayName, entry.path);
+        m_historyCombo->setItemData(m_historyCombo->count() - 1,
+                                    entry.path,
+                                    Qt::ToolTipRole);
+    }
+    m_historyCombo->setCurrentIndex(m_history.currentIndexNewestFirst());
+    m_historyCombo->setEnabled(!entries.isEmpty());
+
+    if (m_backButton) {
+        m_backButton->setEnabled(m_history.canBack());
+    }
+    if (m_forwardButton) {
+        m_forwardButton->setEnabled(m_history.canForward());
+    }
+}
+
+void MainWindow::navigateHistory(HistoryDirection direction)
+{
+    const int previousIndex = m_history.currentIndexNewestFirst();
+    const QString path = direction == HistoryDirection::Back ? m_history.back()
+                                                              : m_history.forward();
+    if (path.isEmpty()) {
+        updateHistoryUi();
+        return;
+    }
+
+    if (!openLocalFile(path, QString(), HistoryMode::Restore)) {
+        m_history.setCurrentIndexNewestFirst(previousIndex);
+        updateHistoryUi();
+    }
+}
+
+void MainWindow::selectHistoryIndex(int index)
+{
+    const QVector<NavigationEntry> entries = m_history.entriesNewestFirst();
+    if (index < 0 || index >= entries.size()) {
+        return;
+    }
+
+    const int previousIndex = m_history.currentIndexNewestFirst();
+    if (index == previousIndex) {
+        return;
+    }
+
+    if (!m_history.setCurrentIndexNewestFirst(index)) {
+        updateHistoryUi();
+        return;
+    }
+
+    if (!openLocalFile(entries.at(index).path, QString(), HistoryMode::Restore)) {
+        m_history.setCurrentIndexNewestFirst(previousIndex);
+        updateHistoryUi();
+    }
+}
+
+void MainWindow::showLoadError(const QString &path, const QString &reason)
+{
+    const QFileInfo info(path);
+    const QString displayName = info.fileName().isEmpty() ? path : info.fileName();
+    const QString detail = QStringLiteral("%1\n\n%2").arg(displayName, reason);
+    m_status->setText(QStringLiteral("Cannot open %1: %2").arg(displayName, reason));
+    QMessageBox::warning(this,
+                         tr("Cannot open file"),
+                         tr("This file cannot be displayed in the window:\n\n%1")
+                             .arg(detail));
+}
+
+void MainWindow::applyPendingAnchor()
+{
+    if (m_pendingAnchor.isEmpty()) {
+        return;
+    }
+
+    const QString anchor = m_pendingAnchor;
+    m_pendingAnchor.clear();
+    MarkdownLinkHandler::scrollToAnchor(m_preview, anchor);
 }
 
 void MainWindow::updateThemeButton()
@@ -201,6 +362,9 @@ void MainWindow::renderNow()
     }
 
     m_preview->setMarkdown(prepared.markdown);
+    if (m_preview->document()->baseUrl() != m_baseUrl) {
+        m_preview->document()->setBaseUrl(m_baseUrl);
+    }
     if (m_codeHighlighter) {
         m_codeHighlighter->rehighlight();
     }
@@ -211,6 +375,7 @@ void MainWindow::renderNow()
 
     if (prepared.blocks.isEmpty()) {
         m_status->setText(QStringLiteral("Markdown rendered; no math/mermaid blocks found."));
+        applyPendingAnchor();
         return;
     }
 
@@ -259,6 +424,7 @@ void MainWindow::renderNow()
                             static_cast<long long>(m_renderTimer.elapsed()),
                             m_cacheHits);
                 }
+                applyPendingAnchor();
             }
         };
 
