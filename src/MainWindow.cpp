@@ -14,6 +14,7 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QHBoxLayout>
@@ -73,11 +74,12 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     layout->setSpacing(6);
 
     auto *toolbar = new QHBoxLayout;
-    m_loadButton = new QPushButton(QStringLiteral("Load sample"), central);
+    m_loadButton = new QPushButton(QStringLiteral("Load"), central);
+    m_loadButton->setToolTip(QStringLiteral("Open a local Markdown or text file"));
     m_renderButton = new QPushButton(QStringLiteral("Render (Ctrl+Enter)"), central);
     m_themeButton = new QPushButton(central);
     updateThemeButton();
-    m_status = new QLabel(QStringLiteral("Ready"), central);
+    m_status = new QLabel(QStringLiteral("No document open"), central);
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_backButton = new QToolButton(central);
     m_backButton->setObjectName(QStringLiteral("historyBackButton"));
@@ -141,7 +143,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     configureRenderer();
 
     connect(m_renderButton, &QPushButton::clicked, this, &MainWindow::renderNow);
-    connect(m_loadButton, &QPushButton::clicked, this, &MainWindow::loadSample);
+    connect(m_loadButton, &QPushButton::clicked, this, &MainWindow::chooseFile);
     connect(m_themeButton, &QPushButton::clicked, this, &MainWindow::toggleTheme);
     connect(m_backButton, &QToolButton::clicked, this, [this]() {
         navigateHistory(HistoryDirection::Back);
@@ -166,7 +168,6 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     addAction(renderShortcut);
 
     updateHistoryUi();
-    loadSample();
 }
 
 MainWindow::~MainWindow()
@@ -200,9 +201,21 @@ void MainWindow::loadFile(const QString &path)
                   LoadErrorMode::StatusOnly);
 }
 
-void MainWindow::loadSample()
+void MainWindow::chooseFile()
 {
-    loadFile(runtimeRoot() + QStringLiteral("/samples/sample.md"));
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        tr("Open file"),
+        QString(),
+        tr("Markdown files (*.md *.markdown);;Text files (*.txt);;All files (*)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    openLocalFile(path,
+                  QString(),
+                  HistoryMode::Record,
+                  LoadErrorMode::Dialog);
 }
 
 bool MainWindow::openLocalFile(const QString &path,

@@ -27,7 +27,7 @@ public:
     void setDarkMode(bool dark);
 
 private slots:
-    void loadSample();
+    void chooseFile();
     void renderNow();
     void toggleTheme();
 

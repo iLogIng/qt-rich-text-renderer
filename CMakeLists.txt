@@ -90,6 +90,11 @@ target_compile_definitions(link-handler-test PRIVATE
     TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/sources"
 )
 
+add_executable(main-window-startup-test
+    tests/main_window_startup_test.cpp
+)
+target_link_libraries(main-window-startup-test PRIVATE rich-text-render-ui)
+
 add_executable(markdown-preprocessor-test
     tests/markdown_preprocessor_test.cpp
 )
@@ -124,6 +129,11 @@ if(BUILD_TESTING)
     add_test(NAME link-resolver-test COMMAND link-resolver-test)
     add_test(NAME link-handler-test COMMAND link-handler-test)
     set_tests_properties(link-handler-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    add_test(NAME main-window-startup-test COMMAND main-window-startup-test)
+    set_tests_properties(main-window-startup-test PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 
