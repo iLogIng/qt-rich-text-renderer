@@ -1,11 +1,15 @@
 #pragma once
 
+#include "AppSettings.h"
 #include "NavigationHistory.h"
 
 #include <QElapsedTimer>
 #include <QMainWindow>
 #include <QUrl>
 
+#include <memory>
+
+class QCloseEvent;
 class QComboBox;
 class QDockWidget;
 class QLabel;
@@ -25,14 +29,21 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit MainWindow(bool dark = false, QWidget *parent = nullptr);
+    explicit MainWindow(bool dark = false,
+                        const QString &settingsPath = QString(),
+                        QWidget *parent = nullptr);
     ~MainWindow() override;
     void loadFile(const QString &path);
     void setDarkMode(bool dark);
+    bool isDarkMode() const;
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void chooseFile();
     void renderNow();
+    void showSettings();
     void toggleTheme();
 
 private:
@@ -65,7 +76,14 @@ private:
                        LoadErrorMode errorMode);
     void applyPendingAnchor();
     void scrollPreviewToBlock(int blockNumber);
+    void applySettings(const AppSettingsData &previous);
+    void applyApplicationFont(int pointSize);
+    void applySourceFont(int pointSize);
+    void updateToolbarHeights();
+    void syncViewSettingsFromUi();
 
+    std::unique_ptr<AppSettings> m_settings;
+    AppSettingsData m_settingsData;
     QPlainTextEdit *m_source = nullptr;
     QTextBrowser *m_preview = nullptr;
     QTabWidget *m_tabs = nullptr;
@@ -75,6 +93,7 @@ private:
     QPushButton *m_renderButton = nullptr;
     QPushButton *m_loadButton = nullptr;
     QPushButton *m_themeButton = nullptr;
+    QPushButton *m_settingsButton = nullptr;
     QToolButton *m_backButton = nullptr;
     QToolButton *m_forwardButton = nullptr;
     QComboBox *m_historyCombo = nullptr;

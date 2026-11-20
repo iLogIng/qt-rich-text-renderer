@@ -9,11 +9,14 @@
 #include "MarkdownSourceHighlighter.h"
 #include "OutlinePanel.h"
 #include "RendererService.h"
+#include "SettingsDialog.h"
 #include "SvgObjectHandler.h"
 #include "Theme.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QAction>
+#include <QApplication>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDir>
@@ -66,14 +69,26 @@ QString qjsPath()
 
 } // namespace
 
-MainWindow::MainWindow(bool dark, QWidget *parent)
+MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     : QMainWindow(parent)
+    , m_settings(std::make_unique<AppSettings>(
+          settingsPath.isEmpty() ? AppSettings::defaultUserPath() : settingsPath,
+          runtimeRoot() + QStringLiteral("/config/settings.ini")))
     , m_dark(dark)
 {
+    m_settingsData = m_settings->load();
+    if (!dark && m_settingsData.theme == AppSettingsData::Theme::Dark) {
+        m_dark = true;
+    }
+
+    applyApplicationFont(m_settingsData.uiFontPointSize);
     applyTheme(m_dark);
 
     setWindowTitle(QStringLiteral("rich-text-render spike"));
     resize(1280, 860);
+    if (!m_settingsData.windowGeometry.isEmpty()) {
+        restoreGeometry(m_settingsData.windowGeometry);
+    }
 
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
@@ -86,6 +101,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_renderButton = new QPushButton(QStringLiteral("Render (Ctrl+Enter)"), central);
     m_themeButton = new QPushButton(central);
     updateThemeButton();
+    m_settingsButton = new QPushButton(QStringLiteral("Settings"), central);
     m_status = new QLabel(QStringLiteral("No document open"), central);
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_backButton = new QToolButton(central);
@@ -114,6 +130,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     toolbar->addWidget(m_loadButton);
     toolbar->addWidget(m_renderButton);
     toolbar->addWidget(m_themeButton);
+    toolbar->addWidget(m_settingsButton);
     toolbar->addSpacing(12);
     toolbar->addWidget(m_status, 1);
     toolbar->addWidget(m_backButton);
@@ -129,9 +146,10 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_source->setReadOnly(true);
     m_source->setPlaceholderText(QStringLiteral("Markdown source"));
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    fixedFont.setPointSize(10);
+    fixedFont.setPointSize(m_settingsData.sourceFontPointSize);
     m_source->setFont(fixedFont);
     m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_dark, this);
+    m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
 
     m_preview = new QTextBrowser(m_tabs);
     m_preview->setObjectName(QStringLiteral("previewView"));
@@ -146,6 +164,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_tabs->addTab(m_preview, tr("Preview"));
     m_tabs->addTab(m_source, tr("Source"));
     m_tabs->setCurrentWidget(m_preview);
+    m_tabs->setTabVisible(m_tabs->indexOf(m_source), m_settingsData.sourceVisible);
     layout->addWidget(m_tabs, 1);
 
     setCentralWidget(central);
@@ -159,6 +178,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     resizeDocks({m_outlineDock}, {240}, Qt::Horizontal);
     connect(m_outlinePanel, &OutlinePanel::blockRequested,
             this, &MainWindow::scrollPreviewToBlock);
+    m_outlineDock->setVisible(m_settingsData.outlineVisible);
 
     statusBar()->showMessage(QStringLiteral("Spike: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
 
@@ -168,6 +188,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     connect(m_renderButton, &QPushButton::clicked, this, &MainWindow::renderNow);
     connect(m_loadButton, &QPushButton::clicked, this, &MainWindow::chooseFile);
     connect(m_themeButton, &QPushButton::clicked, this, &MainWindow::toggleTheme);
+    connect(m_settingsButton, &QPushButton::clicked, this, &MainWindow::showSettings);
     connect(m_backButton, &QToolButton::clicked, this, [this]() {
         navigateHistory(HistoryDirection::Back);
     });
@@ -200,6 +221,16 @@ MainWindow::~MainWindow()
     }
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (m_settings) {
+        syncViewSettingsFromUi();
+        m_settingsData.windowGeometry = saveGeometry();
+        m_settings->save(m_settingsData);
+    }
+    QMainWindow::closeEvent(event);
+}
+
 void MainWindow::configureRenderer()
 {
     const QString root = runtimeRoot();
@@ -207,13 +238,15 @@ void MainWindow::configureRenderer()
                              + QStringLiteral("/rich-text-render-spike");
     bool idleOk = false;
     const int idleEnv = qEnvironmentVariableIntValue("RICH_TEXT_RENDER_IDLE_MS", &idleOk);
-    const int idleMs = idleOk && idleEnv > 0 ? idleEnv : 60000;
+    const int idleMs = idleOk && idleEnv > 0 ? idleEnv : m_settingsData.rendererIdleTimeoutMs;
     m_renderer->configure(qjsPath(),
                           root + QStringLiteral("/renderer/dist/mathjax-worker.mjs"),
                           root + QStringLiteral("/renderer/dist/mermaid-full-worker.mjs"),
                           cacheDir,
                           QStringLiteral("mathjax-3.2.2;mermaid-13.0.0-alpha.3;qjs-0.18.0;service-v3-full"),
-                          idleMs);
+                          idleMs,
+                          m_settingsData.mathRequestTimeoutMs,
+                          m_settingsData.mermaidRequestTimeoutMs);
 }
 
 void MainWindow::loadFile(const QString &path)
@@ -229,16 +262,133 @@ void MainWindow::chooseFile()
     const QString path = QFileDialog::getOpenFileName(
         this,
         tr("Open file"),
-        QString(),
+        m_settingsData.lastDirectory,
         tr("Markdown files (*.md *.markdown);;Text files (*.txt);;All files (*)"));
     if (path.isEmpty()) {
         return;
     }
 
+    m_settingsData.lastDirectory = QFileInfo(path).absolutePath();
+    syncViewSettingsFromUi();
+    m_settings->save(m_settingsData);
+
     openLocalFile(path,
                   QString(),
                   HistoryMode::Record,
                   LoadErrorMode::Dialog);
+}
+
+void MainWindow::showSettings()
+{
+    syncViewSettingsFromUi();
+
+    AppSettingsData dialogData = m_settingsData;
+    dialogData.theme = m_dark ? AppSettingsData::Theme::Dark
+                              : AppSettingsData::Theme::Light;
+
+    SettingsDialog dialog(dialogData, m_settings->defaults(), this);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const AppSettingsData previous = m_settingsData;
+    m_settingsData = dialog.values();
+    applySettings(previous);
+    m_settings->save(m_settingsData);
+}
+
+void MainWindow::applySettings(const AppSettingsData &previous)
+{
+    const bool themeChanged =
+        (m_settingsData.theme == AppSettingsData::Theme::Dark) != m_dark;
+    const bool uiFontChanged =
+        previous.uiFontPointSize != m_settingsData.uiFontPointSize;
+    const bool sourceFontChanged =
+        previous.sourceFontPointSize != m_settingsData.sourceFontPointSize;
+    const bool sourceHighlightingChanged =
+        previous.sourceHighlighting != m_settingsData.sourceHighlighting;
+    const bool widthChanged = previous.maxSvgWidth != m_settingsData.maxSvgWidth;
+    const bool rendererChanged =
+        previous.rendererIdleTimeoutMs != m_settingsData.rendererIdleTimeoutMs
+        || previous.mathRequestTimeoutMs != m_settingsData.mathRequestTimeoutMs
+        || previous.mermaidRequestTimeoutMs != m_settingsData.mermaidRequestTimeoutMs;
+
+    if (uiFontChanged) {
+        applyApplicationFont(m_settingsData.uiFontPointSize);
+    }
+    if (sourceFontChanged) {
+        applySourceFont(m_settingsData.sourceFontPointSize);
+    }
+    if (sourceHighlightingChanged) {
+        m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
+    }
+
+    m_outlineDock->setVisible(m_settingsData.outlineVisible);
+    m_tabs->setTabVisible(m_tabs->indexOf(m_source), m_settingsData.sourceVisible);
+    if (!m_settingsData.sourceVisible && m_tabs->currentWidget() == m_source) {
+        m_tabs->setCurrentWidget(m_preview);
+    }
+
+    if (rendererChanged) {
+        configureRenderer();
+    }
+
+    if (themeChanged) {
+        setDarkMode(m_settingsData.theme == AppSettingsData::Theme::Dark);
+    } else if ((uiFontChanged || widthChanged) && !m_source->toPlainText().isEmpty()) {
+        renderNow();
+    }
+}
+
+void MainWindow::applyApplicationFont(int pointSize)
+{
+    QFont font = QApplication::font();
+    font.setPointSize(pointSize);
+    QApplication::setFont(font);
+
+    if (m_preview) {
+        m_preview->setFont(font);
+        m_preview->document()->setDefaultFont(font);
+    }
+    updateToolbarHeights();
+}
+
+void MainWindow::applySourceFont(int pointSize)
+{
+    if (!m_source) {
+        return;
+    }
+    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    font.setPointSize(pointSize);
+    m_source->setFont(font);
+}
+
+void MainWindow::updateToolbarHeights()
+{
+    if (!m_renderButton) {
+        return;
+    }
+    const int height = m_renderButton->sizeHint().height();
+    if (m_backButton) {
+        m_backButton->setFixedHeight(height);
+    }
+    if (m_forwardButton) {
+        m_forwardButton->setFixedHeight(height);
+    }
+    if (m_historyCombo) {
+        m_historyCombo->setFixedHeight(height);
+    }
+}
+
+void MainWindow::syncViewSettingsFromUi()
+{
+    if (m_outlineDock) {
+        m_settingsData.outlineVisible = m_outlineDock->isVisible();
+    }
+    if (m_tabs && m_source) {
+        m_settingsData.sourceVisible =
+            m_tabs->isTabVisible(m_tabs->indexOf(m_source));
+    }
 }
 
 bool MainWindow::openLocalFile(const QString &path,
@@ -399,7 +549,17 @@ void MainWindow::updateThemeButton()
 
 void MainWindow::toggleTheme()
 {
-    setDarkMode(!m_dark);
+    const bool dark = !m_dark;
+    setDarkMode(dark);
+    m_settingsData.theme = dark ? AppSettingsData::Theme::Dark
+                                : AppSettingsData::Theme::Light;
+    syncViewSettingsFromUi();
+    m_settings->save(m_settingsData);
+}
+
+bool MainWindow::isDarkMode() const
+{
+    return m_dark;
 }
 
 void MainWindow::setDarkMode(bool dark)
@@ -482,7 +642,7 @@ void MainWindow::renderNow()
                 block.kind == RenderBlock::Kind::Mermaid,
                 m_dark,
                 m_preview->palette().color(QPalette::Text),
-                860,
+                m_settingsData.maxSvgWidth,
                 &error);
             if (!ok) {
                 qWarning() << "render failed for" << block.token << error;

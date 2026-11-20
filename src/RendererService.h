@@ -24,7 +24,9 @@ public:
                    const QString &mermaidWorkerScript,
                    const QString &cacheDir,
                    const QString &version,
-                   int idleMs = 60000);
+                   int idleMs = 60000,
+                   int mathRequestTimeoutMs = 10000,
+                   int mermaidRequestTimeoutMs = 15000);
 
     void renderMath(const QString &tex, bool display, Callback callback);
     void renderMermaid(const QString &source, bool dark, Callback callback);

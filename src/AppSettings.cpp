@@ -216,6 +216,7 @@ void AppSettings::save(const AppSettingsData &data)
 {
     QDir().mkpath(QFileInfo(m_userPath).absolutePath());
     QSettings user(m_userPath, QSettings::IniFormat);
+    user.setValue(QStringLiteral("meta/version"), 1);
     user.setValue(QStringLiteral("appearance/theme"), themeName(data.theme));
     user.setValue(QStringLiteral("appearance/uiFontPointSize"), data.uiFontPointSize);
     user.setValue(QStringLiteral("appearance/sourceFontPointSize"), data.sourceFontPointSize);

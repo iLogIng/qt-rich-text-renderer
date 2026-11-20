@@ -59,6 +59,8 @@ add_library(rich-text-render-ui STATIC
     src/MarkdownLinkHandler.h
     src/OutlinePanel.cpp
     src/OutlinePanel.h
+    src/SettingsDialog.cpp
+    src/SettingsDialog.h
     src/Theme.cpp
     src/Theme.h
 )
@@ -108,6 +110,11 @@ add_executable(app-settings-test
 )
 target_link_libraries(app-settings-test PRIVATE rich-text-render-core)
 
+add_executable(settings-dialog-test
+    tests/settings_dialog_test.cpp
+)
+target_link_libraries(settings-dialog-test PRIVATE rich-text-render-ui)
+
 add_executable(markdown-preprocessor-test
     tests/markdown_preprocessor_test.cpp
 )
@@ -156,6 +163,11 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME app-settings-test COMMAND app-settings-test)
+    add_test(NAME settings-dialog-test COMMAND settings-dialog-test)
+    set_tests_properties(settings-dialog-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
     add_test(NAME markdown-preprocessor-test COMMAND markdown-preprocessor-test)
     add_test(NAME markdown-outline-test COMMAND markdown-outline-test)
     set_tests_properties(markdown-outline-test PROPERTIES

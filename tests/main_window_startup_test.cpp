@@ -2,8 +2,10 @@
 
 #include <QApplication>
 #include <QComboBox>
+#include <QDockWidget>
 #include <QFile>
 #include <QPlainTextEdit>
+#include <QSettings>
 #include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTextStream>
@@ -28,7 +30,14 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
 
-    MainWindow window;
+    QTemporaryDir directory;
+    expect(directory.isValid(), QStringLiteral("temporary directory available"));
+    if (!directory.isValid()) {
+        return 1;
+    }
+
+    const QString settingsPath = directory.filePath(QStringLiteral("settings.ini"));
+    MainWindow window(false, settingsPath);
     auto *source = window.findChild<QPlainTextEdit *>();
     auto *history = window.findChild<QComboBox *>(QStringLiteral("historyCombo"));
     auto *back = window.findChild<QToolButton *>(QStringLiteral("historyBackButton"));
@@ -48,12 +57,6 @@ int main(int argc, char **argv)
     expect(!back->isEnabled(), QStringLiteral("startup Back is disabled"));
     expect(!forward->isEnabled(), QStringLiteral("startup Forward is disabled"));
 
-    QTemporaryDir directory;
-    expect(directory.isValid(), QStringLiteral("temporary directory available"));
-    if (!directory.isValid()) {
-        return 1;
-    }
-
     const QString path = directory.filePath(QStringLiteral("startup.md"));
     QFile file(path);
     expect(file.open(QIODevice::WriteOnly), QStringLiteral("write startup fixture"));
@@ -72,6 +75,33 @@ int main(int argc, char **argv)
     if (outline->topLevelItemCount() == 1) {
         expect(outline->topLevelItem(0)->text(0) == QStringLiteral("Startup heading"),
                QStringLiteral("outline shows the heading title"));
+    }
+
+    const QString customSettingsPath = directory.filePath(QStringLiteral("custom-settings.ini"));
+    {
+        QSettings customSettings(customSettingsPath, QSettings::IniFormat);
+        customSettings.setValue(QStringLiteral("appearance/uiFontPointSize"), 12);
+        customSettings.setValue(QStringLiteral("appearance/sourceFontPointSize"), 14);
+        customSettings.setValue(QStringLiteral("view/outlineVisible"), false);
+        customSettings.setValue(QStringLiteral("view/sourceVisible"), false);
+        customSettings.sync();
+    }
+
+    MainWindow customized(false, customSettingsPath);
+    auto *customSource = customized.findChild<QPlainTextEdit *>();
+    auto *customTabs = customized.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
+    auto *customOutline = customized.findChild<QDockWidget *>(QStringLiteral("outlineDock"));
+    expect(customSource && customTabs && customOutline,
+           QStringLiteral("customized window widgets found"));
+    if (customSource && customTabs && customOutline) {
+        expect(QApplication::font().pointSize() == 12,
+               QStringLiteral("UI font size setting is applied"));
+        expect(customSource->font().pointSize() == 14,
+               QStringLiteral("source font size setting is applied"));
+        expect(customOutline->isHidden(), QStringLiteral("outline visibility setting is applied"));
+        const int sourceIndex = customTabs->indexOf(customSource);
+        expect(sourceIndex >= 0 && !customTabs->isTabVisible(sourceIndex),
+               QStringLiteral("source visibility setting is applied"));
     }
 
     if (failures == 0) {

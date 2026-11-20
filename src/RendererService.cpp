@@ -25,12 +25,20 @@ void RendererService::configure(const QString &qjsPath,
                                 const QString &mermaidWorkerScript,
                                 const QString &cacheDir,
                                 const QString &version,
-                                int idleMs)
+                                int idleMs,
+                                int mathRequestTimeoutMs,
+                                int mermaidRequestTimeoutMs)
 {
     m_cache.configure(cacheDir, version);
 
-    m_mathWorker->configure(qjsPath, mathWorkerScript, 10000, idleMs);
-    m_mermaidWorker->configure(qjsPath, mermaidWorkerScript, 15000, idleMs);
+    m_mathWorker->configure(qjsPath,
+                            mathWorkerScript,
+                            mathRequestTimeoutMs,
+                            idleMs);
+    m_mermaidWorker->configure(qjsPath,
+                               mermaidWorkerScript,
+                               mermaidRequestTimeoutMs,
+                               idleMs);
 }
 
 void RendererService::renderMath(const QString &tex, bool display, Callback callback)

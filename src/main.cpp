@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     window.show();
     if (toggleThemeAfterStart) {
         QTimer::singleShot(1500, &window, [&window]() {
-            QMetaObject::invokeMethod(&window, "toggleTheme", Qt::DirectConnection);
+            window.setDarkMode(!window.isDarkMode());
         });
     }
     if (!screenshotPath.isEmpty()) {
