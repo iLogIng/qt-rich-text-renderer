@@ -74,13 +74,41 @@ add_executable(rich-text-render
 )
 target_link_libraries(rich-text-render PRIVATE rich-text-render-ui)
 
-add_executable(link-resolution-test
-    tests/link_resolution_test.cpp
+add_executable(link-resolver-test
+    tests/link_resolver_test.cpp
 )
-target_link_libraries(link-resolution-test PRIVATE rich-text-render-ui)
-target_compile_definitions(link-resolution-test PRIVATE
+target_link_libraries(link-resolver-test PRIVATE rich-text-render-core)
+target_compile_definitions(link-resolver-test PRIVATE
     TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/sources"
 )
+
+add_executable(link-handler-test
+    tests/link_handler_test.cpp
+)
+target_link_libraries(link-handler-test PRIVATE rich-text-render-ui)
+target_compile_definitions(link-handler-test PRIVATE
+    TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/sources"
+)
+
+add_executable(markdown-preprocessor-test
+    tests/markdown_preprocessor_test.cpp
+)
+target_link_libraries(markdown-preprocessor-test PRIVATE rich-text-render-core)
+
+add_executable(svg-cache-test
+    tests/svg_cache_test.cpp
+)
+target_link_libraries(svg-cache-test PRIVATE rich-text-render-core)
+
+add_executable(svg-sanitizer-test
+    tests/svg_sanitizer_test.cpp
+)
+target_link_libraries(svg-sanitizer-test PRIVATE rich-text-render-document)
+
+add_executable(document-rendering-test
+    tests/document_rendering_test.cpp
+)
+target_link_libraries(document-rendering-test PRIVATE rich-text-render-document)
 
 add_executable(navigation-history-test
     tests/navigation_history_test.cpp
@@ -93,8 +121,17 @@ add_executable(local-file-loader-test
 target_link_libraries(local-file-loader-test PRIVATE rich-text-render-core)
 
 if(BUILD_TESTING)
-    add_test(NAME link-resolution-test COMMAND link-resolution-test)
-    set_tests_properties(link-resolution-test PROPERTIES
+    add_test(NAME link-resolver-test COMMAND link-resolver-test)
+    add_test(NAME link-handler-test COMMAND link-handler-test)
+    set_tests_properties(link-handler-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    add_test(NAME markdown-preprocessor-test COMMAND markdown-preprocessor-test)
+    add_test(NAME svg-cache-test COMMAND svg-cache-test)
+    add_test(NAME svg-sanitizer-test COMMAND svg-sanitizer-test)
+    add_test(NAME document-rendering-test COMMAND document-rendering-test)
+    set_tests_properties(document-rendering-test PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 
