@@ -42,13 +42,23 @@ private:
         Forward,
     };
 
+    enum class LoadErrorMode {
+        StatusOnly,
+        Dialog,
+    };
+
     void configureRenderer();
     void updateThemeButton();
     void updateHistoryUi();
-    bool openLocalFile(const QString &path, const QString &fragment, HistoryMode mode);
+    bool openLocalFile(const QString &path,
+                       const QString &fragment,
+                       HistoryMode mode,
+                       LoadErrorMode errorMode);
     void navigateHistory(HistoryDirection direction);
     void selectHistoryIndex(int index);
-    void showLoadError(const QString &path, const QString &reason);
+    void showLoadError(const QString &path,
+                       const QString &reason,
+                       LoadErrorMode errorMode);
     void applyPendingAnchor();
 
     QPlainTextEdit *m_source = nullptr;

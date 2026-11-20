@@ -34,10 +34,6 @@ int main(int argc, char **argv)
             QMetaObject::invokeMethod(&window, "toggleTheme", Qt::DirectConnection);
         });
     }
-    if (!filePath.isEmpty()) {
-        window.loadFile(filePath);
-    }
-
     if (!screenshotPath.isEmpty()) {
         QTimer::singleShot(8000, &window, [&window, screenshotPath, &app]() {
             const bool ok = window.grab().save(screenshotPath);
@@ -45,6 +41,10 @@ int main(int argc, char **argv)
                                 << screenshotPath << "\n";
             app.quit();
         });
+    }
+
+    if (!filePath.isEmpty()) {
+        window.loadFile(filePath);
     }
 
     return app.exec();

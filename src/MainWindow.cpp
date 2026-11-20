@@ -152,7 +152,10 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
             this, &MainWindow::selectHistoryIndex);
     connect(m_linkHandler, &MarkdownLinkHandler::localFileRequested,
             this, [this](const QString &path, const QString &fragment) {
-                openLocalFile(path, fragment, HistoryMode::Record);
+                openLocalFile(path,
+                              fragment,
+                              HistoryMode::Record,
+                              LoadErrorMode::Dialog);
             });
 
     auto *renderShortcut = new QAction(this);
@@ -190,7 +193,10 @@ void MainWindow::configureRenderer()
 
 void MainWindow::loadFile(const QString &path)
 {
-    openLocalFile(path, QString(), HistoryMode::Record);
+    openLocalFile(path,
+                  QString(),
+                  HistoryMode::Record,
+                  LoadErrorMode::StatusOnly);
 }
 
 void MainWindow::loadSample()
@@ -200,11 +206,12 @@ void MainWindow::loadSample()
 
 bool MainWindow::openLocalFile(const QString &path,
                                const QString &fragment,
-                               HistoryMode mode)
+                               HistoryMode mode,
+                               LoadErrorMode errorMode)
 {
     const LocalFileContent loaded = LocalFileLoader::load(path);
     if (!loaded.ok) {
-        showLoadError(path, loaded.error);
+        showLoadError(path, loaded.error, errorMode);
         return false;
     }
 
@@ -268,7 +275,10 @@ void MainWindow::navigateHistory(HistoryDirection direction)
         return;
     }
 
-    if (!openLocalFile(path, QString(), HistoryMode::Restore)) {
+    if (!openLocalFile(path,
+                       QString(),
+                       HistoryMode::Restore,
+                       LoadErrorMode::Dialog)) {
         m_history.setCurrentIndexNewestFirst(previousIndex);
         updateHistoryUi();
     }
@@ -291,18 +301,28 @@ void MainWindow::selectHistoryIndex(int index)
         return;
     }
 
-    if (!openLocalFile(entries.at(index).path, QString(), HistoryMode::Restore)) {
+    if (!openLocalFile(entries.at(index).path,
+                       QString(),
+                       HistoryMode::Restore,
+                       LoadErrorMode::Dialog)) {
         m_history.setCurrentIndexNewestFirst(previousIndex);
         updateHistoryUi();
     }
 }
 
-void MainWindow::showLoadError(const QString &path, const QString &reason)
+void MainWindow::showLoadError(const QString &path,
+                               const QString &reason,
+                               LoadErrorMode errorMode)
 {
     const QFileInfo info(path);
     const QString displayName = info.fileName().isEmpty() ? path : info.fileName();
     const QString detail = QStringLiteral("%1\n\n%2").arg(displayName, reason);
     m_status->setText(QStringLiteral("Cannot open %1: %2").arg(displayName, reason));
+
+    if (errorMode == LoadErrorMode::StatusOnly) {
+        return;
+    }
+
     QMessageBox::warning(this,
                          tr("Cannot open file"),
                          tr("This file cannot be displayed in the window:\n\n%1")
