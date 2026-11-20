@@ -473,20 +473,20 @@ scripts/package-appimage.sh
 5. 写入 `AppRun`、desktop、icon；
 6. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
 
-脚本默认使用：
+脚本默认从 `PATH` 查找：
 
-```text
-/tmp/opencode/linuxdeploy-x86_64.AppImage
-/tmp/opencode/appimagetool-x86_64.AppImage
-```
+- `linuxdeploy`：从 <https://github.com/linuxdeploy/linuxdeploy/releases> 获取 AppImage；
+- `appimagetool`：从 <https://github.com/AppImage/appimagetool/releases> 获取 AppImage。
 
-也可以通过环境变量覆盖：
+下载后赋予可执行权限并放入 `PATH`，或者直接指定程序路径：
 
 ```bash
 LINUXDEPLOY=/path/to/linuxdeploy \
 APPIMAGETOOL=/path/to/appimagetool \
 scripts/package-appimage.sh
 ```
+
+脚本使用 AppImage 的 `--appimage-extract-and-run` 参数，因此不需要系统安装 FUSE。
 
 ### 当前产物
 
