@@ -11,16 +11,25 @@ MAX_TOTAL_MB="${MAX_TOTAL_MB:-128}"
 MAX_WORKERS="${MAX_WORKERS:-2}"
 
 CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-CONFIG="/tmp/opencode/rtr-mem-config"
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-mem.XXXXXX")"
+CONFIG="$RUN_DIR/config"
+LOG="$RUN_DIR/mem-${LABEL}.log"
+
+cleanup() {
+  if [[ -n "${app_pid:-}" ]]; then
+    kill "$app_pid" 2>/dev/null || true
+  fi
+  rm -rf "$RUN_DIR"
+}
+trap cleanup EXIT
+
 if [[ "$WARM" != "1" ]]; then
   rm -rf "$CACHE"
 fi
-rm -rf "$CONFIG"
-mkdir -p /tmp/opencode
 
 XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
-  --file "$FILE" --screenshot "/tmp/opencode/mem-${LABEL}.png" \
-  >"/tmp/opencode/mem-${LABEL}.log" 2>&1 &
+  --file "$FILE" --screenshot "$RUN_DIR/mem-${LABEL}.png" \
+  >"$LOG" 2>&1 &
 app_pid=$!
 
 python3 - "$app_pid" "$MAX_TOTAL_MB" "$MAX_WORKERS" <<'PY'
@@ -96,4 +105,4 @@ print('PASS: worker count and total PSS within bounds')
 PY
 
 wait "$app_pid" 2>/dev/null || true
-grep -E '^SUMMARY' "/tmp/opencode/mem-${LABEL}.log" || true
+grep -E '^SUMMARY' "$LOG" || true

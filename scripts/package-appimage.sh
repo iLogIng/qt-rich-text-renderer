@@ -4,15 +4,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-LINUXDEPLOY="${LINUXDEPLOY:-/tmp/opencode/linuxdeploy-x86_64.AppImage}"
-APPIMAGETOOL="${APPIMAGETOOL:-/tmp/opencode/appimagetool-x86_64.AppImage}"
+LINUXDEPLOY="${LINUXDEPLOY:-linuxdeploy}"
+APPIMAGETOOL="${APPIMAGETOOL:-appimagetool}"
 
-if [[ ! -x "$LINUXDEPLOY" ]]; then
+if ! command -v "$LINUXDEPLOY" >/dev/null 2>&1; then
   echo "linuxdeploy not found: $LINUXDEPLOY" >&2
+  echo "Download the AppImage from https://github.com/linuxdeploy/linuxdeploy/releases" >&2
+  echo "or set LINUXDEPLOY=/path/to/linuxdeploy" >&2
   exit 1
 fi
-if [[ ! -x "$APPIMAGETOOL" ]]; then
+if ! command -v "$APPIMAGETOOL" >/dev/null 2>&1; then
   echo "appimagetool not found: $APPIMAGETOOL" >&2
+  echo "Download the AppImage from https://github.com/AppImage/appimagetool/releases" >&2
+  echo "or set APPIMAGETOOL=/path/to/appimagetool" >&2
   exit 1
 fi
 

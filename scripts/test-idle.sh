@@ -5,13 +5,23 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-CONFIG="/tmp/opencode/rtr-idle-config"
-rm -rf "$CACHE" "$CONFIG"
-mkdir -p /tmp/opencode
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-idle.XXXXXX")"
+CONFIG="$RUN_DIR/config"
+LOG="$RUN_DIR/idle.log"
+
+cleanup() {
+  if [[ -n "${app_pid:-}" ]]; then
+    kill "$app_pid" 2>/dev/null || true
+  fi
+  rm -rf "$RUN_DIR"
+}
+trap cleanup EXIT
+
+rm -rf "$CACHE"
 
 XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
-  --file tests/sources/bench.md --screenshot /tmp/opencode/idle.png \
-  >/tmp/opencode/idle.log 2>&1 &
+  --file tests/sources/bench.md --screenshot "$RUN_DIR/idle.png" \
+  >"$LOG" 2>&1 &
 app_pid=$!
 
 sleep 5

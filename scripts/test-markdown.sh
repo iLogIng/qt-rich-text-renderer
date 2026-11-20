@@ -3,13 +3,17 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-mkdir -p /tmp/opencode
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-math.XXXXXX")"
+trap 'rm -rf "$RUN_DIR"' EXIT
 
-LOG=/tmp/opencode/math-delimiters.log
+LOG="$RUN_DIR/math-delimiters.log"
 rm -rf "$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
+if ! XDG_CONFIG_HOME="$RUN_DIR/config" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
   --file tests/sources/math-delimiters.md \
-  --screenshot /tmp/opencode/math-delimiters.png >"$LOG" 2>&1
+  --screenshot "$RUN_DIR/math-delimiters.png" >"$LOG" 2>&1; then
+  cat "$LOG" >&2
+  exit 1
+fi
 
 summary=$(grep -E '^SUMMARY ' "$LOG" | tail -1 || true)
 echo "$summary"

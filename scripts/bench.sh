@@ -5,8 +5,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-CONFIG="/tmp/opencode/rtr-bench-config"
-rm -rf "$CACHE" "$CONFIG"
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-bench.XXXXXX")"
+CONFIG="$RUN_DIR/config"
+trap 'rm -rf "$RUN_DIR"' EXIT
+rm -rf "$CACHE"
 mkdir -p out
 
 echo "cold run:"
