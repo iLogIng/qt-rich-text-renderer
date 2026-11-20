@@ -12,28 +12,11 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(svgcheck
-    tools/svgcheck.cpp
-    src/SvgSanitizer.cpp
-    src/SvgSanitizer.h
-)
-target_include_directories(svgcheck PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(svgcheck PRIVATE Qt6::Widgets Qt6::Svg)
-
-add_executable(rich-text-render
-    src/main.cpp
-    src/CodeHighlighter.cpp
-    src/CodeHighlighter.h
+add_library(rich-text-render-core STATIC
     src/LinkResolver.cpp
     src/LinkResolver.h
     src/LocalFileLoader.cpp
     src/LocalFileLoader.h
-    src/MainWindow.cpp
-    src/MainWindow.h
-    src/MarkdownDocumentBuilder.cpp
-    src/MarkdownDocumentBuilder.h
-    src/MarkdownLinkHandler.cpp
-    src/MarkdownLinkHandler.h
     src/MarkdownPreprocessor.cpp
     src/MarkdownPreprocessor.h
     src/MarkdownTypes.h
@@ -46,46 +29,68 @@ add_executable(rich-text-render
     src/RenderTypes.h
     src/SvgCache.cpp
     src/SvgCache.h
+)
+target_include_directories(rich-text-render-core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(rich-text-render-core PUBLIC Qt6::Core)
+
+add_library(rich-text-render-document STATIC
+    src/CodeHighlighter.cpp
+    src/CodeHighlighter.h
+    src/MarkdownDocumentBuilder.cpp
+    src/MarkdownDocumentBuilder.h
     src/SvgObjectHandler.cpp
     src/SvgObjectHandler.h
     src/SvgSanitizer.cpp
     src/SvgSanitizer.h
+)
+target_include_directories(rich-text-render-document PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(rich-text-render-document PUBLIC Qt6::Gui Qt6::Svg)
+
+add_library(rich-text-render-ui STATIC
+    src/MainWindow.cpp
+    src/MainWindow.h
+    src/MarkdownLinkHandler.cpp
+    src/MarkdownLinkHandler.h
     src/Theme.cpp
     src/Theme.h
 )
-target_link_libraries(rich-text-render PRIVATE Qt6::Widgets Qt6::Svg)
-target_compile_definitions(rich-text-render PRIVATE
+target_include_directories(rich-text-render-ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(rich-text-render-ui PUBLIC
+    rich-text-render-core
+    rich-text-render-document
+    Qt6::Widgets
+)
+target_compile_definitions(rich-text-render-ui PRIVATE
     RENDERER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+add_executable(svgcheck
+    tools/svgcheck.cpp
+)
+target_link_libraries(svgcheck PRIVATE rich-text-render-document)
+
+add_executable(rich-text-render
+    src/main.cpp
+)
+target_link_libraries(rich-text-render PRIVATE rich-text-render-ui)
+
 add_executable(link-resolution-test
     tests/link_resolution_test.cpp
-    src/LinkResolver.cpp
-    src/LinkResolver.h
-    src/MarkdownLinkHandler.cpp
-    src/MarkdownLinkHandler.h
 )
-target_include_directories(link-resolution-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(link-resolution-test PRIVATE Qt6::Widgets)
+target_link_libraries(link-resolution-test PRIVATE rich-text-render-ui)
 target_compile_definitions(link-resolution-test PRIVATE
     TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/sources"
 )
 
 add_executable(navigation-history-test
     tests/navigation_history_test.cpp
-    src/NavigationHistory.cpp
-    src/NavigationHistory.h
 )
-target_include_directories(navigation-history-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(navigation-history-test PRIVATE Qt6::Core)
+target_link_libraries(navigation-history-test PRIVATE rich-text-render-core)
 
 add_executable(local-file-loader-test
     tests/local_file_loader_test.cpp
-    src/LocalFileLoader.cpp
-    src/LocalFileLoader.h
 )
-target_include_directories(local-file-loader-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(local-file-loader-test PRIVATE Qt6::Core)
+target_link_libraries(local-file-loader-test PRIVATE rich-text-render-core)
 
 if(BUILD_TESTING)
     add_test(NAME link-resolution-test COMMAND link-resolution-test)
