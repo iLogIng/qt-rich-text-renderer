@@ -55,6 +55,8 @@ add_library(rich-text-render-ui STATIC
     src/MainWindow.h
     src/MarkdownLinkHandler.cpp
     src/MarkdownLinkHandler.h
+    src/OutlinePanel.cpp
+    src/OutlinePanel.h
     src/Theme.cpp
     src/Theme.h
 )

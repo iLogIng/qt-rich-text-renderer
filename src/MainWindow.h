@@ -7,6 +7,7 @@
 #include <QUrl>
 
 class QComboBox;
+class QDockWidget;
 class QLabel;
 class QPlainTextEdit;
 class QPushButton;
@@ -16,6 +17,7 @@ class QToolButton;
 class CodeHighlighter;
 class MarkdownLinkHandler;
 class MarkdownSourceHighlighter;
+class OutlinePanel;
 class RendererService;
 class SvgObjectHandler;
 
@@ -62,10 +64,13 @@ private:
                        const QString &reason,
                        LoadErrorMode errorMode);
     void applyPendingAnchor();
+    void scrollPreviewToBlock(int blockNumber);
 
     QPlainTextEdit *m_source = nullptr;
     QTextBrowser *m_preview = nullptr;
     QTabWidget *m_tabs = nullptr;
+    QDockWidget *m_outlineDock = nullptr;
+    OutlinePanel *m_outlinePanel = nullptr;
     QLabel *m_status = nullptr;
     QPushButton *m_renderButton = nullptr;
     QPushButton *m_loadButton = nullptr;

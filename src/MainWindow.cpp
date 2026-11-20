@@ -4,8 +4,10 @@
 #include "LocalFileLoader.h"
 #include "MarkdownDocumentBuilder.h"
 #include "MarkdownLinkHandler.h"
+#include "MarkdownOutline.h"
 #include "MarkdownPreprocessor.h"
 #include "MarkdownSourceHighlighter.h"
+#include "OutlinePanel.h"
 #include "RendererService.h"
 #include "SvgObjectHandler.h"
 #include "Theme.h"
@@ -15,10 +17,12 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDir>
+#include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QHBoxLayout>
+#include <QHash>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPalette>
@@ -29,7 +33,9 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QTabWidget>
+#include <QTextBlock>
 #include <QTextBrowser>
+#include <QTextCursor>
 #include <QTextDocument>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -143,6 +149,17 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     layout->addWidget(m_tabs, 1);
 
     setCentralWidget(central);
+
+    m_outlinePanel = new OutlinePanel(this);
+    m_outlineDock = new QDockWidget(tr("Outline"), this);
+    m_outlineDock->setObjectName(QStringLiteral("outlineDock"));
+    m_outlineDock->setWidget(m_outlinePanel);
+    m_outlineDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    addDockWidget(Qt::LeftDockWidgetArea, m_outlineDock);
+    resizeDocks({m_outlineDock}, {240}, Qt::Horizontal);
+    connect(m_outlinePanel, &OutlinePanel::blockRequested,
+            this, &MainWindow::scrollPreviewToBlock);
+
     statusBar()->showMessage(QStringLiteral("Spike: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
 
     m_renderer = new RendererService(this);
@@ -360,6 +377,19 @@ void MainWindow::applyPendingAnchor()
     MarkdownLinkHandler::scrollToAnchor(m_preview, anchor);
 }
 
+void MainWindow::scrollPreviewToBlock(int blockNumber)
+{
+    const QTextBlock block = m_preview->document()->findBlockByNumber(blockNumber);
+    if (!block.isValid()) {
+        return;
+    }
+
+    m_tabs->setCurrentWidget(m_preview);
+    QTextCursor cursor(block);
+    m_preview->setTextCursor(cursor);
+    m_preview->ensureCursorVisible();
+}
+
 void MainWindow::updateThemeButton()
 {
     if (m_themeButton) {
@@ -411,6 +441,17 @@ void MainWindow::renderNow()
     if (m_codeHighlighter) {
         m_codeHighlighter->rehighlight();
     }
+
+    QHash<QString, QString> tokenLabels;
+    for (const RenderBlock &block : prepared.blocks) {
+        tokenLabels.insert(block.token,
+                           block.kind == RenderBlock::Kind::Math
+                               ? block.source
+                               : QStringLiteral("Mermaid"));
+    }
+    m_outlinePanel->setEntries(
+        MarkdownOutline::fromDocument(*m_preview->document(), tokenLabels));
+
     m_blockCount = prepared.blocks.size();
     m_pending = m_blockCount;
     m_cacheHits = 0;
