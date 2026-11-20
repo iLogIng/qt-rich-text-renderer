@@ -240,7 +240,26 @@ flowchart TD
 - 模板只读，用户覆盖写入 `QSettings`；
 - `--dark` 只覆盖当前会话；
 - Source 只读，Markdown 高亮在 Source 文档上运行；
-- 目录条目保存 blockNumber，不依靠生成 anchor。
+- 目录条目保存 blockNumber，不依靠生成 anchor；
+- Outline dock 固定左侧，`Outline` 开关只负责隐藏/显示，不允许浮动或取下。
+
+### 4.5 图片与 SVG 预览
+
+```mermaid
+flowchart TD
+    A["Preview 点击"] --> B{"点击格式"}
+    B -- "Markdown image" --> C["解析 document base URL"]
+    C --> D["MediaPreviewWindow::showImageFile"]
+    B -- "SvgObjectHandler object" --> E["读取 SvgProperty"]
+    E --> F["MediaPreviewWindow::showSvg"]
+    G["本地图片链接 / Load 图片"] --> H["openLocalFile 图片预检"]
+    H --> D
+```
+
+- 图片点击优先于图片外层的链接；
+- 图片和 SVG 使用独立的非模态预览窗口；
+- 预览窗口按屏幕可用区域缩放；
+- 远程图片不下载。
 
 ---
 

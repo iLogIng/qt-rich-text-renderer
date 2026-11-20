@@ -177,6 +177,8 @@ cache key = SHA256(
 | 本地历史         | `src/NavigationHistory.*`             | 双向链表、最多 64 条、back/forward、最新优先列表     |
 | 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
 | 目录面板         | `src/OutlinePanel.*`                  | 左侧标题树、层级组织和 block 跳转信号                |
+| Preview 点击     | `src/PreviewBrowser.*`                | 识别图片与渲染 SVG 点击，发出预览请求                |
+| 媒体预览窗口     | `src/MediaPreviewWindow.*`            | 本地图片与 SVG 的独立预览窗口                        |
 | SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
@@ -198,7 +200,7 @@ cache key = SHA256(
 |---|---|---|
 | `rich-text-render-core` | Markdown 预处理、应用设置、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
 | `rich-text-render-document` | 文档构建、标题目录、Source 高亮、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
-| `rich-text-render-ui` | 主窗口、目录面板、设置对话框、链接交互、主题 | 前两个库、`Qt6::Widgets` |
+| `rich-text-render-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets` |
 | `rich-text-render` | 应用入口 | `rich-text-render-ui` |
 
 依赖方向固定为：
@@ -351,6 +353,7 @@ cmake --build build -j"$(nproc)"
 
 - 左侧 `Outline` 目录 dock；
 - 中央 `Preview` / `Source` 标签页；
+- 标签栏最左侧 `Outline` 开关，用于显示或隐藏目录；
 - `Source` 为只读视图，支持 Markdown 语法高亮；
 - `Load`：打开本地 Markdown 或文本文件；
 - `Render (Ctrl+Enter)`；
@@ -369,7 +372,8 @@ cmake --build build -j"$(nproc)"
 - 从 Qt 生成的 `QTextDocument` 标题层级提取；
 - 点击条目切换到 Preview 并滚动到对应 block；
 - 标题中的数学/Mermaid token 使用可读替代文字；
-- 默认显示在左侧，可在 Settings 中隐藏。
+- 固定在主窗口左侧，只能隐藏，不能拖动、浮动或取下；
+- 标签栏左侧 `Outline` 按钮和 Settings 都可以切换显示状态。
 
 Source 行为：
 
@@ -377,11 +381,20 @@ Source 行为：
 - Markdown 语法高亮使用 Qt `QSyntaxHighlighter`；
 - 可在 Settings 中调整 Source 字号或隐藏 Source tab。
 
+媒体预览：
+
+- 点击 Markdown 内嵌图片，在新的预览窗口打开；
+- 点击本地图片链接（包括图片链接语法）打开预览窗口，不替换当前文档；
+- 点击已渲染的 MathJax/Mermaid SVG，在新的预览窗口打开；
+- 图片按屏幕可用区域缩放，SVG 以当前主题的归一化结果渲染；
+- 远程图片不下载，只提示仅支持本地图片。
+
 链接行为：
 
 - 相对链接以当前 Markdown 文件所在目录为 base；
 - `#anchor` 在文档内跳转；没有显式 anchor 的 Markdown 标题按 GitHub 风格 slug 匹配；
 - 本机非二进制、非目录文件直接在窗口内加载并重新渲染，不调用系统文本编辑器；
+- 本地图片文件走独立预览窗口，不进入文本渲染链路；
 - 文本解码支持 UTF-8（含 BOM）、带 BOM 的 UTF-16 LE/BE 和 Latin-1；无 BOM 的 UTF-16 与 UTF-32 会按二进制拒绝；
 - 目录、二进制文件、超过 32MiB 的文件会提示并保留当前文档；
 - `http/https` 和 `mailto:` 打开前必须确认；
@@ -534,6 +547,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 ### 交互
 
 - Source 只读，没有编辑、保存或外部修改同步；
+- 图片/SVG 预览不提供缩放、旋转或拖拽，远程图片不下载；
 - 没有每条消息复制；
 - 没有代码块复制；
 - 没有跨消息任意拖选；

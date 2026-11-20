@@ -285,6 +285,8 @@
 - [x] 删除未参与构建的 `RendererClient`
 - [x] Source 改为只读 tab，使用 Qt `QSyntaxHighlighter` 做 Markdown 语法高亮
 - [x] `MarkdownOutline` 从 `QTextDocument` 提取标题，左侧 Outline dock 点击跳转
+- [x] Outline dock 固定左侧，通过 `Outline` 按钮/设置隐藏或显示，不允许浮动或取下
+- [x] 点击 Markdown 图片、本地图片链接和渲染 SVG，在独立窗口预览
 - [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
 - [x] `config/settings.ini` 完整配置模板，打包进 AppImage
 - [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
@@ -311,7 +313,7 @@ scripts/package-appimage.sh
 - 代码高亮继续使用 Qt `QSyntaxHighlighter` 和 `CodeHighlighter`，不在当前阶段引入 KSyntaxHighlighting；
 - 配置系统使用只读 `config/settings.ini` 模板和 QSettings 用户覆盖，不新增其他配置框架；
 - 维护期只处理正确性 bug、安全问题、依赖升级、Qt/发行版兼容、性能回归、测试和打包；
-- 已记录但暂不实现的能力：代码块复制、跨消息选区、图片资源策略、可见区域优先队列、当前节滚动高亮、KSyntaxHighlighting 替换。
+- 已记录但暂不实现的能力：代码块复制、跨消息选区、远程图片下载、图片预览缩放、可见区域优先队列、当前节滚动高亮、KSyntaxHighlighting 替换。
 
 ## 非目标 / 不再讨论
 

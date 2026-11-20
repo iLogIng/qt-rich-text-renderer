@@ -213,7 +213,8 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - Source 高亮识别 fenced code，避免把代码中的 `#` 误判为标题；
 - `MarkdownOutline` 从 Qt Markdown 文档提取标题层级、标题文字和 block 编号；
 - 标题中的数学/Mermaid token 会替换成可读文字；
-- 点击目录条目不依赖 anchor，直接切换到 Preview 并滚动到 block。
+- 点击目录条目不依赖 anchor，直接切换到 Preview 并滚动到 block；
+- 目录 dock 固定在左侧，只能通过标签栏 `Outline` 开关或 Settings 隐藏，不能浮动或取下。
 
 配置系统：
 
@@ -232,6 +233,23 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - `settings-dialog-test`；
 - `document-rendering-test` 中的 Source 高亮和 fenced code 状态；
 - `main-window-startup-test` 中的设置应用和目录生成。
+
+## 6.5 图片与 SVG 预览
+
+`PreviewBrowser` 在普通链接处理之前识别媒体点击：
+
+- Markdown 内嵌图片：读取 `QTextImageFormat`，按文档 base URL 解析；
+- 已渲染 MathJax/Mermaid：读取 `SvgObjectHandler::SvgProperty`；
+- 本地图片链接或 Load 图片：在文本加载前识别图片并打开预览；
+- 图片外层链接不会阻止图片预览。
+
+`MediaPreviewWindow` 使用独立非模态窗口：
+
+- 本地图片通过 `QImageReader` 解码；
+- SVG 通过 `QSvgRenderer` 按屏幕尺寸和 device pixel ratio 渲染；
+- 远程图片不下载，只提示仅支持本地图片。
+
+已通过临时 UI 探针验证图片点击、SVG 点击、图片链接预览和预览窗口创建。
 
 ## 7. 缓存与“渲染是纯函数”
 
