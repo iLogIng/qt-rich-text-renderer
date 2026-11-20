@@ -1,6 +1,6 @@
 # 程序流程图
 
-> 对应代码：`src/main.cpp`、`src/MainWindow.cpp`、`src/RendererService.cpp`、`src/RendererWorker.cpp`、`src/MarkdownRenderer.cpp`、`src/SvgObjectHandler.cpp`
+> 对应代码：`src/main.cpp`、`src/MainWindow.cpp`、`src/RendererService.cpp`、`src/RendererWorker.cpp`、`src/MarkdownPreprocessor.cpp`、`src/MarkdownDocumentBuilder.cpp`、`src/SvgObjectHandler.cpp`
 >
 > 本文件只放流程图；架构与模块说明见 [README.md](../README.md)、[ADR-0001](ADR-0001-rendering-pipeline.md)。
 
@@ -53,37 +53,38 @@ sequenceDiagram
     autonumber
     participant U as 触发源
     participant MW as MainWindow
-    participant MR as MarkdownRenderer
+    participant MP as MarkdownPreprocessor
+    participant MDB as MarkdownDocumentBuilder
     participant RS as RendererService
-    participant FS as 文件缓存
+    participant SC as SvgCache
     participant Q as qjs worker
     participant TD as QTextDocument
 
     U->>MW: 本地链接 / 历史切换 / Ctrl+Enter / 切主题
     MW->>RS: cancelAll()
     MW->>MW: ++m_generation
-    MW->>MR: prepare(source)
-    MR-->>MW: markdown + blocks[]
+    MW->>MP: prepare(source)
+    MP-->>MW: markdown + blocks[]
     MW->>TD: setMarkdown(markdown)
     Note over TD: math/mermaid 已变成文本 token<br/>代码块保留并带 BlockCodeLanguage
     MW->>TD: CodeHighlighter::rehighlight()
 
     loop 每个 block
         MW->>RS: renderMath() / renderMermaid()
-        RS->>RS: cache key = SHA256(kind, version, source, options, theme)
-        RS->>FS: 查 <key>.svg
+        RS->>SC: key(kind, source, display, theme)
+        RS->>SC: read(key)
         alt 缓存命中
-            FS-->>RS: SVG
+            SC-->>RS: SVG
             RS-->>MW: callback(fromCache=true)
         else 缓存未命中
             RS->>RS: single-flight 合并相同 key
             RS->>Q: NDJSON 请求
             Q-->>RS: NDJSON 结果
-            RS->>FS: 写 <key>.svg
+            RS->>SC: write(key, svg)
             RS-->>MW: callback(svg)
         end
-        MW->>MR: embedSvg(...)
-        MR->>TD: insertText(ObjectReplacementCharacter, SvgObjectFormat)
+        MW->>MDB: embedSvg(...)
+        MDB->>TD: insertText(ObjectReplacementCharacter, SvgObjectFormat)
     end
 
     TD->>TD: 布局时调用 intrinsicSize()
@@ -98,8 +99,8 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A["RendererService::render(kind, source, options)"] --> B["cacheKey()"]
-    B --> C{"缓存文件存在?"}
+    A["RendererService::render(kind, source, options)"] --> B["SvgCache::key()"]
+    B --> C{"SvgCache::read() 命中?"}
 
     C -- 是 --> D["读取 SVG"]
     D --> E["QTimer::singleShot(0)"]
@@ -171,7 +172,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["anchorClicked(QUrl)"] --> B["MarkdownLinkHandler::resolve"]
+    A["anchorClicked(QUrl)"] --> B["LinkResolver::resolve"]
     B --> C{"类型"}
     C -- "#anchor" --> D["标题 slug → setTextCursor/ensureCursorVisible"]
     C -- "http/https" --> E["确认后系统浏览器"]
@@ -249,8 +250,10 @@ sequenceDiagram
 flowchart LR
     subgraph GUI["主进程（GUI 线程）"]
         MW["MainWindow"]
+        MP["MarkdownPreprocessor"]
+        MDB["MarkdownDocumentBuilder"]
         RS["RendererService"]
-        MR["MarkdownRenderer"]
+        SC["SvgCache"]
         OH["SvgObjectHandler"]
         TD["QTextDocument"]
     end
@@ -260,9 +263,12 @@ flowchart LR
         Q2["qjs + mermaid-full-worker.mjs"]
     end
 
-    MW --> MR
+    MW --> MP
     MW --> RS
-    MR --> TD
+    RS --> SC
+    MW --> MDB
+    MP --> MDB
+    MDB --> TD
     TD --> OH
     OH -->|"可见对象"| TD
     RS -->|"NDJSON"| Q1

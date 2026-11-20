@@ -69,13 +69,16 @@ flowchart LR
     Nav["Back / Forward<br/>history dropdown"]
   end
 
-  subgraph Core["C++ core"]
-    MD["MarkdownRenderer<br/>scan + placeholders"]
-    RS["RendererService<br/>cache + queue + single-flight"]
+  subgraph Core["C++ modules"]
+    MD["MarkdownPreprocessor<br/>scan + placeholders"]
+    MDB["MarkdownDocumentBuilder<br/>SVG object insertion"]
+    RS["RendererService<br/>queue + single-flight"]
+    Cache["SvgCache<br/>content-addressed storage"]
     San["SvgSanitizer<br/>QtSvg normalization"]
     Obj["SvgObjectHandler<br/>QTextObjectInterface"]
     Doc["QTextDocument"]
-    Link["MarkdownLinkHandler<br/>local / remote / anchor"]
+    Link["MarkdownLinkHandler<br/>user confirmation + anchors"]
+    Resolver["LinkResolver<br/>scheme + path policy"]
     Files["LocalFileLoader<br/>text validation"]
     History["NavigationHistory<br/>max 64"]
   end
@@ -88,18 +91,21 @@ flowchart LR
   Editor --> MD
   MD --> Preview
   MD --> RS
-  RS -->|"cache hit"| San
+  RS --> Cache
+  Cache --> RS
   RS -->|"cache miss"| MW
   RS -->|"cache miss"| DW
   MW --> SVGOut["SVG output"]
   DW --> SVGOut
   SVGOut --> San
-  San --> Obj
+  San --> MDB
+  MDB --> Obj
   Obj --> Doc
   Doc --> Preview
   Preview --> Link
+  Link --> Resolver
   Link -->|"local file"| Files
-  Link -->|"remote"| External["System browser / mail client"]
+  Link -->|"remote/mail"| External["System browser / mail client"]
   Files --> History
   Nav --> History
   History -->|"restore file"| Files
@@ -111,15 +117,13 @@ flowchart LR
 
 ````text
 Markdown
-  → 扫描 $$...$$ / ```mermaid
-  → 替换成唯一 token
-  → QTextDocument::setMarkdown()
-  → RendererService 检查缓存 / single-flight
-  → cache miss 进入对应 worker
-      → MathJax 或 Mermaid 输出 SVG
-      → 写入内容寻址缓存
+  → MarkdownPreprocessor 扫描 $$...$$ / ```mermaid
+  → 替换成唯一 token，返回 PreparedMarkdown
+  → MainWindow 将 prepared Markdown 交给 QTextDocument::setMarkdown()
+  → RendererService 检查 / single-flight
+  → SvgCache 命中或 worker 输出 SVG
   → SvgSanitizer 归一化
-  → token 被替换为自定义对象字符
+  → MarkdownDocumentBuilder 把 token 替换为自定义对象字符
   → SvgObjectHandler 在绘制时用 QSvgRenderer 直接画 SVG
 ````
 
@@ -149,10 +153,13 @@ cache key = SHA256(
 | ---------------- | ------------------------------------- | ---------------------------------------------------- |
 | 应用入口         | `src/main.cpp`                        | 命令行参数、主题初始值、截图模式                     |
 | 主窗口           | `src/MainWindow.*`                    | 编辑器/预览 splitter、工具栏、主题切换、异步渲染编排 |
-| Markdown 处理    | `src/MarkdownRenderer.*`              | 扫描 math/mermaid、生成 token、插入 SVG 对象         |
-| 渲染服务         | `src/RendererService.*`               | 缓存、single-flight、队列、generation 取消           |
+| Markdown 预处理  | `src/MarkdownPreprocessor.*`          | 扫描 math/mermaid、生成 token、保护 code span        |
+| 文档构建         | `src/MarkdownDocumentBuilder.*`       | 插入 SVG 对象、token 错误替换、尺寸归一化            |
+| 渲染服务         | `src/RendererService.*`               | single-flight、队列、generation 取消                 |
 | Worker 进程      | `src/RendererWorker.*`                | 懒启动 qjs、NDJSON、超时、idle、内存/CPU 限制        |
-| 链接处理         | `src/MarkdownLinkHandler.*`           | base URL、标题锚点、本地/远程/邮件策略               |
+| SVG 缓存         | `src/SvgCache.*`                      | SHA-256 key、文件读写、版本隔离                       |
+| 链接解析         | `src/LinkResolver.*`                  | scheme、base URL、本地路径和 canonical path 策略     |
+| 链接交互         | `src/MarkdownLinkHandler.*`           | 标题锚点、本地文件请求、远程/邮件确认                |
 | 本地文件加载     | `src/LocalFileLoader.*`               | 存在性、目录、大小、二进制检测、UTF-8/UTF-16 解码    |
 | 本地历史         | `src/NavigationHistory.*`             | 双向链表、最多 64 条、back/forward、最新优先列表     |
 | 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
@@ -168,6 +175,44 @@ cache key = SHA256(
 | 构建脚本         | `scripts/`                            | setup/build/test/bench/package                       |
 | 结果文档         | `docs/RESULTS.md`                     | 实测数据、限制、结论                                 |
 | 决策记录         | `docs/ADR-0001-rendering-pipeline.md` | 为什么采用这条渲染路线                               |
+
+### 库边界
+
+构建目标按依赖方向拆分：
+
+| CMake 目标 | 内容 | 依赖 |
+|---|---|---|
+| `rich-text-render-core` | Markdown 预处理、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
+| `rich-text-render-document` | 文档构建、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
+| `rich-text-render-ui` | 主窗口、链接交互、主题 | 前两个库、`Qt6::Widgets` |
+| `rich-text-render` | 应用入口 | `rich-text-render-ui` |
+
+依赖方向固定为：
+
+```text
+main -> ui -> { core, document }
+```
+
+`core` 不依赖 Widgets；`document` 不依赖主窗口。测试按被测模块链接对应库，不再重复编译应用源码。
+
+### 高亮后端与依赖边界
+
+当前代码高亮只使用 Qt 自带的 `QSyntaxHighlighter`：
+
+- 实现：`CodeHighlighter`；
+- 支持语言：C++ / Python / JavaScript / JSON / Bash / LaTeX；
+- 不引入额外语法高亮库，不改变现有语言集合。
+
+后续如果确实需要更准确的多语言高亮，再评估 KDE Frameworks 6 的 **KSyntaxHighlighting**：
+
+- Fedora 构建依赖：`kf6-syntax-highlighting-devel`；
+- Fedora 运行依赖：`kf6-syntax-highlighting`；
+- CMake：`find_package(KF6SyntaxHighlighting)`，链接 `KF6::SyntaxHighlighting`；
+- 需要适配多语言代码块的状态管理，不能直接用一个单 Definition 实例覆盖整篇文档；
+- AppImage 需要打包 `libKF6SyntaxHighlighting.so.6` 及其 Qt6Network 依赖，预计增加约 2–3MB；
+- 需要补充许可证说明并重新做主题、语言别名和视觉回归。
+
+当前不启用该后端；这条路线只作为后续维护期的可选替换项记录。
 
 ## 4. 构建
 
@@ -186,15 +231,20 @@ scripts/bench.sh
 scripts/mem-bench.sh
 ```
 
-`scripts/test.sh` 也会运行三个 C++ 单元测试：
+`scripts/test.sh` 在渲染器 smoke test 之后运行 CTest。当前模块测试包括：
 
-- `build/link-resolution-test`：base URL、锚点、远程/危险 scheme、本地链接信号；
-- `build/navigation-history-test`：back/forward、forward 截断、64 条上限；
-- `build/local-file-loader-test`：文本/二进制/目录/缺失文件/UTF-16/大小限制。
+- `link-resolver-test`：scheme、base URL、本地路径和 canonical path；
+- `link-handler-test`：本地文件信号、标题锚点和 GitHub slug；
+- `markdown-preprocessor-test`：数学、Mermaid、fenced code 和货币误判；
+- `svg-cache-test`：cache key、display/theme 隔离和内容读写；
+- `svg-sanitizer-test`：CSS 变量、颜色、尺寸、脚本和事件属性清理；
+- `document-rendering-test`：代码高亮、SVG 插入和错误替换；
+- `navigation-history-test`：back/forward、forward 截断和 64 条上限；
+- `local-file-loader-test`：文本/二进制/目录/缺失文件/UTF-16/大小限制。
 
 `tests/sources/link-source.md` 可用于手动验证本地文件、锚点、远程链接和危险 scheme。
 
-三个 C++ 测试也注册到了 CTest：
+直接运行全部 CTest：
 
 ```bash
 cmake --build build -j"$(nproc)"
@@ -391,7 +441,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - Qt Markdown 只覆盖常用子集；复杂嵌套列表、脚注、部分 GFM 未验证；
 - 数学分隔符支持 `\(...\)`、`$...$`、`$$...$$`、`\[...\]`；
 - 代码块已支持 C++/Python/JS/JSON/Bash/LaTeX 高亮；
-- 当前高亮器是项目内 `CodeHighlighter`（正则近似），后续可评估 KSyntaxHighlighting；
+- 当前高亮器是项目内 `CodeHighlighter`（正则近似），不包含 KSyntaxHighlighting；替换依赖和迁移条件见“高亮后端与依赖边界”；
 - 代码块背景、边框、行距仍可继续打磨；
 - Mermaid 不是生产版本，固定为 `13.0.0-alpha.3`；
 - Mermaid full worker 已启用；常用图 24/24 smoke test 通过，但 alpha 版本的全部 33 种图仍需完整回归；

@@ -79,7 +79,7 @@
 
 已修复：
 
-- `RendererClient` 维护 active process 集合；
+- 旧 one-shot 客户端维护 active process 集合（该客户端后来已移除）；
 - `cancelAll()` 在文件/主题/重新渲染时 kill 旧进程，并递增 generation；
 - 被取消的进程不再写缓存、不再回调。
 
@@ -169,7 +169,7 @@ Mermaid v13 alpha 的关键性质：
 
 修复方式：
 
-- `MarkdownRenderer::embedSvg` 接收 `QPalette::Text`；
+- `MarkdownDocumentBuilder::embedSvg` 接收 `QPalette::Text`；
 - `SvgSanitizer` 把 `currentColor` 替换为该前景色；
 - 新增 `--dark` 运行参数与工具栏 `Dark mode / Light mode` 切换；
 - 浅色模式改为显式 `#ffffff` 背景 + `#111111` 文字，不依赖系统 `standardPalette()`；

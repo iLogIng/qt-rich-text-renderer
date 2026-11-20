@@ -111,7 +111,7 @@
 - [x] 代码块深/浅色主题高亮
 - [ ] 代码块背景、边框、等宽字体、行距精细调整
 - [ ] 高亮精确性：注释/字符串包含 `//`、`#`、引号时避免误着色
-- [ ] 中期评估用 KSyntaxHighlighting（KDE Frameworks 6）替换自研规则，保留现有接口
+- [ ] 仅在未来需要更精确的多语言高亮时评估 KSyntaxHighlighting（KDE Frameworks 6）：Fedora 需要 `kf6-syntax-highlighting-devel` 和 `kf6-syntax-highlighting`，CMake 链接 `KF6::SyntaxHighlighting`，并适配多语言代码块状态；当前不启用
 - [ ] 代码块复制入口与高亮一起设计
 - [ ] 长代码块性能测试（1000 行以上）
 - 验收：代码块可读性接近常见 Markdown 阅读器；切换主题不破坏高亮。
@@ -279,7 +279,12 @@
 - [x] 本地文件在窗口内导航；`LocalFileLoader` 拒绝目录/二进制/超大文件
 - [x] `NavigationHistory` 双向链表 + back/forward + 64 条上限
 - [x] 工具栏右侧历史下拉框：最新在上、显示文件名、tooltip 完整路径
-- [x] `link-resolution-test`、`navigation-history-test`、`local-file-loader-test`
+- [x] 将 MarkdownRenderer 拆为 `MarkdownPreprocessor` 和 `MarkdownDocumentBuilder`
+- [x] 抽出独立 `LinkResolver` 和 `SvgCache`
+- [x] 建立 `rich-text-render-core`、`rich-text-render-document`、`rich-text-render-ui` 三个静态库
+- [x] 删除未参与构建的 `RendererClient`
+- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`markdown-preprocessor-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
+- [x] 记录 KSyntaxHighlighting 的未来依赖和迁移边界；当前只使用 Qt `QSyntaxHighlighter`
 
 ## 验证命令
 
@@ -292,6 +297,13 @@ scripts/test-idle.sh
 scripts/bench.sh
 scripts/package-appimage.sh
 ```
+
+## 当前维护边界
+
+- Markdown 功能冻结为 Qt importer 加现有预处理器支持的子集，不新增 front matter、脚注、GFM 扩展或自写 parser；
+- 代码高亮继续使用 Qt `QSyntaxHighlighter` 和 `CodeHighlighter`，不在当前阶段引入 KSyntaxHighlighting；
+- 维护期只处理正确性 bug、安全问题、依赖升级、Qt/发行版兼容、性能回归、测试和打包；
+- 已记录但暂不实现的能力：代码块复制、跨消息选区、图片资源策略、可见区域优先队列、KSyntaxHighlighting 替换。
 
 ## 非目标 / 不再讨论
 
