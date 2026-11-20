@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QScrollBar>
+#include <QTextBlock>
 #include <QTextBrowser>
 #include <QTextStream>
 #include <QUrl>
@@ -81,6 +82,47 @@ int main(int argc, char **argv)
     QCoreApplication::processEvents();
     expect(view.verticalScrollBar()->value() > 0,
            QStringLiteral("heading anchor scrolls the document"));
+
+    const QString slugMarkdown =
+        QStringLiteral("# 4.2 Links\n\nbody\n\n"
+                       "# a_b\n\nbody\n\n"
+                       "# Hello, world!\n\nbody\n\n"
+                       "# Foo\n\nbody\n\n"
+                       "# Foo\n\nbody\n\n"
+                       "# Foo-1\n\nbody\n");
+    view.setMarkdown(slugMarkdown);
+    QCoreApplication::processEvents();
+
+    const auto headingBlockNumber = [&view](const QString &text, int occurrence) {
+        int seen = 0;
+        for (QTextBlock block = view.document()->begin(); block.isValid(); block = block.next()) {
+            if (block.blockFormat().headingLevel() <= 0 || block.text() != text) {
+                continue;
+            }
+            if (seen++ == occurrence) {
+                return block.blockNumber();
+            }
+        }
+        return -1;
+    };
+
+    const auto expectHeadingAnchor = [&](const QString &fragment,
+                                         const QString &heading,
+                                         int occurrence) {
+        view.verticalScrollBar()->setValue(0);
+        MarkdownLinkHandler::scrollToAnchor(&view, fragment);
+        QCoreApplication::processEvents();
+        const int expected = headingBlockNumber(heading, occurrence);
+        expect(expected >= 0, QStringLiteral("heading fixture exists: %1").arg(heading));
+        expect(view.textCursor().block().blockNumber() == expected,
+               QStringLiteral("GitHub heading anchor resolves: #%1").arg(fragment));
+    };
+
+    expectHeadingAnchor(QStringLiteral("42-links"), QStringLiteral("4.2 Links"), 0);
+    expectHeadingAnchor(QStringLiteral("a_b"), QStringLiteral("a_b"), 0);
+    expectHeadingAnchor(QStringLiteral("hello-world"), QStringLiteral("Hello, world!"), 0);
+    expectHeadingAnchor(QStringLiteral("foo-1"), QStringLiteral("Foo"), 1);
+    expectHeadingAnchor(QStringLiteral("foo-1-1"), QStringLiteral("Foo-1"), 0);
 
     if (failures == 0) {
         QTextStream(stdout) << "link resolution tests passed\n";

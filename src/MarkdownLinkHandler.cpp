@@ -4,7 +4,6 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QMessageBox>
-#include <QRegularExpression>
 #include <QTextBlock>
 #include <QTextBrowser>
 #include <QTextCursor>
@@ -13,19 +12,53 @@
 
 namespace {
 
-QString normalizedAnchor(const QString &fragment)
+QString decodedFragment(const QString &fragment)
 {
-    static const QRegularExpression nonSlugCharacters(QStringLiteral("[^\\p{L}\\p{N}]+"));
-    static const QRegularExpression edgeHyphens(QStringLiteral("^-+|-+$"));
-
-    QString text = QUrl::fromPercentEncoding(fragment.toUtf8()).trimmed().toLower();
+    QString text = QUrl::fromPercentEncoding(fragment.toUtf8()).trimmed();
     if (text.startsWith(QLatin1Char('#'))) {
         text.remove(0, 1);
     }
-    text.replace(nonSlugCharacters, QStringLiteral("-"));
-    text.remove(edgeHyphens);
     return text;
 }
+
+QString githubHeadingSlug(const QString &heading)
+{
+    QString slug;
+    slug.reserve(heading.size());
+    for (const QChar character : heading.toLower()) {
+        if (character == QLatin1Char(' ')) {
+            slug.append(QLatin1Char('-'));
+            continue;
+        }
+        if (character == QLatin1Char('-') || character == QLatin1Char('_')
+            || character.isLetterOrNumber()
+            || character.category() == QChar::Mark_NonSpacing
+            || character.category() == QChar::Mark_SpacingCombining
+            || character.category() == QChar::Mark_Enclosing) {
+            slug.append(character);
+        }
+    }
+    return slug;
+}
+
+class HeadingSlugger {
+public:
+    QString next(const QString &heading)
+    {
+        const QString base = githubHeadingSlug(heading);
+        QString slug = base;
+        while (m_occurrences.contains(slug)) {
+            const int count = m_occurrences.value(base) + 1;
+            m_occurrences.insert(base, count);
+            slug = base + QLatin1Char('-') + QString::number(count);
+        }
+        m_occurrences.insert(slug, 0);
+        return slug;
+    }
+
+private:
+    QHash<QString, int> m_occurrences;
+};
 
 } // namespace
 
@@ -129,24 +162,20 @@ void MarkdownLinkHandler::scrollToAnchor(QTextBrowser *view, const QString &frag
         return;
     }
 
-    const QString wanted = normalizedAnchor(fragment);
+    const QString wanted = githubHeadingSlug(decodedFragment(fragment));
     if (wanted.isEmpty()) {
         return;
     }
 
     // QTextDocument's Markdown importer does not create anchor names for
     // headings, so resolve GitHub-style heading slugs ourselves.
-    QHash<QString, int> seen;
+    HeadingSlugger slugger;
     for (QTextBlock block = view->document()->begin(); block.isValid(); block = block.next()) {
         if (block.blockFormat().headingLevel() <= 0) {
             continue;
         }
 
-        const QString base = normalizedAnchor(block.text());
-        const int suffix = seen.value(base, 0);
-        seen.insert(base, suffix + 1);
-        const QString slug = suffix == 0 ? base : base + QLatin1Char('-') + QString::number(suffix);
-        if (slug == wanted) {
+        if (slugger.next(block.text()) == wanted) {
             QTextCursor cursor(block);
             view->setTextCursor(cursor);
             view->ensureCursorVisible();
