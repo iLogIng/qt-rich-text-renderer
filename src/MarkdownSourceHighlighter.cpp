@@ -104,6 +104,19 @@ void MarkdownSourceHighlighter::highlightBlock(const QString &text)
     static const QRegularExpression fence(
         QStringLiteral("^\\s{0,3}(?:`{3,}|~{3,}).*$"));
     static const QRegularExpression quote(QStringLiteral("^\\s{0,3}>.*$"));
+
+    if (previousBlockState() == 1) {
+        setFormat(0, text.size(), m_inlineCode);
+        setCurrentBlockState(fence.match(text).hasMatch() ? 0 : 1);
+        return;
+    }
+
+    if (fence.match(text).hasMatch()) {
+        setFormat(0, text.size(), m_fence);
+        setCurrentBlockState(1);
+        return;
+    }
+    setCurrentBlockState(0);
     static const QRegularExpression listMarker(
         QStringLiteral("^\\s*(?:[-+*]|\\d+[.)])\\s+"));
     static const QRegularExpression bold(
@@ -117,7 +130,6 @@ void MarkdownSourceHighlighter::highlightBlock(const QString &text)
         QStringLiteral("\\$\\$[^$]+\\$\\$|\\$[^$]+\\$"));
 
     applyRegex(text, heading, m_heading);
-    applyRegex(text, fence, m_fence);
     applyRegex(text, quote, m_quote);
     applyRegex(text, listMarker, m_marker);
     applyRegex(text, bold, m_bold);

@@ -3,6 +3,7 @@
 #include "MarkdownSourceHighlighter.h"
 
 #include <QAbstractTextDocumentLayout>
+#include <QFont>
 #include <QGuiApplication>
 #include <QTextBlock>
 #include <QTextBlockFormat>
@@ -66,6 +67,20 @@ int main(int argc, char **argv)
     if (headingBlock.layout()) {
         expect(headingBlock.layout()->formats().isEmpty(),
                QStringLiteral("disabling source highlighting clears formats"));
+    }
+
+    QTextDocument fencedDocument;
+    fencedDocument.setPlainText(
+        QStringLiteral("# Heading\n```\n# not a heading\n```\n"));
+    MarkdownSourceHighlighter fencedHighlighter(&fencedDocument, false);
+    fencedHighlighter.rehighlight();
+    fencedDocument.documentLayout()->documentSize();
+    const QTextBlock codeLine = fencedDocument.findBlockByNumber(2);
+    if (codeLine.layout() && !codeLine.layout()->formats().isEmpty()) {
+        expect(codeLine.layout()->formats().first().format.fontWeight() != QFont::Bold,
+               QStringLiteral("hash inside fenced code is not styled as a heading"));
+    } else {
+        expect(false, QStringLiteral("fenced code line receives a source format"));
     }
 
     QTextDocument document;
