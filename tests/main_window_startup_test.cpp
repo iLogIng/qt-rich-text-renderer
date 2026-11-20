@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QFile>
 #include <QPlainTextEdit>
+#include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QToolButton>
@@ -37,6 +38,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    expect(source->isReadOnly(), QStringLiteral("source view is read-only"));
     expect(source->toPlainText().isEmpty(), QStringLiteral("startup document is empty"));
     expect(history->count() == 0, QStringLiteral("startup history is empty"));
     expect(!back->isEnabled(), QStringLiteral("startup Back is disabled"));

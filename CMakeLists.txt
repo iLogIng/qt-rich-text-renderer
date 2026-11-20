@@ -38,6 +38,8 @@ add_library(rich-text-render-document STATIC
     src/CodeHighlighter.h
     src/MarkdownDocumentBuilder.cpp
     src/MarkdownDocumentBuilder.h
+    src/MarkdownSourceHighlighter.cpp
+    src/MarkdownSourceHighlighter.h
     src/SvgObjectHandler.cpp
     src/SvgObjectHandler.h
     src/SvgSanitizer.cpp

@@ -10,10 +10,12 @@ class QComboBox;
 class QLabel;
 class QPlainTextEdit;
 class QPushButton;
+class QTabWidget;
 class QTextBrowser;
 class QToolButton;
 class CodeHighlighter;
 class MarkdownLinkHandler;
+class MarkdownSourceHighlighter;
 class RendererService;
 class SvgObjectHandler;
 
@@ -63,6 +65,7 @@ private:
 
     QPlainTextEdit *m_source = nullptr;
     QTextBrowser *m_preview = nullptr;
+    QTabWidget *m_tabs = nullptr;
     QLabel *m_status = nullptr;
     QPushButton *m_renderButton = nullptr;
     QPushButton *m_loadButton = nullptr;
@@ -73,6 +76,7 @@ private:
     RendererService *m_renderer = nullptr;
     SvgObjectHandler *m_svgHandler = nullptr;
     CodeHighlighter *m_codeHighlighter = nullptr;
+    MarkdownSourceHighlighter *m_sourceHighlighter = nullptr;
     MarkdownLinkHandler *m_linkHandler = nullptr;
     NavigationHistory m_history;
     QString m_pendingAnchor;

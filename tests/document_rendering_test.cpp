@@ -1,5 +1,6 @@
 #include "CodeHighlighter.h"
 #include "MarkdownDocumentBuilder.h"
+#include "MarkdownSourceHighlighter.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QGuiApplication>
@@ -48,6 +49,24 @@ int main(int argc, char **argv)
     highlighter.setDark(true);
     highlightedDocument.documentLayout()->documentSize();
     expect(codeBlock.layout() != nullptr, QStringLiteral("code block layout survives theme switch"));
+
+    QTextDocument sourceDocument;
+    sourceDocument.setPlainText(QStringLiteral("# Heading\n\n**bold** text\n"));
+    MarkdownSourceHighlighter sourceHighlighter(&sourceDocument, false);
+    sourceHighlighter.rehighlight();
+    sourceDocument.documentLayout()->documentSize();
+    const QTextBlock headingBlock = sourceDocument.firstBlock();
+    expect(headingBlock.layout() != nullptr, QStringLiteral("source heading layout exists"));
+    if (headingBlock.layout()) {
+        expect(!headingBlock.layout()->formats().isEmpty(),
+               QStringLiteral("Markdown source heading receives formats"));
+    }
+    sourceHighlighter.setEnabled(false);
+    sourceDocument.documentLayout()->documentSize();
+    if (headingBlock.layout()) {
+        expect(headingBlock.layout()->formats().isEmpty(),
+               QStringLiteral("disabling source highlighting clears formats"));
+    }
 
     QTextDocument document;
     document.setPlainText(QStringLiteral("before TOKEN after"));

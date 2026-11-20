@@ -5,6 +5,7 @@
 #include "MarkdownDocumentBuilder.h"
 #include "MarkdownLinkHandler.h"
 #include "MarkdownPreprocessor.h"
+#include "MarkdownSourceHighlighter.h"
 #include "RendererService.h"
 #include "SvgObjectHandler.h"
 #include "Theme.h"
@@ -24,10 +25,10 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
-#include <QSplitter>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
+#include <QTabWidget>
 #include <QTextBrowser>
 #include <QTextDocument>
 #include <QToolButton>
@@ -114,14 +115,20 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     toolbar->addWidget(m_historyCombo);
     layout->addLayout(toolbar);
 
-    auto *splitter = new QSplitter(Qt::Horizontal, central);
-    m_source = new QPlainTextEdit(splitter);
+    m_tabs = new QTabWidget(central);
+    m_tabs->setObjectName(QStringLiteral("documentTabs"));
+
+    m_source = new QPlainTextEdit(m_tabs);
+    m_source->setObjectName(QStringLiteral("sourceView"));
+    m_source->setReadOnly(true);
     m_source->setPlaceholderText(QStringLiteral("Markdown source"));
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     fixedFont.setPointSize(10);
     m_source->setFont(fixedFont);
+    m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_dark, this);
 
-    m_preview = new QTextBrowser(splitter);
+    m_preview = new QTextBrowser(m_tabs);
+    m_preview->setObjectName(QStringLiteral("previewView"));
     m_preview->setOpenExternalLinks(false);
     m_preview->setReadOnly(true);
     m_preview->document()->setDocumentMargin(12);
@@ -130,11 +137,10 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_dark, this);
     m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
 
-    splitter->addWidget(m_source);
-    splitter->addWidget(m_preview);
-    splitter->setStretchFactor(0, 2);
-    splitter->setStretchFactor(1, 5);
-    layout->addWidget(splitter, 1);
+    m_tabs->addTab(m_preview, tr("Preview"));
+    m_tabs->addTab(m_source, tr("Source"));
+    m_tabs->setCurrentWidget(m_preview);
+    layout->addWidget(m_tabs, 1);
 
     setCentralWidget(central);
     statusBar()->showMessage(QStringLiteral("Spike: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
@@ -377,6 +383,9 @@ void MainWindow::setDarkMode(bool dark)
     updateThemeButton();
     if (m_codeHighlighter) {
         m_codeHighlighter->setDark(dark);
+    }
+    if (m_sourceHighlighter) {
+        m_sourceHighlighter->setDark(dark);
     }
     if (!m_source->toPlainText().isEmpty()) {
         renderNow();
