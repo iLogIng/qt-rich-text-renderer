@@ -55,7 +55,19 @@ int main()
     history.visit(QStringLiteral("/tmp/d.md"), QStringLiteral("d.md"));
     expect(history.size() == 3, QStringLiteral("revisiting current entry is ignored"));
 
-    expect(history.setCurrentIndexNewestFirst(2), QStringLiteral("select oldest entry"));
+    history.clear();
+    history.visit(QStringLiteral("/tmp/a.md"), QStringLiteral("a.md"));
+    history.visit(QStringLiteral("/tmp/b.md"), QStringLiteral("b.md"));
+    history.visit(QStringLiteral("/tmp/c.md"), QStringLiteral("c.md"));
+    expect(history.back() == QStringLiteral("/tmp/b.md"), QStringLiteral("move before same-path visit"));
+    history.visit(QStringLiteral("/tmp/b.md"), QStringLiteral("b.md"));
+    entries = history.entriesNewestFirst();
+    expect(history.size() == 2, QStringLiteral("same-path visit does not duplicate current entry"));
+    expect(!history.canForward(), QStringLiteral("same-path visit discards forward history"));
+    expect(entries.at(0).path == QStringLiteral("/tmp/b.md"), QStringLiteral("same-path visit keeps current entry"));
+    expect(entries.at(1).path == QStringLiteral("/tmp/a.md"), QStringLiteral("same-path visit keeps older entry"));
+
+    expect(history.setCurrentIndexNewestFirst(1), QStringLiteral("select oldest entry"));
     expect(history.currentPath() == QStringLiteral("/tmp/a.md"), QStringLiteral("selection updates current path"));
     expect(!history.canBack(), QStringLiteral("selection at oldest disables back"));
     expect(history.forward() == QStringLiteral("/tmp/b.md"), QStringLiteral("selection preserves forward movement"));

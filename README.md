@@ -261,7 +261,7 @@ cmake --build build -j"$(nproc)"
 历史行为：
 
 - 使用 `std::list` 双向链表，最多保存 64 条；
-- 新导航发生在历史中间时，forward 历史被丢弃；
+- 新导航发生在历史中间时，forward 历史被丢弃；再次导航到当前文件也会丢弃 forward；
 - `Back` / `Forward` 按浏览器语义移动；
 - 下拉列表最新记录在上、最远记录在下；
 - 列表只显示文件名，tooltip 显示完整路径；

@@ -15,6 +15,10 @@ void NavigationHistory::visit(const QString &path, const QString &displayName)
         return;
     }
     if (m_hasCurrent && m_current != m_entries.end() && m_current->path == path) {
+        const auto next = std::next(m_current);
+        if (next != m_entries.end()) {
+            m_entries.erase(next, m_entries.end());
+        }
         return;
     }
 
