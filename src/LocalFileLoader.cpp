@@ -113,7 +113,12 @@ LocalFileContent LocalFileLoader::load(const QString &path)
         return result;
     }
 
-    const QByteArray data = file.readAll();
+    const QByteArray data = file.read(kMaxFileBytes + 1);
+    if (data.size() > kMaxFileBytes) {
+        result.error = QStringLiteral("file is too large to display (limit: %1 MiB)")
+                           .arg(kMaxFileBytes / (1024 * 1024));
+        return result;
+    }
     if (file.error() != QFileDevice::NoError) {
         result.error = QStringLiteral("cannot read file: %1").arg(file.errorString());
         return result;
