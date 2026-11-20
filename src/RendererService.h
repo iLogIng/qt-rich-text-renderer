@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderTypes.h"
+#include "SvgCache.h"
 
 #include <QHash>
 #include <QObject>
@@ -43,16 +44,11 @@ private:
                 bool display,
                 const QString &theme,
                 Callback callback);
-    QString cacheKey(const QString &kind,
-                     const QString &source,
-                     bool display,
-                     const QString &theme) const;
     void handleWorkerResult(const QString &key, quint64 generation, const RenderResult &result);
 
     RendererWorker *m_mathWorker = nullptr;
     RendererWorker *m_mermaidWorker = nullptr;
-    QString m_cacheDir;
-    QString m_version;
+    SvgCache m_cache;
     QHash<QString, Inflight> m_inflight;
     quint64 m_generation = 0;
 };

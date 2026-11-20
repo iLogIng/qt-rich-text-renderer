@@ -44,6 +44,8 @@ add_executable(rich-text-render
     src/RendererWorker.cpp
     src/RendererWorker.h
     src/RenderTypes.h
+    src/SvgCache.cpp
+    src/SvgCache.h
     src/SvgObjectHandler.cpp
     src/SvgObjectHandler.h
     src/SvgSanitizer.cpp

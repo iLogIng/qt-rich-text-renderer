@@ -2,10 +2,6 @@
 
 #include "RendererWorker.h"
 
-#include <QCryptographicHash>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
 #include <QTimer>
 #include <QDebug>
 
@@ -31,9 +27,7 @@ void RendererService::configure(const QString &qjsPath,
                                 const QString &version,
                                 int idleMs)
 {
-    m_cacheDir = cacheDir;
-    m_version = version;
-    QDir().mkpath(m_cacheDir);
+    m_cache.configure(cacheDir, version);
 
     m_mathWorker->configure(qjsPath, mathWorkerScript, 10000, idleMs);
     m_mermaidWorker->configure(qjsPath, mermaidWorkerScript, 15000, idleMs);
@@ -70,24 +64,6 @@ int RendererService::pendingCount() const
     return m_mathWorker->pendingCount() + m_mermaidWorker->pendingCount();
 }
 
-QString RendererService::cacheKey(const QString &kind,
-                                  const QString &source,
-                                  bool display,
-                                  const QString &theme) const
-{
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData("rich-text-render-service-v2");
-    hash.addData(kind.toUtf8());
-    hash.addData(m_version.toUtf8());
-    hash.addData(source.toUtf8());
-    if (kind == QStringLiteral("math")) {
-        hash.addData(display ? "display" : "inline");
-    } else {
-        hash.addData(theme.toUtf8());
-    }
-    return QString::fromLatin1(hash.result().toHex());
-}
-
 void RendererService::render(const QString &kind,
                              const QString &source,
                              bool display,
@@ -95,24 +71,19 @@ void RendererService::render(const QString &kind,
                              Callback callback)
 {
     const quint64 generation = m_generation;
-    const QString key = cacheKey(kind, source, display, theme);
-    const QString cachePath = QDir(m_cacheDir).filePath(key + QStringLiteral(".svg"));
+    const QString key = m_cache.key(kind, source, display, theme);
 
-    if (QFileInfo::exists(cachePath)) {
-        QFile cache(cachePath);
-        if (cache.open(QIODevice::ReadOnly)) {
-            RenderResult result;
-            result.svg = QString::fromUtf8(cache.readAll());
-            result.fromCache = true;
-            if (!result.svg.isEmpty()) {
-                QTimer::singleShot(0, this, [this, generation, callback = std::move(callback), result]() {
-                    if (generation == m_generation) {
-                        callback(result);
-                    }
-                });
-                return;
+    QString cachedSvg;
+    if (m_cache.read(key, &cachedSvg)) {
+        RenderResult result;
+        result.svg = cachedSvg;
+        result.fromCache = true;
+        QTimer::singleShot(0, this, [this, generation, callback = std::move(callback), result]() {
+            if (generation == m_generation) {
+                callback(result);
             }
-        }
+        });
+        return;
     }
 
     const auto existing = m_inflight.constFind(key);
@@ -157,10 +128,7 @@ void RendererService::handleWorkerResult(const QString &key,
     }
 
     if (result.error.isEmpty() && !result.svg.isEmpty()) {
-        QFile cache(QDir(m_cacheDir).filePath(key + QStringLiteral(".svg")));
-        if (cache.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            cache.write(result.svg.toUtf8());
-        }
+        m_cache.write(key, result.svg);
     }
 
     for (const Callback &callback : callbacks) {
