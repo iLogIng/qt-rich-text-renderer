@@ -1,6 +1,6 @@
 # 程序流程图
 
-> 对应代码：`src/main.cpp`、`src/MainWindow.cpp`、`src/RendererService.cpp`、`src/RendererWorker.cpp`、`src/MarkdownPreprocessor.cpp`、`src/MarkdownDocumentBuilder.cpp`、`src/SvgObjectHandler.cpp`
+> 对应代码：`src/main.cpp`、`src/MainWindow.cpp`、`src/AppSettings.cpp`、`src/RendererService.cpp`、`src/RendererWorker.cpp`、`src/MarkdownPreprocessor.cpp`、`src/MarkdownDocumentBuilder.cpp`、`src/MarkdownOutline.cpp`、`src/OutlinePanel.cpp`、`src/SettingsDialog.cpp`、`src/SvgObjectHandler.cpp`
 >
 > 本文件只放流程图；架构与模块说明见 [README.md](../README.md)、[ADR-0001](ADR-0001-rendering-pipeline.md)。
 
@@ -13,17 +13,20 @@ sequenceDiagram
     autonumber
     participant M as main()
     participant W as MainWindow
+    participant A as AppSettings
     participant S as RendererService
     participant E as 事件循环
 
     M->>M: QApplication + org/app 名
     M->>M: 解析 --file / --dark / --screenshot / --toggle-theme
     M->>W: 构造 MainWindow(dark)
-    W->>W: applyTheme() + 注册 SvgObjectHandler
-    W->>W: 创建按钮 / 编辑器 / 预览 / splitter
-    W->>W: 创建 MarkdownLinkHandler、back/forward、历史下拉框
+    W->>A: load()（模板默认值 + QSettings 用户覆盖）
+    W->>W: 应用 UI 字号、Source 字号、主题、窗口几何
+    W->>W: 创建按钮 / Outline / Preview+Source tabs / history
+    W->>W: 应用 Outline/Source 可见性和 source highlighter
+    W->>W: 注册 SvgObjectHandler 和 MarkdownLinkHandler
     W->>S: new RendererService(this)
-    W->>S: configure(qjs, math worker, mermaid worker, cacheDir, version, idleMs)
+    W->>S: configure(qjs, workers, cache, version, idle/timeouts)
     W->>W: connect 信号槽 + Ctrl+Return
     W->>W: updateHistoryUi()（空历史）
     M->>W: show()
@@ -32,7 +35,7 @@ sequenceDiagram
         W->>W: history.visit() + renderNow()
     end
     opt 有 --toggle-theme
-        M->>W: singleShot(1500) → toggleTheme()
+        M->>W: singleShot(1500) → setDarkMode(!isDarkMode())
     end
     opt 有 --screenshot
         M->>W: singleShot(8000) → grab().save()
@@ -65,6 +68,8 @@ sequenceDiagram
     MW->>TD: setMarkdown(markdown)
     Note over TD: math/mermaid 已变成文本 token<br/>代码块保留并带 BlockCodeLanguage
     MW->>TD: CodeHighlighter::rehighlight()
+    MW->>MW: MarkdownOutline::fromDocument(TD) → OutlinePanel
+    MW->>MW: Source tab 使用 MarkdownSourceHighlighter
 
     loop 每个 block
         MW->>RS: renderMath() / renderMermaid()
@@ -210,6 +215,32 @@ flowchart LR
 - 最新记录在链表尾部；UI 反转后最新在上；
 - 下拉框只显示文件名，tooltip 保存完整路径；
 - 打开失败时回滚历史游标，不把坏记录留在当前位置。
+
+### 4.4 目录与设置
+
+```mermaid
+flowchart TD
+    A["renderNow / setMarkdown"] --> B["MarkdownOutline::fromDocument"]
+    B --> C["OutlinePanel::setEntries"]
+    C --> D["点击标题"]
+    D --> E["切换到 Preview + scrollPreviewToBlock"]
+
+    F["Settings 按钮"] --> G["同步 Outline/Source 可见性"]
+    G --> H["SettingsDialog(current, defaults)"]
+    H --> I["accept"]
+    I --> J["applySettings(previous)"]
+    J --> K["应用字体/主题/宽度/超时"]
+    J --> L["保存 QSettings 用户覆盖"]
+
+    M["config/settings.ini"] --> N["AppSettings::defaults()"]
+    O["用户 settings.ini"] --> P["AppSettings::load()"]
+    N --> P
+```
+
+- 模板只读，用户覆盖写入 `QSettings`；
+- `--dark` 只覆盖当前会话；
+- Source 只读，Markdown 高亮在 Source 文档上运行；
+- 目录条目保存 blockNumber，不依靠生成 anchor。
 
 ---
 

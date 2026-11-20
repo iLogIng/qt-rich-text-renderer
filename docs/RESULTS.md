@@ -205,6 +205,34 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - 打开失败时回滚历史游标；
 - `tests/navigation_history_test.cpp` 覆盖 back/forward、forward 截断、选择、64 条上限和清空。
 
+## 6.4 文档视图、目录与设置
+
+当前窗口采用左侧目录 dock 和中央 Preview / Source 标签页：
+
+- Source 只读，使用 Qt `QSyntaxHighlighter` 做 Markdown 语法着色；
+- Source 高亮识别 fenced code，避免把代码中的 `#` 误判为标题；
+- `MarkdownOutline` 从 Qt Markdown 文档提取标题层级、标题文字和 block 编号；
+- 标题中的数学/Mermaid token 会替换成可读文字；
+- 点击目录条目不依赖 anchor，直接切换到 Preview 并滚动到 block。
+
+配置系统：
+
+- `config/settings.ini` 是完整只读默认模板，随 AppImage 打包；
+- 用户修改通过 QSettings 写入独立设置文件；
+- Settings 对话框支持 Appearance / View / Preview / Advanced；
+- 字体大小分为应用/预览字号和只读 Source 字号；
+- 主题、字号、目录/Source 可见性、预览宽度和渲染超时都可以运行时应用；
+- `--dark` 仅覆盖当前会话，不自动写回配置；
+- 窗口几何、最近目录、主题和可见性会持久化。
+
+相关测试：
+
+- `markdown-outline-test`；
+- `app-settings-test`；
+- `settings-dialog-test`；
+- `document-rendering-test` 中的 Source 高亮和 fenced code 状态；
+- `main-window-startup-test` 中的设置应用和目录生成。
+
 ## 7. 缓存与“渲染是纯函数”
 
 实际使用的内容寻址缓存：
@@ -235,7 +263,7 @@ key = SHA256(
 
 ## 8. AppImage
 
-> 当前 AppImage 已包含 renderer service 与 worker 脚本；代码改动后重新执行 `scripts/package-appimage.sh`。
+> 当前 AppImage 已包含 renderer service、worker 脚本和 `config/settings.ini` 默认模板；代码改动后重新执行 `scripts/package-appimage.sh`。
 
 构建方式：
 
@@ -272,6 +300,8 @@ QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
 - 跨消息任意拖选：未实现；
 - 每条消息复制/代码块复制：未实现；
 - 本地历史只保存文件路径，不保存滚动位置、锚点或未保存编辑；
+- Source 按设计保持只读，不提供文件编辑和保存；
+- 目录尚未根据预览滚动位置同步高亮当前节；
 - 本地链接没有 workspace allowlist；单文件上限 32MiB；
 - SQLite/Blob 缓存：当前是文件缓存；
 - renderer service 的可见区域优先队列：未实现；

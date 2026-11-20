@@ -283,7 +283,12 @@
 - [x] 抽出独立 `LinkResolver` 和 `SvgCache`
 - [x] 建立 `rich-text-render-core`、`rich-text-render-document`、`rich-text-render-ui` 三个静态库
 - [x] 删除未参与构建的 `RendererClient`
-- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`markdown-preprocessor-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
+- [x] Source 改为只读 tab，使用 Qt `QSyntaxHighlighter` 做 Markdown 语法高亮
+- [x] `MarkdownOutline` 从 `QTextDocument` 提取标题，左侧 Outline dock 点击跳转
+- [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
+- [x] `config/settings.ini` 完整配置模板，打包进 AppImage
+- [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
+- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
 - [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
 - [x] 记录 KSyntaxHighlighting 的未来依赖和迁移边界；当前只使用 Qt `QSyntaxHighlighter`
 
@@ -302,13 +307,16 @@ scripts/package-appimage.sh
 ## 当前维护边界
 
 - Markdown 功能冻结为 Qt importer 加现有预处理器支持的子集，不新增 front matter、脚注、GFM 扩展或自写 parser；
+- Source 是只读查看器，不进入文档编辑、保存、外部修改同步或 dirty 状态范围；
 - 代码高亮继续使用 Qt `QSyntaxHighlighter` 和 `CodeHighlighter`，不在当前阶段引入 KSyntaxHighlighting；
+- 配置系统使用只读 `config/settings.ini` 模板和 QSettings 用户覆盖，不新增其他配置框架；
 - 维护期只处理正确性 bug、安全问题、依赖升级、Qt/发行版兼容、性能回归、测试和打包；
-- 已记录但暂不实现的能力：代码块复制、跨消息选区、图片资源策略、可见区域优先队列、KSyntaxHighlighting 替换。
+- 已记录但暂不实现的能力：代码块复制、跨消息选区、图片资源策略、可见区域优先队列、当前节滚动高亮、KSyntaxHighlighting 替换。
 
 ## 非目标 / 不再讨论
 
 - QtWebEngine
+- 文档编辑、保存和 dirty 状态（Source 只读）
 - QML / MarkQml 渲染链路
 - 自写 TeX 布局
 - 自写 Mermaid 布局

@@ -63,8 +63,10 @@
 ```mermaid
 flowchart LR
   subgraph UI["Qt Widgets"]
-    Editor["Markdown editor"]
+    Editor["Read-only source"]
     Preview["QTextBrowser preview"]
+    Outline["Outline dock"]
+    Settings["Settings dialog"]
     Theme["Theme / palette"]
     Nav["Back / Forward<br/>history dropdown"]
   end
@@ -72,6 +74,9 @@ flowchart LR
   subgraph Core["C++ modules"]
     MD["MarkdownPreprocessor<br/>scan + placeholders"]
     MDB["MarkdownDocumentBuilder<br/>SVG object insertion"]
+    OutlineModel["MarkdownOutline<br/>heading entries"]
+    SourceHL["MarkdownSourceHighlighter<br/>Qt source coloring"]
+    SettingsStore["AppSettings<br/>template + QSettings"]
     RS["RendererService<br/>queue + single-flight"]
     Cache["SvgCache<br/>content-addressed storage"]
     San["SvgSanitizer<br/>QtSvg normalization"]
@@ -102,6 +107,10 @@ flowchart LR
   MDB --> Obj
   Obj --> Doc
   Doc --> Preview
+  Editor --- SourceHL
+  Doc --> OutlineModel
+  OutlineModel --> Outline
+  Settings --> SettingsStore
   Preview --> Link
   Link --> Resolver
   Link -->|"local file"| Files
@@ -151,10 +160,14 @@ cache key = SHA256(
 
 | 模块             | 路径                                  | 职责                                                 |
 | ---------------- | ------------------------------------- | ---------------------------------------------------- |
-| 应用入口         | `src/main.cpp`                        | 命令行参数、主题初始值、截图模式                     |
-| 主窗口           | `src/MainWindow.*`                    | 编辑器/预览 splitter、工具栏、主题切换、异步渲染编排 |
+| 应用入口         | `src/main.cpp`                        | 命令行参数、主题覆盖、截图模式                       |
+| 主窗口           | `src/MainWindow.*`                    | 标签页、工具栏、目录 dock、主题、设置和异步渲染编排  |
 | Markdown 预处理  | `src/MarkdownPreprocessor.*`          | 扫描 math/mermaid、生成 token、保护 code span        |
 | 文档构建         | `src/MarkdownDocumentBuilder.*`       | 插入 SVG 对象、token 错误替换、尺寸归一化            |
+| 文档目录         | `src/MarkdownOutline.*`               | 从 `QTextDocument` 标题提取层级、标题和 block 编号   |
+| Source 高亮      | `src/MarkdownSourceHighlighter.*`     | 只读 Source 的 Markdown 语法着色，不参与渲染         |
+| 应用设置         | `src/AppSettings.*`                   | 只读模板默认值、QSettings 用户覆盖、范围校验         |
+| 设置对话框       | `src/SettingsDialog.*`                | Appearance / View / Preview / Advanced 设置编辑      |
 | 渲染服务         | `src/RendererService.*`               | single-flight、队列、generation 取消                 |
 | Worker 进程      | `src/RendererWorker.*`                | 懒启动 qjs、NDJSON、超时、idle、内存/CPU 限制        |
 | SVG 缓存         | `src/SvgCache.*`                      | SHA-256 key、文件读写、版本隔离                       |
@@ -163,6 +176,7 @@ cache key = SHA256(
 | 本地文件加载     | `src/LocalFileLoader.*`               | 存在性、目录、大小、二进制检测、UTF-8/UTF-16 解码    |
 | 本地历史         | `src/NavigationHistory.*`             | 双向链表、最多 64 条、back/forward、最新优先列表     |
 | 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
+| 目录面板         | `src/OutlinePanel.*`                  | 左侧标题树、层级组织和 block 跳转信号                |
 | SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
@@ -182,9 +196,9 @@ cache key = SHA256(
 
 | CMake 目标 | 内容 | 依赖 |
 |---|---|---|
-| `rich-text-render-core` | Markdown 预处理、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
-| `rich-text-render-document` | 文档构建、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
-| `rich-text-render-ui` | 主窗口、链接交互、主题 | 前两个库、`Qt6::Widgets` |
+| `rich-text-render-core` | Markdown 预处理、应用设置、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
+| `rich-text-render-document` | 文档构建、标题目录、Source 高亮、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
+| `rich-text-render-ui` | 主窗口、目录面板、设置对话框、链接交互、主题 | 前两个库、`Qt6::Widgets` |
 | `rich-text-render` | 应用入口 | `rich-text-render-ui` |
 
 依赖方向固定为：
@@ -214,6 +228,46 @@ main -> ui -> { core, document }
 
 当前不启用该后端；这条路线只作为后续维护期的可选替换项记录。
 
+### 配置与设置
+
+完整默认模板位于：
+
+```text
+config/settings.ini
+```
+
+AppImage 内路径：
+
+```text
+usr/share/rich-text-render/config/settings.ini
+```
+
+模板是只读默认值来源，包含所有用户可配置项和说明注释。用户修改通过 QSettings 写入独立文件，避免 QSettings 重写模板时丢失注释：
+
+```text
+QStandardPaths::AppConfigLocation/settings.ini
+```
+
+Linux 上通常为：
+
+```text
+~/.config/locvas-spike/rich-text-render-spike/settings.ini
+```
+
+配置项：
+
+- `appearance.theme`：light / dark；
+- `appearance.uiFontPointSize`：应用与预览字号，8–18；
+- `appearance.sourceFontPointSize`：只读 Source 字号，8–24；
+- `appearance.sourceHighlighting`：Source Markdown 高亮开关；
+- `view.outlineVisible`：左侧目录面板；
+- `view.sourceVisible`：Source tab；
+- `preview.maxSvgWidth`：预览 SVG 最大宽度；
+- `renderer.idleTimeoutMs`、`mathRequestTimeoutMs`、`mermaidRequestTimeoutMs`；
+- `files.lastDirectory`、`window.geometry`：运行状态持久化。
+
+Settings 对话框提供 Appearance、View、Preview、Advanced 四组设置，并包含 Restore Defaults。命令行 `--dark` 只覆盖当前会话，不会自动写入用户配置。
+
 ## 4. 构建
 
 ### 脚本方式
@@ -235,11 +289,14 @@ scripts/mem-bench.sh
 
 - `link-resolver-test`：scheme、base URL、本地路径和 canonical path；
 - `link-handler-test`：本地文件信号、标题锚点和 GitHub slug；
-- `main-window-startup-test`：空白启动、空历史和显式文件加载；
+- `main-window-startup-test`：空白启动、空历史、显式加载、目录和设置应用；
+- `app-settings-test`：模板默认值、用户覆盖、校验、读写和默认路径；
+- `settings-dialog-test`：设置加载、编辑、恢复默认和保留非对话框状态；
 - `markdown-preprocessor-test`：数学、Mermaid、fenced code 和货币误判；
+- `markdown-outline-test`：标题层级、token 标签、block 顺序和空目录；
 - `svg-cache-test`：cache key、display/theme 隔离和内容读写；
 - `svg-sanitizer-test`：CSS 变量、颜色、尺寸、脚本和事件属性清理；
-- `document-rendering-test`：代码高亮、SVG 插入和错误替换；
+- `document-rendering-test`：代码高亮、Source 高亮、fenced code 状态、SVG 插入和错误替换；
 - `navigation-history-test`：back/forward、forward 截断和 64 条上限；
 - `local-file-loader-test`：文本/二进制/目录/缺失文件/UTF-16/大小限制。
 
@@ -292,18 +349,33 @@ cmake --build build -j"$(nproc)"
 
 窗口包含：
 
-- 左侧 Markdown 编辑器；
-- 右侧渲染预览；
+- 左侧 `Outline` 目录 dock；
+- 中央 `Preview` / `Source` 标签页；
+- `Source` 为只读视图，支持 Markdown 语法高亮；
 - `Load`：打开本地 Markdown 或文本文件；
 - `Render (Ctrl+Enter)`；
 - **`Dark mode` / `Light mode` 切换按钮**；
+- `Settings`：编辑字体、视图、预览和渲染器超时；
 - 右上角 `Back` / `Forward` 和本地文件历史下拉框。
 
 启动行为：
 
-- 默认不加载任何文档，编辑器和预览为空，历史也为空；
+- 默认不加载任何文档，Preview、Source 和 Outline 均为空，历史也为空；
 - 使用 `Load` 或 `--file` 后才打开文件；
 - `sample.md` 保留在项目 `samples/` 目录中，但应用代码不硬编码该路径，不会自动加载，也不打包进 AppImage。
+
+目录行为：
+
+- 从 Qt 生成的 `QTextDocument` 标题层级提取；
+- 点击条目切换到 Preview 并滚动到对应 block；
+- 标题中的数学/Mermaid token 使用可读替代文字；
+- 默认显示在左侧，可在 Settings 中隐藏。
+
+Source 行为：
+
+- 只读，不提供表单式编辑或文件保存；
+- Markdown 语法高亮使用 Qt `QSyntaxHighlighter`；
+- 可在 Settings 中调整 Source 字号或隐藏 Source tab。
 
 链接行为：
 
@@ -324,8 +396,8 @@ cmake --build build -j"$(nproc)"
 - 列表只显示文件名，tooltip 显示完整路径；
 - 选中历史项会直接切换文件，不新增重复记录。
 
-> 本地历史目前只保存文件路径，不保存滚动位置、锚点或编辑器未保存内容。
-> 通过链接、Back/Forward 或下拉列表切换文件时，编辑器中的未保存修改会被替换。
+> 本地历史目前只保存文件路径，不保存滚动位置或锚点。
+> Source 是只读视图，不提供编辑保存能力，因此导航切换不会产生未保存文档内容。
 
 切换主题会重新渲染当前文档，MathJax 使用新的前景色，Mermaid 使用新的主题。
 
@@ -384,8 +456,9 @@ scripts/package-appimage.sh
 1. 用 `linuxdeploy --plugin qt` 把 Qt 依赖/插件部署到 `AppDir`；
 2. 复制 `qjs` 到 `AppDir/usr/bin/qjs`；
 3. 复制 `renderer/dist/*.mjs` 到 `AppDir/usr/share/rich-text-render/renderer/dist/`；
-4. 写入 `AppRun`、desktop、icon；
-5. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
+4. 复制 `config/settings.ini` 到 `AppDir/usr/share/rich-text-render/config/`；
+5. 写入 `AppRun`、desktop、icon；
+6. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
 
 脚本默认使用：
 
@@ -437,7 +510,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 1. 固定 Qt、QuickJS、Node、linuxdeploy、appimagetool 版本；
 2. 在干净的 Fedora/Ubuntu 虚拟机跑 AppImage smoke test；
 3. 用真实 AI 输出语料做 Markdown/MathJax/Mermaid 回归；
-4. 校验 AppImage 内 `qjs` 和 JS bundles 的路径；
+4. 校验 AppImage 内 `qjs`、JS bundles 和 `config/settings.ini` 的路径；
 5. 把 `scripts/package-appimage.sh` 拆成 CI job，产物上传到 release；
 6. 处理 `linuxdeploy` 在 Fedora `.relr.dyn` 上的 strip 报错（固定打包基础镜像或关闭 strip）。
 
@@ -449,6 +522,8 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - 数学分隔符支持 `\(...\)`、`$...$`、`$$...$$`、`\[...\]`；
 - 代码块已支持 C++/Python/JS/JSON/Bash/LaTeX 高亮；
 - 当前高亮器是项目内 `CodeHighlighter`（正则近似），不包含 KSyntaxHighlighting；替换依赖和迁移条件见“高亮后端与依赖边界”；
+- Source 高亮也是 Qt `QSyntaxHighlighter` 的轻量规则，不是完整 Markdown parser；
+- 目录尚未根据滚动位置高亮当前节；
 - 代码块背景、边框、行距仍可继续打磨；
 - Mermaid 不是生产版本，固定为 `13.0.0-alpha.3`；
 - Mermaid full worker 已启用；常用图 24/24 smoke test 通过，但 alpha 版本的全部 33 种图仍需完整回归；
@@ -458,6 +533,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 
 ### 交互
 
+- Source 只读，没有编辑、保存或外部修改同步；
 - 没有每条消息复制；
 - 没有代码块复制；
 - 没有跨消息任意拖选；
@@ -485,6 +561,13 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - cache key 已包含渲染器版本、kind、source、options、Mermaid 主题；
 - 未包含 DPI/字体/主题色（MathJax 的颜色在嵌入时处理，但未来加主题色时需要扩展）；
 - 没有缓存清理/容量控制。
+
+### 配置
+
+- 模板是只读默认值，实际用户修改写入独立的 QSettings 文件；
+- QSettings 保存用户文件时不会保留手工写在用户文件中的注释；
+- 窗口几何、最近目录和可见性会持久化，但不会持久化打开过的文档内容；
+- Settings 对话框暂不直接编辑模板文件路径或 `window.geometry` 原始值。
 
 ### 安全
 
@@ -522,6 +605,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 src/                    Qt Widgets 应用与渲染/缓存逻辑
 renderer/               MathJax/Mermaid 的 QuickJS bundle
 third_party/quickjs-ng  QuickJS-ng submodule
+config/                 完整 settings.ini 默认模板
 samples/                demo Markdown（sample.md）
 tests/sources/          测试输入：公式 / Mermaid / 基准 Markdown
 tools/svgcheck.cpp      SVG -> PNG 的 QtSvg 检查工具
