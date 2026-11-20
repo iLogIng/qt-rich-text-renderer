@@ -1,4 +1,5 @@
 #include "MarkdownLinkHandler.h"
+#include "LinkResolver.h"
 
 #include <QApplication>
 #include <QFileInfo>
@@ -29,25 +30,25 @@ int main(int argc, char **argv)
     const QString benchPath = sourceDir + QStringLiteral("bench.md");
     const QUrl base = QUrl::fromLocalFile(sourceDir);
 
-    const auto relative = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("bench.md")), base);
-    expect(relative.kind == MarkdownLinkHandler::Kind::LocalFile, QStringLiteral("relative file kind"));
+    const auto relative = LinkResolver::resolve(QUrl(QStringLiteral("bench.md")), base);
+    expect(relative.kind == LinkResolver::Kind::LocalFile, QStringLiteral("relative file kind"));
     expect(relative.error.isEmpty(), QStringLiteral("relative file resolves"));
 
-    const auto anchor = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("#section")), base);
-    expect(anchor.kind == MarkdownLinkHandler::Kind::Anchor, QStringLiteral("anchor kind"));
+    const auto anchor = LinkResolver::resolve(QUrl(QStringLiteral("#section")), base);
+    expect(anchor.kind == LinkResolver::Kind::Anchor, QStringLiteral("anchor kind"));
 
-    const auto remote = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("https://example.com")), base);
-    expect(remote.kind == MarkdownLinkHandler::Kind::Remote, QStringLiteral("remote kind"));
+    const auto remote = LinkResolver::resolve(QUrl(QStringLiteral("https://example.com")), base);
+    expect(remote.kind == LinkResolver::Kind::Remote, QStringLiteral("remote kind"));
 
-    const auto rejected = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("javascript:alert(1)")), base);
-    expect(rejected.kind == MarkdownLinkHandler::Kind::Rejected, QStringLiteral("javascript rejected"));
+    const auto rejected = LinkResolver::resolve(QUrl(QStringLiteral("javascript:alert(1)")), base);
+    expect(rejected.kind == LinkResolver::Kind::Rejected, QStringLiteral("javascript rejected"));
 
-    const auto missing = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("missing.md")), base);
-    expect(missing.kind == MarkdownLinkHandler::Kind::LocalFile, QStringLiteral("missing file kind"));
+    const auto missing = LinkResolver::resolve(QUrl(QStringLiteral("missing.md")), base);
+    expect(missing.kind == LinkResolver::Kind::LocalFile, QStringLiteral("missing file kind"));
     expect(!missing.error.isEmpty(), QStringLiteral("missing file reports error"));
 
-    const auto noBase = MarkdownLinkHandler::resolve(QUrl(QStringLiteral("sample.md")), QUrl());
-    expect(noBase.kind == MarkdownLinkHandler::Kind::Rejected, QStringLiteral("relative link without base rejected"));
+    const auto noBase = LinkResolver::resolve(QUrl(QStringLiteral("sample.md")), QUrl());
+    expect(noBase.kind == LinkResolver::Kind::Rejected, QStringLiteral("relative link without base rejected"));
 
     QTextBrowser view;
     MarkdownLinkHandler handler(&view, nullptr);

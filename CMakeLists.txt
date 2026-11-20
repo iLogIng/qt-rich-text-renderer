@@ -24,6 +24,8 @@ add_executable(rich-text-render
     src/main.cpp
     src/CodeHighlighter.cpp
     src/CodeHighlighter.h
+    src/LinkResolver.cpp
+    src/LinkResolver.h
     src/LocalFileLoader.cpp
     src/LocalFileLoader.h
     src/MainWindow.cpp
@@ -56,6 +58,8 @@ target_compile_definitions(rich-text-render PRIVATE
 
 add_executable(link-resolution-test
     tests/link_resolution_test.cpp
+    src/LinkResolver.cpp
+    src/LinkResolver.h
     src/MarkdownLinkHandler.cpp
     src/MarkdownLinkHandler.h
 )
