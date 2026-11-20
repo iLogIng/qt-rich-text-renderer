@@ -38,6 +38,8 @@ add_library(rich-text-render-document STATIC
     src/CodeHighlighter.h
     src/MarkdownDocumentBuilder.cpp
     src/MarkdownDocumentBuilder.h
+    src/MarkdownOutline.cpp
+    src/MarkdownOutline.h
     src/MarkdownSourceHighlighter.cpp
     src/MarkdownSourceHighlighter.h
     src/SvgObjectHandler.cpp
@@ -102,6 +104,11 @@ add_executable(markdown-preprocessor-test
 )
 target_link_libraries(markdown-preprocessor-test PRIVATE rich-text-render-core)
 
+add_executable(markdown-outline-test
+    tests/markdown_outline_test.cpp
+)
+target_link_libraries(markdown-outline-test PRIVATE rich-text-render-document)
+
 add_executable(svg-cache-test
     tests/svg_cache_test.cpp
 )
@@ -140,6 +147,11 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME markdown-preprocessor-test COMMAND markdown-preprocessor-test)
+    add_test(NAME markdown-outline-test COMMAND markdown-outline-test)
+    set_tests_properties(markdown-outline-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
     add_test(NAME svg-cache-test COMMAND svg-cache-test)
     add_test(NAME svg-sanitizer-test COMMAND svg-sanitizer-test)
     add_test(NAME document-rendering-test COMMAND document-rendering-test)
