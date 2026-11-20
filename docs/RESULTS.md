@@ -25,7 +25,7 @@
 | Mermaid SVG → QSvgRenderer | ⚠️ 需清洗 | 原始 SVG 出现黑块；归一化 CSS 变量/颜色后正常 |
 | `QTextDocument` 嵌入 SVG | ✅ | `SvgObjectHandler` + `QTextObjectInterface`，绘制时直接渲染 SVG |
 | 文件缓存 | ✅ | 二次渲染 30 blocks 约 30–50ms |
-| AppImage | ✅ | 34.6MB，含 Qt + qjs + MathJax + Mermaid，无 WebEngine |
+| AppImage | ✅ | 35.3MB，含 Qt + qjs + MathJax + Mermaid full，无 WebEngine |
 
 ## 2. 体积
 
@@ -34,9 +34,10 @@
 | `qjs` 可执行文件 | 1.5MB |
 | MathJax QuickJS bundle | 1.8MB |
 | Mermaid QuickJS bundle (slim + flowchart/sequence/state) | 664KB |
+| Mermaid full worker bundle | 2.1MB |
 | Qt 应用二进制 | 6.7MB |
 | AppDir（含 Qt 依赖/插件） | 约 85MB |
-| AppImage（完整） | **34.6MB / 33MiB** |
+| AppImage（完整） | **35.3MB / 34MiB** |
 | qjs + 4 个 JS bundle | 约 5MB |
 
 对比：QtWebEngine 通常会带来 130–180MB 的额外体积。这个方案避开了它。
@@ -100,11 +101,15 @@
 
 | 场景 | qjs 进程 | qjs PSS | 主进程 PSS | 总 PSS | 耗时 |
 |---|---:|---:|---:|---:|---:|
-| 30 blocks 冷 | 2 | 23.7MB | 21.1MB | **44.8MB** | 203ms |
-| 400 blocks 冷 | 2 | 29.9MB | 25.8MB | **55.7MB** | 1.6s |
-| 400 blocks 热 | 2 | 23.0MB | 25.4MB | **48.4MB** | 236ms |
+| 30 blocks 冷（slim 3 图） | 2 | 23.7MB | 21.1MB | 44.8MB | 203ms |
+| 400 blocks 冷（slim 3 图） | 2 | 29.9MB | 25.8MB | 55.7MB | 1.6s |
+| 30 blocks 冷（full 图集） | 2 | 41.0MB | 21.2MB | **62.2MB** | 322ms |
+| 400 blocks 冷（full 图集） | 2 | 45.7MB | 26.3MB | **72.0MB** | 1.6s |
+| 400 blocks 热（full 图集） | 2 | 23.0MB | 25.4MB | **48.4MB** | 236ms |
 
 结论：**128MB 总应用 PSS 目标已达成**，而且 400 blocks 的 qjs 进程数稳定为 2。
+
+Full Mermaid 图集比 slim 多约 18MB qjs PSS，但总应用仍有约 56MB 余量。
 
 ## 4. MathJax 结果
 
@@ -123,7 +128,8 @@ MathJax SVG 的一些性质：
 Mermaid v13 alpha 的关键性质：
 
 - 官方声明无 DOM、确定性输出、Node/Deno/web worker 可运行；
-- 在 QuickJS-ng 中，`mermaid/slim` + flowchart/sequence/state 可以运行；
+- `mermaid/slim` + flowchart/sequence/state 可以运行；完整 `mermaid` worker 也已验证；
+- 完整 worker 的常用图类型 smoke test 24/24 通过；
 - 输出 SVG 使用大量 CSS 变量（`--_p`、`--_tx`、`--_el` 等）；
 - QtSvg 不解析 CSS 变量和 `color(from ...)`，原始 SVG 会出现黑块/缺失文字；
 - 8 位 hex 颜色（`#e8e8e8cc`）在 QtSvg 中会变成黑色，需要转成 6 位；
@@ -138,7 +144,7 @@ Mermaid v13 alpha 的关键性质：
 
 - 标题、段落、粗体、链接：正常；
 - 表格：正常；
-- 行内代码/代码块：能被识别，但没有语法高亮，代码块视觉样式有限；
+- 行内代码/代码块：能被识别；代码块语言由 `QTextFormat::BlockCodeLanguage` 标记，已接入 `QSyntaxHighlighter`；
 - 中文、emoji：正常；
 - 复杂嵌套列表/脚注：未验证；
 - 需要占位符替换才能插入自定义 SVG 对象；
@@ -208,7 +214,7 @@ key = SHA256(
 
 结果：
 
-- 完整 AppImage：**34.6MB / 33MiB**；
+- 完整 AppImage：**35.3MB / 34MiB**；
 - AppDir（未压缩）：约 85MB；
 - 渲染链（qjs + 4 个 JS bundle）：约 5MB；
 - 不再包含 WebEngine。
@@ -236,7 +242,7 @@ QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
 - renderer service 的可见区域优先队列：未实现；
 - renderer worker 崩溃恢复的自动化测试：未完成；
 - QtSvg 全量语料：只测了公式、流程图、表格、中文/emoji；未测 RTL、复杂表格、SVG 滤镜、字体回退；
-- Mermaid 33 种图：只测 flowchart/sequence/state 的少量样例；
+- Mermaid full 图集：常用 24 类 smoke test 通过；剩余低频/alpha 图类型仍需完整语料；
 - Mermaid v13 alpha 的升级稳定性：未验证；
 - QuickJS 安全边界：qjs 运行受信任的 bundle；SVG sanitizer 不是完整安全清洗器；
 - AppImage 在干净虚拟机/无 Qt 环境下的验证：只在当前 Fedora 上通过 `--appimage-extract-and-run` 运行；

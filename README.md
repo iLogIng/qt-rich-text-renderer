@@ -19,14 +19,18 @@
 - 数学公式：可用；
 - Mermaid：可用（基于 alpha 版本）；
 - Markdown 表格、中文、emoji、代码块：可用；
+- 数学：支持 `$...$`、`\(...\)`、`$$...$$`、`\[...\]`；
+- 所有 fenced code 都按代码处理，只有 `mermaid` 例外；`latex`/`math` fence 不渲染成公式；
+- 代码高亮：C++ / Python / JS / JSON / Bash / LaTeX；
 - 深色模式：可用，公式和 Mermaid 都会随主题重新渲染；
 - 缓存：可用，热缓存基本无感；
 - renderer service：两个 qjs worker，进程数上限 2；
-- 内存：30 blocks 总 PSS 约 44.8MB，400 blocks 约 55.7MB；
-- AppImage：可用，约 **34.6MB / 33MiB**，无需 WebEngine；
+- Mermaid：full worker，常用图类型 24/24 smoke test 通过；
+- 内存：30 blocks 总 PSS 约 62.2MB，400 blocks 约 72.0MB；
+- AppImage：可用，约 **35.3MB / 34MiB**，无需 WebEngine；
 - 不需要 QtWebEngine，不需要 Node 运行时。
 
-当前最大缺口是**代码块语法高亮**、**复制/选区**和**安全清洗**。
+当前最大缺口是**复制/选区**、**安全清洗**和**可见区域优先队列**；代码块语法高亮已完成。
 
 ## 1. 效果评估
 
@@ -36,14 +40,14 @@
 - Mermaid v13 alpha 的 DOM-free 渲染在 QuickJS 中确实能跑，流程图、边、边标签、中文都正常；
 - 深色模式下数学公式使用系统前景色，不再融入背景；
 - Mermaid 深色主题会输出深色节点与浅色文字；
-- 30 个 block 冷启动约 200–230ms，热缓存约 13–50ms；
-- 400 个 block 冷启动约 1.6s，总 PSS 约 55.7MB；
+- 30 个 block 冷启动约 250–320ms，热缓存约 13–50ms；
+- 400 个 block 冷启动约 1.6s，总 PSS 约 72.0MB；
+- Mermaid full bundle：常用图类型 24/24 smoke test 通过；
 - 两个 qjs worker 常驻上限，空闲 60s 自动退出；
 - AppImage 没有 WebEngine 的体积负担。
 
 ### 还不够好的部分
 
-- 代码块只是等宽文本，没有语法高亮；
 - 没有每条消息复制 / 代码块复制 / 跨消息选区；
 - Markdown 只覆盖常用子集，复杂 GFM 未验证；
 - Mermaid 仍是 alpha，升级需要回归；
@@ -135,13 +139,14 @@ cache key = SHA256(
 | Markdown 处理    | `src/MarkdownRenderer.*`              | 扫描 math/mermaid、生成 token、插入 SVG 对象         |
 | 渲染服务         | `src/RendererService.*`               | 缓存、single-flight、队列、generation 取消           |
 | Worker 进程      | `src/RendererWorker.*`                | 懒启动 qjs、NDJSON、超时、idle、内存/CPU 限制        |
+| 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
 | SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
 | 旧 one-shot 客户端 | `src/RendererClient.*`              | 保留为对照/降级参考，当前主路径不使用                 |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
 | MathJax 核心     | `renderer/src/mathjax-core.mjs`       | `liteAdaptor` + TeX + SVG                            |
 | MathJax worker   | `renderer/src/mathjax-worker.mjs`     | NDJSON worker、常驻渲染 MathJax                       |
-| Mermaid worker   | `renderer/src/mermaid-worker.mjs`     | NDJSON worker、常驻渲染 Mermaid                       |
+| Mermaid worker   | `renderer/src/mermaid-worker.mjs` / `mermaid-full-worker.mjs` | NDJSON worker；full 版本启用完整图集 |
 | 旧 qjs 入口      | `renderer/src/mathjax-qjs.mjs` 等     | 一次性脚本，用于对照测试                             |
 | JS 构建          | `renderer/build.mjs`                  | esbuild 打包为 QuickJS 可执行 bundle                 |
 | SVG 检查工具     | `tools/svgcheck.cpp`                  | SVG → PNG，验证 QtSvg 兼容性                         |
@@ -158,6 +163,8 @@ scripts/setup-quickjs.sh
 scripts/setup-renderer.sh
 scripts/build.sh
 scripts/test.sh
+scripts/test-markdown.sh
+scripts/test-mermaid-full.py
 scripts/test-process-bound.sh
 scripts/test-idle.sh
 scripts/bench.sh
@@ -237,6 +244,8 @@ QT_QPA_PLATFORM=offscreen ./build/rich-text-render --dark --screenshot out/app-d
 
 ```bash
 scripts/test.sh
+scripts/test-markdown.sh
+scripts/test-mermaid-full.py
 scripts/test-process-bound.sh
 scripts/test-idle.sh
 scripts/bench.sh
@@ -249,6 +258,8 @@ scripts/mem-bench.sh tests/sources/bench400.md bench400
 - 总应用 PSS ≤128MB。
 
 `test-idle.sh` 使用 `RICH_TEXT_RENDER_IDLE_MS=2000` 验证 worker 空闲退出。
+
+`test-markdown.sh` 验证数学分隔符/代码块 token 数量；`test-mermaid-full.py` 验证完整 Mermaid worker 的常用图类型。
 
 ## 6. 打包与发布流水线
 
@@ -305,9 +316,9 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 | qjs                        |      1.5MB |
 | MathJax bundle             |      1.8MB |
 | Mermaid bundle             |      664KB |
-| AppImage                   | **34.6MB / 33MiB** |
+| AppImage                   | **35.3MB / 34MiB** |
 | AppDir（未压缩）           |      约 85MB |
-| 渲染链（qjs + JS bundles） |      约 5MB |
+| 渲染链（qjs + JS bundles） |      约 7MB |
 
 ### CI 建议
 
@@ -325,12 +336,11 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 ### 渲染
 
 - Qt Markdown 只覆盖常用子集；复杂嵌套列表、脚注、部分 GFM 未验证；
-- 只支持 `\(...\)` 行内数学和 `$$...$$` 块级数学；
-- 不支持 `\[...\]`、`$...$`；
-- 代码块没有语法高亮；
-- 代码块/表格的视觉样式比较基础；
+- 数学分隔符支持 `\(...\)`、`$...$`、`$$...$$`、`\[...\]`；
+- 代码块已支持 C++/Python/JS/JSON/Bash/LaTeX 高亮；
+- 代码块背景、边框、行距仍可继续打磨；
 - Mermaid 不是生产版本，固定为 `13.0.0-alpha.3`；
-- Mermaid 只打包了 flowchart/sequence/state，其他图类型未启用；
+- Mermaid full worker 已启用；常用图 24/24 smoke test 通过，但 alpha 版本的全部 33 种图仍需完整回归；
 - Mermaid SVG 需要 `SvgSanitizer` 做 QtSvg 兼容处理；
 - `QSvgRenderer` 不是完整浏览器 SVG，复杂滤镜/字体特性未验证；
 - 未做高 DPI、字体回退、RTL 的全量测试。
@@ -346,8 +356,8 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 ### 进程与性能
 
 - 已改为两个懒启动 qjs worker（MathJax / Mermaid），进程数上限 2；
-- 30 blocks：总 PSS 约 44.8MB，冷启动约 200–230ms；
-- 400 blocks：总 PSS 约 55.7MB，冷启动约 1.5–1.7s；
+- 30 blocks：总 PSS 约 62.2MB，冷启动约 250–320ms；
+- 400 blocks：总 PSS 约 72.0MB，冷启动约 1.5–1.7s；
 - 空闲 60s 自动退出（测试可缩短到 2s）；
 - worker 有内存/CPU rlimit、请求超时、崩溃重启；
 - 当前是 FIFO 队列，可见区域优先尚未实现；
@@ -380,14 +390,13 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 
 完整待办与建议打磨顺序见 [TODO.md](TODO.md) 的 **Polish 顺序** 小节。
 
-1. **代码块语法高亮**：优先做，视觉差距最大；
-2. **每条消息复制 + 代码块复制**；
-3. **renderer service 收尾**：可见区域优先、崩溃恢复测试；
-4. **SVG sanitizer hardening**：脚本/事件/外链白名单；
-5. **SQLite/Blob 缓存**；
-6. **真实 AI 输出语料 + golden 测试**；
-7. **AppImage CI** 与干净环境验证；
-8. 再评估是否需要跨消息选区。
+1. **每条消息复制 + 代码块复制**：实际使用差距最大；
+2. **renderer service 收尾**：可见区域优先、崩溃恢复测试；
+3. **SVG sanitizer hardening**：脚本/事件/外链白名单；
+4. **SQLite/Blob 缓存**；
+5. **真实 AI 输出语料 + golden 测试**；
+6. **AppImage CI** 与干净环境验证；
+7. 再评估是否需要跨消息选区。
 
 ## 9. 目录
 

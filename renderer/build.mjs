@@ -37,3 +37,9 @@ await build({
   entryPoints: ['src/mermaid-worker.mjs'],
   outfile: 'dist/mermaid-worker.mjs',
 });
+
+await build({
+  ...common,
+  entryPoints: ['src/mermaid-full-worker.mjs'],
+  outfile: 'dist/mermaid-full-worker.mjs',
+});

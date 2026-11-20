@@ -7,6 +7,7 @@ class QLabel;
 class QPlainTextEdit;
 class QPushButton;
 class QTextBrowser;
+class CodeHighlighter;
 class RendererService;
 class SvgObjectHandler;
 
@@ -36,6 +37,7 @@ private:
     QPushButton *m_themeButton = nullptr;
     RendererService *m_renderer = nullptr;
     SvgObjectHandler *m_svgHandler = nullptr;
+    CodeHighlighter *m_codeHighlighter = nullptr;
     bool m_dark = false;
     QElapsedTimer m_renderTimer;
     int m_generation = 0;

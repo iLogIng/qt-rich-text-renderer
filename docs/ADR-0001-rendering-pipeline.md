@@ -22,10 +22,12 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
 ## Decision
 
 1. **Markdown**
-   - 使用 `QTextDocument::setMarkdown`；
-   - 通过占位符机制插入数学/Mermaid 图像；
-   - v1 支持 `\(...\)` 行内数学和 `$$...$$` 块级数学；
-   - 代码块复制后置，语法高亮后置。
+   - 使用块级 tokenizer + `QTextDocument::setMarkdown`；
+   - 通过占位符机制插入数学/Mermaid 对象；
+   - 支持 `\(...\)`、`$...$` 行内数学和 `$$...$$`、`\[...\]` 块级数学；
+   - fenced code 全部作为代码，只有 `mermaid` 例外；
+   - 使用 `QTextFormat::BlockCodeLanguage` + `QSyntaxHighlighter` 做代码高亮；
+   - 代码块复制后置。
 
 2. **TeX**
    - 使用 MathJax 3.2.2 + `liteAdaptor`，在 QuickJS-ng 中渲染为 SVG；
@@ -34,7 +36,8 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
    - `currentColor` 替换为 `QPalette::Text`，保证深色模式下可读。
 
 3. **Mermaid**
-   - 使用 Mermaid `13.0.0-alpha.3`，`mermaid/slim` + flowchart/sequence/state；
+   - 使用 Mermaid `13.0.0-alpha.3`；
+   - 默认 full worker；常用 24 类 smoke test 通过；
    - QuickJS-ng 执行；
    - 允许 alpha 风险，但必须锁定精确版本；
    - 输出 SVG 经过 QtSvg 兼容归一化：CSS 变量解析、8 位 hex 颜色降级、`width="100%"` 转 viewBox。
@@ -68,11 +71,11 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
 
 ### Positive
 
-- 30 blocks 冷启动约 203ms，400 blocks 约 1.6s；
-- 30 blocks 总 PSS 约 44.8MB；400 blocks 总 PSS 约 55.7MB；
+- 30 blocks 冷启动约 250–320ms，400 blocks 约 1.6s；
+- 30 blocks 总 PSS 约 62.2MB；400 blocks 总 PSS 约 72.0MB（full Mermaid 图集）；
 - qjs worker 数上限 2，空闲 60s 退出；
 - 自定义 SVG 对象避免了 400 个 QImage 常驻；
-- AppImage 约 34.6MB，无 WebEngine；
+- AppImage 约 35.3MB，无 WebEngine；
 - 无 WebEngine、无 Node 运行时；
 - MathJax SVG 在 QSvgRenderer 下工作良好；
 - Mermaid v13 alpha 的 DOM-free 渲染在 QuickJS 中可运行。
@@ -83,7 +86,7 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
 - 需要维护 SVG 归一化/清洗层；
 - renderer service 需要继续补可见区域优先和崩溃恢复测试；
 - Qt Markdown 仍有子集限制；
-- 代码高亮、复制、Blob 缓存、跨消息选区未完成；
+- 复制、Blob 缓存、跨消息选区未完成；
 - QtSvg 不是完整 SVG 渲染器，需要持续测试。
 
 ### Risks

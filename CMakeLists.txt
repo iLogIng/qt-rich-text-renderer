@@ -20,6 +20,8 @@ target_link_libraries(svgcheck PRIVATE Qt6::Widgets Qt6::Svg)
 
 add_executable(rich-text-render
     src/main.cpp
+    src/CodeHighlighter.cpp
+    src/CodeHighlighter.h
     src/MainWindow.cpp
     src/MainWindow.h
     src/MarkdownRenderer.cpp

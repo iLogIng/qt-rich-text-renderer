@@ -62,7 +62,8 @@ sequenceDiagram
     MW->>MR: prepare(source)
     MR-->>MW: markdown + blocks[]
     MW->>TD: setMarkdown(markdown)
-    Note over TD: math/mermaid 已变成文本 token
+    Note over TD: math/mermaid 已变成文本 token<br/>代码块保留并带 BlockCodeLanguage
+    MW->>TD: CodeHighlighter::rehighlight()
 
     loop 每个 block
         MW->>RS: renderMath() / renderMermaid()
@@ -142,6 +143,24 @@ flowchart TD
 ```
 
 > 这里不再为每个 block 常驻 QImage；400 blocks 的主进程 PSS 从 420MB 降到约 26MB。
+
+---
+
+## 4.1 代码块高亮
+
+```mermaid
+flowchart TD
+    A["QTextDocument::setMarkdown"] --> B["每个 QTextBlock"]
+    B --> C{"BlockCodeLanguage 非空?"}
+    C -- 否 --> D["普通文本，不高亮"]
+    C -- 是 --> E["CodeHighlighter::highlightBlock"]
+    E --> F["按语言应用 QSyntaxHighlighter 格式"]
+    F --> G["深/浅色主题 rehighlight"]
+```
+
+支持的语言：C++ / Python / JavaScript / JSON / Bash / LaTeX。
+
+`latex` 和 `math` fence 仍按代码处理，不自动渲染为公式。
 
 ---
 

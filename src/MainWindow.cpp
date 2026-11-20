@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "CodeHighlighter.h"
 #include "MarkdownRenderer.h"
 #include "RendererService.h"
 #include "SvgObjectHandler.h"
@@ -92,6 +93,7 @@ MainWindow::MainWindow(bool dark, QWidget *parent)
     m_preview->document()->setDocumentMargin(12);
     m_svgHandler = new SvgObjectHandler(this);
     m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
+    m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_dark, this);
 
     splitter->addWidget(m_source);
     splitter->addWidget(m_preview);
@@ -135,9 +137,9 @@ void MainWindow::configureRenderer()
     const int idleMs = idleOk && idleEnv > 0 ? idleEnv : 60000;
     m_renderer->configure(qjsPath(),
                           root + QStringLiteral("/renderer/dist/mathjax-worker.mjs"),
-                          root + QStringLiteral("/renderer/dist/mermaid-worker.mjs"),
+                          root + QStringLiteral("/renderer/dist/mermaid-full-worker.mjs"),
                           cacheDir,
-                          QStringLiteral("mathjax-3.2.2;mermaid-13.0.0-alpha.3;qjs-0.18.0;service-v2"),
+                          QStringLiteral("mathjax-3.2.2;mermaid-13.0.0-alpha.3;qjs-0.18.0;service-v3-full"),
                           idleMs);
 }
 
@@ -178,6 +180,9 @@ void MainWindow::setDarkMode(bool dark)
     m_dark = dark;
     applyTheme(dark);
     updateThemeButton();
+    if (m_codeHighlighter) {
+        m_codeHighlighter->setDark(dark);
+    }
     if (!m_source->toPlainText().isEmpty()) {
         renderNow();
     }
@@ -196,6 +201,9 @@ void MainWindow::renderNow()
     }
 
     m_preview->setMarkdown(prepared.markdown);
+    if (m_codeHighlighter) {
+        m_codeHighlighter->rehighlight();
+    }
     m_blockCount = prepared.blocks.size();
     m_pending = m_blockCount;
     m_cacheHits = 0;

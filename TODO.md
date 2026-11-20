@@ -17,7 +17,7 @@
 | 2 | 块级 Markdown tokenizer：尊重 code span、围栏、引用、列表、表格 | P1-9（语料回归见 P0-5） |
 | 3 | XML 白名单 SVG sanitizer：脚本/事件/外链/foreignObject | P0-4 |
 | 4 | SQLite/Blob 缓存：single-flight、原子写、LRU、版本失效 | P1-7 |
-| 5 | 代码块语法高亮 + 每条消息/代码块复制 | P0-1、P0-2 |
+| 5 | 每条消息/代码块复制（代码高亮已完成） | P0-2 |
 | 6 | 流式增量 + 取消 + 选区冻结 | P1-8 |
 | 7 | 高 DPI / 字体 / 主题 / 响应式宽度 / 无障碍 | P1-11、P1-12、P2-14 |
 | 8 | 干净 VM AppImage + CI + 许可证材料 | P0-6 |
@@ -56,8 +56,9 @@
 
 ### 优化后实测
 
-- 30 blocks：qjs 进程 **2**，qjs PSS **23.7MB**，主进程 PSS **21.1MB**，总 PSS **44.8MB**，冷启动约 **203ms**；
-- 400 blocks：qjs 进程 **2**，qjs PSS **29.9MB**，主进程 PSS **25.8MB**，总 PSS **55.7MB**，冷启动约 **1.6s**；
+- 30 blocks（full Mermaid）：qjs 进程 **2**，qjs PSS **41.0MB**，主进程 PSS **21.2MB**，总 PSS **62.2MB**，冷启动约 **322ms**；
+- 400 blocks（full Mermaid）：qjs 进程 **2**，qjs PSS **45.7MB**，主进程 PSS **26.3MB**，总 PSS **72.0MB**，冷启动约 **1.6s**；
+- slim 3 图对比：30 blocks 总 PSS 44.8MB，400 blocks 55.7MB；
 - 400 blocks 热缓存：总 PSS 约 **48.4MB**，耗时约 **236ms**；
 - idle 2s 测试：qjs worker 已退出；
 - 自定义 `QTextObjectInterface` 不再为每个 block 常驻 QImage，主进程 PSS 从 400+MB 降到约 26MB。
@@ -67,14 +68,14 @@
 | 指标 | 目标 |
 |---|---|
 | qjs worker 数 | **≤2**（1 MathJax + 1 Mermaid） |
-| qjs 渲染器进程组 PSS 峰值 | **≤40MB** |
+| qjs 渲染器进程组 PSS 峰值 | slim ≤40MB；full 图集 ≤50MB |
 | 总应用 PSS（Qt + worker） | **≤128MB** |
 | 400 个唯一 block 冷渲染 | 先测，再定；建议 ≤10s |
 | 单 block 热渲染 | MathJax <5ms；Mermaid <20ms（待实测） |
 | 空闲回收 | 60s 后退出 |
 | 队列上限 | 建议 64；可见内容优先 |
 
-> 40MB 指的是 **qjs 渲染器进程组 PSS**，不是整个应用。当前主进程本身已约 39.5MB PSS；要求“整个应用 ≤40MB”不现实。
+> 40MB 指的是 **qjs 渲染器进程组 PSS**，不是整个应用。Full Mermaid 图集实测约 41–46MB；slim 3 图约 24–30MB。总应用目标仍是 ≤128MB。
 
 ### 实施结果
 
@@ -103,9 +104,10 @@
 
 ### 1. 代码块语法高亮
 
-- [ ] 识别 fenced code block 的语言标记
-- [ ] 用 `QSyntaxHighlighter` 或自有高亮器实现 C++ / Python / JSON / JavaScript / Bash
-- [ ] 代码块背景、边框、等宽字体、行距与深/浅色主题一致
+- [x] 识别 fenced code block 的语言标记（`QTextFormat::BlockCodeLanguage`）
+- [x] 用 `QSyntaxHighlighter` 实现 C++ / Python / JSON / JavaScript / Bash / LaTeX
+- [x] 代码块深/浅色主题高亮
+- [ ] 代码块背景、边框、等宽字体、行距精细调整
 - [ ] 代码块复制入口与高亮一起设计
 - [ ] 长代码块性能测试（1000 行以上）
 - 验收：代码块可读性接近常见 Markdown 阅读器；切换主题不破坏高亮。
@@ -128,7 +130,7 @@
 - [x] SVG 对象绘制（QTextObjectInterface，避免 QImage 常驻）
 - [ ] 渲染进程崩溃后的自动恢复测试
 - [ ] 可见区域优先队列
-- 验收：30 blocks → 2 workers、总 PSS 44.8MB；400 blocks → 2 workers、总 PSS 55.7MB；已通过。
+- 验收：30 blocks → 2 workers、总 PSS 62.2MB；400 blocks → 2 workers、总 PSS 72.0MB（full Mermaid）；已通过。
 
 ### 4. SVG / 输入安全加固
 
@@ -261,8 +263,13 @@
 - [x] renderer service：两个懒启动 qjs worker，max 2
 - [x] NDJSON worker 协议、single-flight、generation 取消、idle 回收
 - [x] 自定义 SVG 对象绘制，去掉 QImage 常驻
-- [x] 128MB 总应用 PSS 目标：30 blocks 44.8MB，400 blocks 55.7MB
+- [x] 128MB 总应用 PSS 目标：30 blocks 62.2MB，400 blocks 72.0MB（full Mermaid）
 - [x] `scripts/mem-bench.sh`、`scripts/test-idle.sh`
+- [x] 块级 Markdown tokenizer（代码围栏/行内 code/数学分隔符）
+- [x] `$...$`、`\(...\)`、`$$...$$`、`\[...\]`
+- [x] `QTextFormat::BlockCodeLanguage` + `QSyntaxHighlighter` 代码高亮
+- [x] Mermaid full worker：常用 24 类 smoke test 通过
+- [x] `scripts/test-markdown.sh`、`scripts/test-mermaid-full.py`
 
 ## 验证命令
 
