@@ -254,6 +254,7 @@ cmake --build build -j"$(nproc)"
 - 相对链接以当前 Markdown 文件所在目录为 base；
 - `#anchor` 在文档内跳转；没有显式 anchor 的 Markdown 标题按 GitHub 风格 slug 匹配；
 - 本机非二进制、非目录文件直接在窗口内加载并重新渲染，不调用系统文本编辑器；
+- 文本解码支持 UTF-8（含 BOM）、带 BOM 的 UTF-16 LE/BE 和 Latin-1；无 BOM 的 UTF-16 与 UTF-32 会按二进制拒绝；
 - 目录、二进制文件、超过 32MiB 的文件会提示并保留当前文档；
 - `http/https` 和 `mailto:` 打开前必须确认；
 - `javascript:`、`data:` 等 scheme 直接拒绝。

@@ -185,7 +185,8 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - `QTextBrowser` 关闭自动打开，统一由 `MarkdownLinkHandler` 处理；
 - `#anchor` 在文档内跳转；Qt Markdown importer 不生成标题 anchor，因此额外按 GitHub 风格 slug 匹配标题；
 - 本机非二进制、非目录文件通过 `localFileRequested` 交给 `MainWindow`，在当前窗口内重新加载，**不再调用系统文本编辑器**；
-- `LocalFileLoader` 校验存在性、目录、大小（32MiB）、NUL/二进制内容，并支持 UTF-8 / UTF-16 BOM；
+- `LocalFileLoader` 校验存在性、目录、大小（32MiB）、NUL/二进制内容，并支持 UTF-8（含 BOM）、带 BOM 的 UTF-16 LE/BE 和 Latin-1；
+- 无 BOM 的 UTF-16 与 UTF-32 文本不在支持范围，会按二进制拒绝；
 - 远程链接、`mailto:` 仍需要确认；
 - `javascript:`、`data:` 等 scheme 拒绝；
 - `tests/link_resolution_test.cpp` 覆盖解析策略、本地链接信号和标题锚点滚动；
