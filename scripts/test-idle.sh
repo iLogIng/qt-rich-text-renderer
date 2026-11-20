@@ -5,10 +5,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-rm -rf "$CACHE"
+CONFIG="/tmp/opencode/rtr-idle-config"
+rm -rf "$CACHE" "$CONFIG"
 mkdir -p /tmp/opencode
 
-RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
+XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
   --file tests/sources/bench.md --screenshot /tmp/opencode/idle.png \
   >/tmp/opencode/idle.log 2>&1 &
 app_pid=$!

@@ -11,12 +11,14 @@ MAX_TOTAL_MB="${MAX_TOTAL_MB:-128}"
 MAX_WORKERS="${MAX_WORKERS:-2}"
 
 CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
+CONFIG="/tmp/opencode/rtr-mem-config"
 if [[ "$WARM" != "1" ]]; then
   rm -rf "$CACHE"
 fi
+rm -rf "$CONFIG"
 mkdir -p /tmp/opencode
 
-RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
+XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
   --file "$FILE" --screenshot "/tmp/opencode/mem-${LABEL}.png" \
   >"/tmp/opencode/mem-${LABEL}.log" 2>&1 &
 app_pid=$!
