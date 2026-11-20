@@ -157,7 +157,6 @@ cache key = SHA256(
 | 本地历史         | `src/NavigationHistory.*`             | 双向链表、最多 64 条、back/forward、最新优先列表     |
 | 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
 | SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
-| 旧 one-shot 客户端 | `src/RendererClient.*`              | 源码保留；未参与当前构建，仅作历史参考                |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
 | MathJax 核心     | `renderer/src/mathjax-core.mjs`       | `liteAdaptor` + TeX + SVG                            |
@@ -417,8 +416,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 - 400 blocks：总 PSS 约 72.0MB，冷启动约 1.5–1.7s；
 - 空闲 60s 自动退出（测试可缩短到 2s）；
 - worker 有内存/CPU rlimit、请求超时、崩溃重启；
-- 当前是 FIFO 队列，可见区域优先尚未实现；
-- one-shot `RendererClient` 源码保留，但未参与当前构建。
+- 当前是 FIFO 队列，可见区域优先尚未实现。
 
 > 早期预留的 qjs 进程组 PSS 子目标（slim 40MB / full 50MB）已不再作为硬性验收口径。
 > full Mermaid 当前约 41–46MB，总应用约 62–72MB，满足使用需求。
