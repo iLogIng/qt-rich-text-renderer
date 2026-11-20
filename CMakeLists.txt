@@ -13,6 +13,8 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(rich-text-render-core STATIC
+    src/AppSettings.cpp
+    src/AppSettings.h
     src/LinkResolver.cpp
     src/LinkResolver.h
     src/LocalFileLoader.cpp
@@ -101,6 +103,11 @@ add_executable(main-window-startup-test
 )
 target_link_libraries(main-window-startup-test PRIVATE rich-text-render-ui)
 
+add_executable(app-settings-test
+    tests/app_settings_test.cpp
+)
+target_link_libraries(app-settings-test PRIVATE rich-text-render-core)
+
 add_executable(markdown-preprocessor-test
     tests/markdown_preprocessor_test.cpp
 )
@@ -148,6 +155,7 @@ if(BUILD_TESTING)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 
+    add_test(NAME app-settings-test COMMAND app-settings-test)
     add_test(NAME markdown-preprocessor-test COMMAND markdown-preprocessor-test)
     add_test(NAME markdown-outline-test COMMAND markdown-outline-test)
     set_tests_properties(markdown-outline-test PROPERTIES
