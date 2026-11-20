@@ -43,12 +43,24 @@ int main(int argc, char **argv)
     auto *back = window.findChild<QToolButton *>(QStringLiteral("historyBackButton"));
     auto *forward = window.findChild<QToolButton *>(QStringLiteral("historyForwardButton"));
     auto *outline = window.findChild<QTreeWidget *>(QStringLiteral("outlineTree"));
+    auto *outlineToggle =
+        window.findChild<QToolButton *>(QStringLiteral("outlineToggleButton"));
+    auto *outlineDock = window.findChild<QDockWidget *>(QStringLiteral("outlineDock"));
 
-    expect(source && history && back && forward && outline,
+    expect(source && history && back && forward && outline && outlineToggle && outlineDock,
            QStringLiteral("main window widgets found"));
-    if (!source || !history || !back || !forward || !outline) {
+    if (!source || !history || !back || !forward || !outline || !outlineToggle || !outlineDock) {
         return 1;
     }
+
+    expect(outlineToggle->isChecked(), QStringLiteral("outline toggle starts checked"));
+    expect(!outlineDock->isHidden(), QStringLiteral("outline starts visible"));
+    outlineToggle->click();
+    expect(outlineDock->isHidden() && !outlineToggle->isChecked(),
+           QStringLiteral("outline toggle hides the fixed outline"));
+    outlineToggle->click();
+    expect(!outlineDock->isHidden() && outlineToggle->isChecked(),
+           QStringLiteral("outline toggle restores the fixed outline"));
 
     expect(source->isReadOnly(), QStringLiteral("source view is read-only"));
     expect(source->toPlainText().isEmpty(), QStringLiteral("startup document is empty"));
@@ -91,14 +103,18 @@ int main(int argc, char **argv)
     auto *customSource = customized.findChild<QPlainTextEdit *>();
     auto *customTabs = customized.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
     auto *customOutline = customized.findChild<QDockWidget *>(QStringLiteral("outlineDock"));
-    expect(customSource && customTabs && customOutline,
+    auto *customOutlineToggle =
+        customized.findChild<QToolButton *>(QStringLiteral("outlineToggleButton"));
+    expect(customSource && customTabs && customOutline && customOutlineToggle,
            QStringLiteral("customized window widgets found"));
-    if (customSource && customTabs && customOutline) {
+    if (customSource && customTabs && customOutline && customOutlineToggle) {
         expect(QApplication::font().pointSize() == 12,
                QStringLiteral("UI font size setting is applied"));
         expect(customSource->font().pointSize() == 14,
                QStringLiteral("source font size setting is applied"));
         expect(customOutline->isHidden(), QStringLiteral("outline visibility setting is applied"));
+        expect(!customOutlineToggle->isChecked(),
+               QStringLiteral("outline toggle reflects hidden outline setting"));
         const int sourceIndex = customTabs->indexOf(customSource);
         expect(sourceIndex >= 0 && !customTabs->isTabVisible(sourceIndex),
                QStringLiteral("source visibility setting is applied"));

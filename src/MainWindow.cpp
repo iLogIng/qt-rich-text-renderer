@@ -7,7 +7,9 @@
 #include "MarkdownOutline.h"
 #include "MarkdownPreprocessor.h"
 #include "MarkdownSourceHighlighter.h"
+#include "MediaPreviewWindow.h"
 #include "OutlinePanel.h"
+#include "PreviewBrowser.h"
 #include "RendererService.h"
 #include "SettingsDialog.h"
 #include "SvgObjectHandler.h"
@@ -151,7 +153,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_dark, this);
     m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
 
-    m_preview = new QTextBrowser(m_tabs);
+    m_preview = new PreviewBrowser(m_tabs);
     m_preview->setObjectName(QStringLiteral("previewView"));
     m_preview->setOpenExternalLinks(false);
     m_preview->setReadOnly(true);
@@ -160,11 +162,25 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
     m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_dark, this);
     m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
+    connect(m_preview, &PreviewBrowser::imagePreviewRequested,
+            this, &MainWindow::previewImageUrl);
+    connect(m_preview, &PreviewBrowser::svgPreviewRequested,
+            this, &MainWindow::previewSvg);
 
     m_tabs->addTab(m_preview, tr("Preview"));
     m_tabs->addTab(m_source, tr("Source"));
     m_tabs->setCurrentWidget(m_preview);
     m_tabs->setTabVisible(m_tabs->indexOf(m_source), m_settingsData.sourceVisible);
+
+    m_outlineToggleButton = new QToolButton(m_tabs);
+    m_outlineToggleButton->setObjectName(QStringLiteral("outlineToggleButton"));
+    m_outlineToggleButton->setText(tr("Outline"));
+    m_outlineToggleButton->setToolTip(tr("Show or hide the document outline"));
+    m_outlineToggleButton->setCheckable(true);
+    m_outlineToggleButton->setAutoRaise(true);
+    m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
+    m_tabs->setCornerWidget(m_outlineToggleButton, Qt::TopLeftCorner);
+
     layout->addWidget(m_tabs, 1);
 
     setCentralWidget(central);
@@ -173,11 +189,17 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     m_outlineDock = new QDockWidget(tr("Outline"), this);
     m_outlineDock->setObjectName(QStringLiteral("outlineDock"));
     m_outlineDock->setWidget(m_outlinePanel);
-    m_outlineDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    m_outlineDock->setAllowedAreas(Qt::LeftDockWidgetArea);
+    m_outlineDock->setFeatures(QDockWidget::NoDockWidgetFeatures);
     addDockWidget(Qt::LeftDockWidgetArea, m_outlineDock);
     resizeDocks({m_outlineDock}, {240}, Qt::Horizontal);
     connect(m_outlinePanel, &OutlinePanel::blockRequested,
             this, &MainWindow::scrollPreviewToBlock);
+    connect(m_outlineToggleButton, &QToolButton::toggled, this, [this](bool visible) {
+        m_outlineDock->setVisible(visible);
+        m_settingsData.outlineVisible = visible;
+        m_settings->save(m_settingsData);
+    });
     m_outlineDock->setVisible(m_settingsData.outlineVisible);
 
     statusBar()->showMessage(QStringLiteral("Spike: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
@@ -323,6 +345,10 @@ void MainWindow::applySettings(const AppSettingsData &previous)
         m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
     }
 
+    {
+        const QSignalBlocker blocker(m_outlineToggleButton);
+        m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
+    }
     m_outlineDock->setVisible(m_settingsData.outlineVisible);
     m_tabs->setTabVisible(m_tabs->indexOf(m_source), m_settingsData.sourceVisible);
     if (!m_settingsData.sourceVisible && m_tabs->currentWidget() == m_source) {
@@ -396,6 +422,12 @@ bool MainWindow::openLocalFile(const QString &path,
                                HistoryMode mode,
                                LoadErrorMode errorMode)
 {
+    if (MediaPreviewWindow::isPreviewableImageFile(path)) {
+        m_status->setText(tr("Previewing image: %1").arg(QFileInfo(path).fileName()));
+        MediaPreviewWindow::showImageFile(path, this);
+        return true;
+    }
+
     const LocalFileContent loaded = LocalFileLoader::load(path);
     if (!loaded.ok) {
         showLoadError(path, loaded.error, errorMode);
@@ -538,6 +570,23 @@ void MainWindow::scrollPreviewToBlock(int blockNumber)
     QTextCursor cursor(block);
     m_preview->setTextCursor(cursor);
     m_preview->ensureCursorVisible();
+}
+
+void MainWindow::previewImageUrl(const QUrl &url)
+{
+    if (!url.isLocalFile()) {
+        QMessageBox::information(this,
+                                 tr("Image preview"),
+                                 tr("Only local images can be previewed:\n\n%1")
+                                     .arg(url.toDisplayString()));
+        return;
+    }
+    MediaPreviewWindow::showImageFile(url.toLocalFile(), this);
+}
+
+void MainWindow::previewSvg(const QString &svg)
+{
+    MediaPreviewWindow::showSvg(svg, tr("SVG preview"), this);
 }
 
 void MainWindow::updateThemeButton()

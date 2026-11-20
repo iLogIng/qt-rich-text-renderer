@@ -16,12 +16,12 @@ class QLabel;
 class QPlainTextEdit;
 class QPushButton;
 class QTabWidget;
-class QTextBrowser;
 class QToolButton;
 class CodeHighlighter;
 class MarkdownLinkHandler;
 class MarkdownSourceHighlighter;
 class OutlinePanel;
+class PreviewBrowser;
 class RendererService;
 class SvgObjectHandler;
 
@@ -81,14 +81,17 @@ private:
     void applySourceFont(int pointSize);
     void updateToolbarHeights();
     void syncViewSettingsFromUi();
+    void previewImageUrl(const QUrl &url);
+    void previewSvg(const QString &svg);
 
     std::unique_ptr<AppSettings> m_settings;
     AppSettingsData m_settingsData;
     QPlainTextEdit *m_source = nullptr;
-    QTextBrowser *m_preview = nullptr;
+    PreviewBrowser *m_preview = nullptr;
     QTabWidget *m_tabs = nullptr;
     QDockWidget *m_outlineDock = nullptr;
     OutlinePanel *m_outlinePanel = nullptr;
+    QToolButton *m_outlineToggleButton = nullptr;
     QLabel *m_status = nullptr;
     QPushButton *m_renderButton = nullptr;
     QPushButton *m_loadButton = nullptr;
