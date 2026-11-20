@@ -31,14 +31,12 @@ fi
 
 mkdir -p \
   AppDir/usr/share/rich-text-render/renderer/dist \
-  AppDir/usr/share/rich-text-render/samples \
   AppDir/usr/share/applications \
   AppDir/usr/share/icons/hicolor/256x256/apps
 
 cp third_party/quickjs-ng/build/qjs AppDir/usr/bin/qjs
 chmod +x AppDir/usr/bin/qjs
 cp renderer/dist/*.mjs AppDir/usr/share/rich-text-render/renderer/dist/
-cp samples/sample.md AppDir/usr/share/rich-text-render/samples/
 cp packaging/rich-text-render.desktop AppDir/rich-text-render.desktop
 cp packaging/rich-text-render.png AppDir/rich-text-render.png
 cp packaging/rich-text-render.desktop AppDir/usr/share/applications/
