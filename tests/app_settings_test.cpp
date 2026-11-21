@@ -32,8 +32,8 @@ bool writeFile(const QString &path, const QByteArray &data)
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("rich-text-render-test"));
-    app.setOrganizationName(QStringLiteral("locvas-test"));
+    app.setApplicationName(QStringLiteral("rich-text-renderer-test"));
+    app.setOrganizationName(QStringLiteral("rich-text-renderer-test"));
 
     QTemporaryDir directory;
     expect(directory.isValid(), QStringLiteral("temporary directory available"));

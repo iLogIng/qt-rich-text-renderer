@@ -1,4 +1,4 @@
-# rich-text-render spike
+# rich-text-renderer
 
 This window uses **Qt Widgets + QTextDocument** for Markdown, and renders math/mermaid blocks through QuickJS into SVG.
 
@@ -62,7 +62,7 @@ console.log(`value = ${value}`);
 
 ```json
 {
-  "name": "locvas",
+  "name": "rich-text-renderer",
   "enabled": true,
   "count": 3
 }

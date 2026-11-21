@@ -128,7 +128,7 @@ void MarkdownLinkHandler::handleUrl(const QUrl &url)
         const auto answer = QMessageBox::question(
             m_dialogParent,
             tr("Open external link?"),
-            tr("This link points outside locvas:\n\n%1")
+            tr("This link points outside rich-text-renderer:\n\n%1")
                 .arg(resolved.url.toDisplayString()),
             QMessageBox::Yes | QMessageBox::No,
             QMessageBox::No);

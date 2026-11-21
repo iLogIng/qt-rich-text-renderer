@@ -18,7 +18,7 @@ QString SvgCache::key(const QString &kind,
                       const QString &theme) const
 {
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    hash.addData("rich-text-render-service-v2");
+    hash.addData("rich-text-renderer-service-v2");
     hash.addData(kind.toUtf8());
     hash.addData(m_version.toUtf8());
     hash.addData(source.toUtf8());

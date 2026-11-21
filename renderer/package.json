@@ -1,5 +1,5 @@
 {
-  "name": "rich-text-render-spike",
+  "name": "rich-text-renderer",
   "private": true,
   "version": "0.1.0",
   "type": "module",

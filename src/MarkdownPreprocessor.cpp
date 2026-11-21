@@ -6,7 +6,7 @@ namespace {
 
 QString makeToken(const QString &prefix, int index)
 {
-    return QStringLiteral("LOCVASBLOCK%1%2TOKEN").arg(prefix).arg(index);
+    return QStringLiteral("RTRBLOCK%1%2TOKEN").arg(prefix).arg(index);
 }
 
 QString addMathBlock(PreparedMarkdown &prepared,

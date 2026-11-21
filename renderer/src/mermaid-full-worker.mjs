@@ -12,7 +12,7 @@ function initialize(theme) {
     securityLevel: 'strict',
     theme: theme === 'dark' ? 'dark' : 'default',
     deterministicIds: true,
-    deterministicIDSeed: 'locvas-spike',
+    deterministicIDSeed: 'rich-text-renderer',
   });
 }
 
@@ -44,7 +44,7 @@ while (true) {
   const started = Date.now();
   try {
     initialize(request.theme);
-    const { svg } = await mermaid.render(`locvas-full-${++renderCounter}`, String(request.source ?? ''));
+    const { svg } = await mermaid.render(`rich-text-renderer-${++renderCounter}`, String(request.source ?? ''));
     send({ id: request.id ?? '', svg, ms: Date.now() - started });
   } catch (error) {
     send({

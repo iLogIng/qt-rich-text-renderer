@@ -11,7 +11,7 @@ mermaid.initialize({
   securityLevel: 'strict',
   theme,
   deterministicIds: true,
-  deterministicIDSeed: 'locvas-spike',
+  deterministicIDSeed: 'rich-text-renderer',
 });
 
 async function main() {
@@ -23,7 +23,7 @@ async function main() {
   if (input === null) {
     throw new Error(`cannot read ${inputPath}`);
   }
-  const { svg } = await mermaid.render('locvas-spike', input);
+  const { svg } = await mermaid.render('rich-text-renderer', input);
   std.out.puts(svg);
 }
 
