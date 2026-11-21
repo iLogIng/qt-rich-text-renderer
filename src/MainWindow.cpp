@@ -617,7 +617,12 @@ void MainWindow::finishPreviewLoad()
 
 void MainWindow::forcePreviewLayout()
 {
-    // Force layout so scrollbar ranges and anchor positions are current.
+    // Reassigning the text width invalidates any partial lazy layout and
+    // forces the complete document to be laid out before sizes are queried.
+    const int width = m_preview->viewport()->width();
+    if (width > 0) {
+        m_preview->document()->setTextWidth(width);
+    }
     m_preview->document()->documentLayout()->documentSize();
 }
 

@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QComboBox>
 #include <QDockWidget>
@@ -204,6 +205,29 @@ int main(int argc, char **argv)
     auto *status = window.findChild<QLabel *>(QStringLiteral("statusLabel"));
     expect(status && status->text().contains(QStringLiteral("Cannot open")),
            QStringLiteral("status-only load failure is reported without a dialog"));
+
+    const QString readmePath =
+        QStringLiteral(TEST_SOURCE_DIR) + QStringLiteral("/README.md");
+    window.loadFile(readmePath);
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    if (preview) {
+        QTextBlock lastHeading;
+        for (int i = preview->document()->blockCount() - 1; i >= 0; --i) {
+            const QTextBlock block = preview->document()->findBlockByNumber(i);
+            if (block.blockFormat().headingLevel() > 0) {
+                lastHeading = block;
+                break;
+            }
+        }
+        expect(lastHeading.isValid(), QStringLiteral("README last heading exists"));
+        if (lastHeading.isValid()) {
+            const QRectF rect =
+                preview->document()->documentLayout()->blockBoundingRect(lastHeading);
+            expect(rect.height() > 0,
+                   QStringLiteral("README last heading receives layout height"));
+        }
+    }
 
     const QString customSettingsPath = directory.filePath(QStringLiteral("custom-settings.ini"));
     {

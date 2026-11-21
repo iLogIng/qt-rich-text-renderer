@@ -109,6 +109,9 @@ add_executable(main-window-startup-test
     tests/main_window_startup_test.cpp
 )
 target_link_libraries(main-window-startup-test PRIVATE rich-text-renderer-ui)
+target_compile_definitions(main-window-startup-test PRIVATE
+    TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 add_executable(app-settings-test
     tests/app_settings_test.cpp
