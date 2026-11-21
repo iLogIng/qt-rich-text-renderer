@@ -1,8 +1,8 @@
 # Third-party notices
 
-This spike uses:
+This project uses:
 
-- **Qt 6** — LGPLv3 / commercial. This project links dynamically against the system Qt installation for the spike; a distributed build must comply with Qt's LGPL terms.
+- **Qt 6** — LGPLv3 / commercial. This project links dynamically against the system Qt installation; a distributed build must comply with Qt's LGPL terms.
 - **QuickJS-ng** — MIT. See `third_party/quickjs-ng/LICENSE`.
 - **MathJax** (`mathjax-full` 3.2.2) — Apache-2.0.
 - **Mermaid** 13.0.0-alpha.3 — MIT.

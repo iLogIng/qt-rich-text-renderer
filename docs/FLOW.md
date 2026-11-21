@@ -238,7 +238,7 @@ flowchart TD
 ```
 
 - 模板只读，用户覆盖写入 `QSettings`；
-- `--dark` 只覆盖当前会话；
+- `--dark` 只覆盖当前进程；
 - Source 只读，Markdown 高亮在 Source 文档上运行；
 - 目录条目保存 blockNumber，不依靠生成 anchor；
 - Outline dock 固定左侧，`Outline` 开关只负责隐藏/显示，不允许浮动或取下。

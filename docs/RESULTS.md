@@ -1,6 +1,6 @@
-# Spike Results: QuickJS + MathJax + Mermaid → SVG → QtSvg
+# 验证结果：QuickJS + MathJax + Mermaid → SVG → QtSvg
 
-日期：2026-11-18（链接与历史更新：2026-11-20）
+记录日期：2026-11-18（链接与历史更新：2026-11-20）
 
 环境：
 
@@ -38,7 +38,7 @@
 | Qt 应用二进制 | 6.7MB |
 | AppDir（含 Qt 依赖/插件） | 约 85MB |
 | AppImage（完整） | **34.3MB / 32.7MiB** |
-| qjs + 4 个 JS bundle | 约 5MB |
+| qjs + 4 个 JS bundle（含测试入口） | 约 7.9MB |
 
 对比：QtWebEngine 通常会带来 130–180MB 的额外体积。这个方案避开了它。
 
@@ -121,7 +121,7 @@ MathJax SVG 的一些性质：
 
 - SVG 根节点 `width`/`height` 使用 `ex` 单位；`QSvgRenderer` 会按 `viewBox` 得到过大的默认尺寸，需要归一化为 px；
 - 包含 `<use xlink:href="#...">`；QSvgRenderer 能正常渲染；
-- 使用 `currentColor`；需要替换为具体颜色（QtSvg 能处理 currentColor，但为确保可预测，spike 中替换为 `#111111`）；
+- 使用 `currentColor`；需要替换为具体颜色（QtSvg 能处理 currentColor，但为确保可预测，本项目替换为 `#111111`）；
 - `fontCache: 'local'` 输出可被 QtSvg 正确渲染；
 - 典型的二次公式 SVG 约 6KB，积分/求和约 5.7KB。
 
@@ -144,7 +144,7 @@ Mermaid v13 alpha 的关键性质：
 
 ## 6. Qt Markdown 表现
 
-`QTextDocument::setMarkdown` 在本 spike 中表现：
+`QTextDocument::setMarkdown` 在本项目中的表现：
 
 - 标题、段落、粗体、链接：正常；
 - 表格：正常；
@@ -152,7 +152,7 @@ Mermaid v13 alpha 的关键性质：
 - 中文、emoji：正常；
 - 复杂嵌套列表/脚注：未验证；
 - 需要占位符替换才能插入自定义 SVG 对象；
-- Qt 的 Markdown importer 不会自动保留自定义对象；本 spike 用 token + `QTextObjectInterface`。
+- Qt 的 Markdown importer 不会自动保留自定义对象；本项目用 token + `QTextObjectInterface`。
 
 实现细节：
 
@@ -223,7 +223,7 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - Settings 对话框支持 Appearance / View / Preview / Advanced；
 - 字体大小分为应用/预览字号和只读 Source 字号；
 - 主题、字号、目录/Source 可见性、预览宽度和渲染超时都可以运行时应用；
-- `--dark` 仅覆盖当前会话，不自动写回配置；
+- `--dark` 仅覆盖当前进程，不自动写回配置；
 - 窗口几何、最近目录、主题和可见性会持久化。
 
 相关测试：
@@ -249,7 +249,7 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - SVG 通过 `QSvgRenderer` 按屏幕尺寸和 device pixel ratio 渲染；
 - 远程图片不下载，只提示仅支持本地图片。
 
-已通过临时 UI 探针验证图片点击、SVG 点击、图片链接预览和预览窗口创建。
+图片点击、SVG 点击、图片链接预览和预览窗口创建均已验证可用。
 
 ## 6.6 Load 与 --file 加载审计
 
@@ -261,7 +261,7 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 [load] path=... size=... mtime=... fileSha256=... textSha256=...
 ```
 
-`Load` 已改用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。实际 Load 自动化探针与 `--file` 得到相同的：
+`Load` 已改用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。`Load` 与 `--file` 两条路径得到相同的审计字段：
 
 - 路径；
 - 文件大小；
@@ -284,7 +284,7 @@ key = SHA256(
 )
 ```
 
-缓存文件：`~/.cache/locvas-spike/rich-text-render-spike/.../<key>.svg`
+缓存文件：`~/.cache/rich-text-renderer/rich-text-renderer/.../<key>.svg`
 
 实际效果：
 
@@ -306,7 +306,7 @@ key = SHA256(
 构建方式：
 
 1. `linuxdeploy` 部署 Qt 依赖到 `AppDir`；
-2. 复制 `qjs` 到 `usr/bin`，只复制运行时使用的 MathJax 和 Mermaid full worker 到 `usr/share/rich-text-render/renderer/dist`；
+2. 复制 `qjs` 到 `usr/bin`，只复制运行时使用的 MathJax 和 Mermaid full worker 到 `usr/share/rich-text-renderer/renderer/dist`；
 3. 复制 `config/settings.ini` 默认模板；
 4. `appimagetool` 生成 AppImage。
 
@@ -320,7 +320,7 @@ key = SHA256(
 运行验证：
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
+QT_QPA_PLATFORM=offscreen ./dist/rich-text-renderer-x86_64.AppImage \
   --appimage-extract-and-run --file samples/sample.md \
   --screenshot out/appimage.png
 ```
@@ -358,5 +358,5 @@ QT_QPA_PLATFORM=offscreen ./rich-text-render-x86_64.AppImage \
 3. 对 Mermaid v13 alpha 做版本锁定和升级回归；
 4. 把 SVG sanitizer 做成独立、可测试的组件，覆盖 MathJax `<use>`、Mermaid CSS 变量、外部资源、脚本/事件属性；
 5. 用真实 AI 输出语料做 Markdown/公式/图表的视觉回归；
-6. 在接入主项目之前，先实现复制、Blob 缓存和 AppImage CI；
+6. 在扩大使用范围之前，先实现复制、Blob 缓存和 AppImage CI；
 7. 如果 Mermaid alpha 不稳定，降级为“v1 只支持 flowchart/sequence，Mermaid 不支持时显示源码 + 外部打开”。

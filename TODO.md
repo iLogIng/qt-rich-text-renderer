@@ -1,6 +1,6 @@
 # TODO
 
-> 项目：rich-text-render spike
+> 项目：rich-text-renderer
 >
 > 记录日期：2026-11-18
 >
@@ -8,7 +8,7 @@
 
 ## Polish 顺序
 
-> 以下是“从 spike 到可日常使用”的建议顺序，汇总自下面的 P0/P1/P2；不替代详细清单。
+> 以下是“从验证版本到可日常使用”的建议顺序，汇总自下面的 P0/P1/P2；不替代详细清单。
 > 每完成一项，都回到真实 AI 输出语料做一次冷/热缓存与视觉回归。
 
 | 顺序 | 打磨项 | 对应现有条目 |
@@ -231,7 +231,7 @@
 - [ ] 数学/Mermaid 的替代文本
 - [ ] 键盘导航与复制
 
-### 15. 长会话
+### 15. 长文档
 
 - [ ] 消息级虚拟化
 - [ ] 图片/SVG 缓存上限
@@ -242,13 +242,6 @@
 - [ ] Linux 之外的打包验证
 - [ ] 字体、路径、进程组差异
 - [ ] AppImage 之外的发行格式
-
-### 17. 与主项目整合
-
-- [ ] 接入 Blob 存储
-- [ ] 接入 SQLite 会话缓存
-- [ ] 接入主项目的 Surface/composer
-- [ ] 与 locvas 的 ADR-0005/0006 对齐
 
 ## 已完成
 
@@ -281,7 +274,7 @@
 - [x] 工具栏右侧历史下拉框：最新在上、显示文件名、tooltip 完整路径
 - [x] 将 MarkdownRenderer 拆为 `MarkdownPreprocessor` 和 `MarkdownDocumentBuilder`
 - [x] 抽出独立 `LinkResolver` 和 `SvgCache`
-- [x] 建立 `rich-text-render-core`、`rich-text-render-document`、`rich-text-render-ui` 三个静态库
+- [x] 建立 `rich-text-renderer-core`、`rich-text-renderer-document`、`rich-text-renderer-ui` 三个静态库
 - [x] 删除未参与构建的 `RendererClient`
 - [x] Source 改为只读 tab，使用 Qt `QSyntaxHighlighter` 做 Markdown 语法高亮
 - [x] `MarkdownOutline` 从 `QTextDocument` 提取标题，左侧 Outline dock 点击跳转

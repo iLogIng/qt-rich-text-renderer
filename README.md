@@ -1,6 +1,8 @@
-# rich-text-render spike
+# rich-text-renderer
 
-一个独立的 Qt6 富文本渲染 spike，用来验证：
+`rich-text-renderer` 是一个独立的 Qt6 富文本渲染项目，用于验证 locvas 期望的本地 Markdown 富文本渲染能力。本仓库不包含 locvas 的实现或集成。
+
+当前实现覆盖：
 
 - Qt Widgets + `QTextDocument` 渲染 Markdown；
 - QuickJS-ng 运行 MathJax，将 TeX 渲染成 SVG；
@@ -11,7 +13,7 @@
 - 深色 / 浅色主题切换；
 - AppImage 打包与体积测量。
 
-> 这是验证项目，不是生产实现。它证明路线可行，但还没有达到可直接发布的产品形态。
+> 本项目是独立验证项目，不是生产实现。当前结果证明渲染路线可行，但还未达到可直接发布的产品形态。
 
 ## 0. 当前结论
 
@@ -151,7 +153,7 @@ cache key = SHA256(
 当前缓存目录：
 
 ```text
-~/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike/
+~/.cache/rich-text-renderer/rich-text-renderer/
 ```
 
 缓存的是**原始 SVG**；颜色/主题在嵌入时由 `SvgSanitizer` 应用。Mermaid 主题不同会生成不同 SVG，因此主题进入 cache key。
@@ -198,10 +200,10 @@ cache key = SHA256(
 
 | CMake 目标 | 内容 | 依赖 |
 |---|---|---|
-| `rich-text-render-core` | Markdown 预处理、应用设置、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
-| `rich-text-render-document` | 文档构建、标题目录、Source 高亮、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
-| `rich-text-render-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets` |
-| `rich-text-render` | 应用入口 | `rich-text-render-ui` |
+| `rich-text-renderer-core` | Markdown 预处理、应用设置、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
+| `rich-text-renderer-document` | 文档构建、标题目录、Source 高亮、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
+| `rich-text-renderer-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets` |
+| `rich-text-renderer` | 应用入口 | `rich-text-renderer-ui` |
 
 依赖方向固定为：
 
@@ -241,7 +243,7 @@ config/settings.ini
 AppImage 内路径：
 
 ```text
-usr/share/rich-text-render/config/settings.ini
+usr/share/rich-text-renderer/config/settings.ini
 ```
 
 模板是只读默认值来源，包含所有用户可配置项和说明注释。用户修改通过 QSettings 写入独立文件，避免 QSettings 重写模板时丢失注释：
@@ -253,7 +255,7 @@ QStandardPaths::AppConfigLocation/settings.ini
 Linux 上通常为：
 
 ```text
-~/.config/locvas-spike/rich-text-render-spike/settings.ini
+~/.config/rich-text-renderer/rich-text-renderer/settings.ini
 ```
 
 配置项：
@@ -268,7 +270,7 @@ Linux 上通常为：
 - `renderer.idleTimeoutMs`、`mathRequestTimeoutMs`、`mermaidRequestTimeoutMs`；
 - `files.lastDirectory`、`window.geometry`：运行状态持久化。
 
-Settings 对话框提供 Appearance、View、Preview、Advanced 四组设置，并包含 Restore Defaults。命令行 `--dark` 只覆盖当前会话，不会自动写入用户配置。
+Settings 对话框提供 Appearance、View、Preview、Advanced 四组设置，并包含 Restore Defaults。命令行 `--dark` 只覆盖当前进程，不会自动写入用户配置。
 
 ## 4. 构建
 
@@ -346,7 +348,7 @@ cmake --build build -j"$(nproc)"
 ### GUI
 
 ```bash
-./build/rich-text-render
+./build/rich-text-renderer
 ```
 
 窗口包含：
@@ -382,7 +384,7 @@ cmake --build build -j"$(nproc)"
 示例：
 
 ```bash
-RICH_TEXT_RENDER_DEBUG_LOAD=1 ./build/rich-text-render --file <path>
+RICH_TEXT_RENDER_DEBUG_LOAD=1 ./build/rich-text-renderer --file <path>
 ```
 
 加载新文档后 Preview 会回到顶部并强制刷新视口，避免文件对话框关闭后留下旧绘制区域。
@@ -440,19 +442,19 @@ Source 行为：
 
 ```bash
 # 渲染指定 Markdown
-./build/rich-text-render --file tests/sources/bench.md
+./build/rich-text-renderer --file tests/sources/bench.md
 
 # 以深色模式启动
-./build/rich-text-render --dark
+./build/rich-text-renderer --dark
 
 # 启动 1.5 秒后自动切换一次主题（用于截图/测试）
-./build/rich-text-render --file samples/sample.md --toggle-theme --screenshot out/toggle.png
+./build/rich-text-renderer --file samples/sample.md --toggle-theme --screenshot out/toggle.png
 
 # 无头截图（8 秒后保存）
-QT_QPA_PLATFORM=offscreen ./build/rich-text-render --file samples/sample.md --screenshot out/app.png
+QT_QPA_PLATFORM=offscreen ./build/rich-text-renderer --file samples/sample.md --screenshot out/app.png
 
 # 深色截图
-QT_QPA_PLATFORM=offscreen ./build/rich-text-render --file samples/sample.md --dark --screenshot out/app-dark.png
+QT_QPA_PLATFORM=offscreen ./build/rich-text-renderer --file samples/sample.md --dark --screenshot out/app-dark.png
 ```
 
 ### 测试与基准
@@ -488,10 +490,10 @@ scripts/package-appimage.sh
 
 1. 用 `linuxdeploy --plugin qt` 把 Qt 依赖/插件部署到 `AppDir`；
 2. 复制 `qjs` 到 `AppDir/usr/bin/qjs`；
-3. 只复制运行时使用的 `mathjax-worker.mjs` 和 `mermaid-full-worker.mjs` 到 `AppDir/usr/share/rich-text-render/renderer/dist/`；
-4. 复制 `config/settings.ini` 到 `AppDir/usr/share/rich-text-render/config/`；
+3. 只复制运行时使用的 `mathjax-worker.mjs` 和 `mermaid-full-worker.mjs` 到 `AppDir/usr/share/rich-text-renderer/renderer/dist/`；
+4. 复制 `config/settings.ini` 到 `AppDir/usr/share/rich-text-renderer/config/`；
 5. 写入 `AppRun`、desktop、icon；
-6. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
+6. 用 `appimagetool` 生成 `dist/rich-text-renderer-x86_64.AppImage`。
 
 脚本默认从 `PATH` 查找：
 
@@ -511,7 +513,7 @@ scripts/package-appimage.sh
 ### 当前产物
 
 ```text
-dist/rich-text-render-x86_64.AppImage
+dist/rich-text-renderer-x86_64.AppImage
 ```
 
 > 当前 `dist/` 已包含 renderer service 和 worker 脚本；改动代码后需重新执行
@@ -520,7 +522,7 @@ dist/rich-text-render-x86_64.AppImage
 验证：
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
+QT_QPA_PLATFORM=offscreen ./dist/rich-text-renderer-x86_64.AppImage \
   --appimage-extract-and-run --file samples/sample.md --dark \
   --screenshot out/appimage-dark.png
 ```
@@ -643,19 +645,12 @@ config/                 完整 settings.ini 默认模板
 samples/                demo Markdown（sample.md）
 tests/sources/          测试输入：公式 / Mermaid / 基准 Markdown
 tools/svgcheck.cpp      SVG -> PNG 的 QtSvg 检查工具
-docs/                   spike 结果、流程与 ADR
+docs/                   验证结果、流程与 ADR
 docs/assets/            最终截图
 packaging/              desktop/icon
 scripts/                构建、测试、基准、打包
 dist/                   生成的 AppImage（gitignored）
 ```
-
-**编写任务聚焦于**
-
-- `src/`
-- `renderer/src/`
-- `tools/`
-- `scripts/`
 
 ## 10. 第三方与许可证
 

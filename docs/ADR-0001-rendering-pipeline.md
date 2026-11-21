@@ -2,15 +2,15 @@
 
 - Status: Accepted
 - Date: 2026-11-18
-- Deciders: rich-text-render spike
+- Deciders: rich-text-renderer
 
 ## Context
 
-Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高亮、没有 TeX、没有 Mermaid，复杂 GFM 也可能走形。WebEngine 可以解决渲染正确性，但会带来 130–180MB 的 Chromium 体积、启动开销，并与“不做浏览器外壳”的目标冲突。
+Qt Widgets 的 Markdown 渲染在富文本阅读场景下不完整：没有语法高亮、没有 TeX、没有 Mermaid，复杂 GFM 也可能走形。WebEngine 可以解决渲染正确性，但会带来 130–180MB 的 Chromium 体积、启动开销，并与“不做浏览器外壳”的目标冲突。
 
 此前评估过 QML + MarkQml，但无法同时满足 Qt Widgets 集成、选区/复制、流式更新与维护成本要求。
 
-本 spike 验证另一条路径：
+本项目验证另一条路径：
 
 - Markdown 用 Qt 原生 importer；
 - TeX 用 QuickJS + MathJax 输出 SVG；
@@ -104,7 +104,7 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
 - **KaTeX + HTML/CSS**：Qt 没有 CSS 引擎，不适合。
 - **自写 TeX 布局**：成本过高。
 - **自写 Mermaid 渲染器**：成本过高，且 v13 alpha 已提供 DOM-free 路径。
-- **只显示 TeX/Mermaid 源码**：可以作为降级方案，但达不到完整 AI 聊天体验。
+- **只显示 TeX/Mermaid 源码**：可以作为降级方案，但达不到完整富文本阅读体验。
 
 ## References
 
