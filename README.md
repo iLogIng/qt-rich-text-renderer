@@ -103,7 +103,7 @@ cmake --build build -j"$(nproc)"
 
 | 环境变量 | 作用 |
 |---|---|
-| `RICH_TEXT_RENDER_DEBUG_LOAD=1` | 输出加载来源、路径、大小、mtime 和 SHA-256 审计信息 |
+| `RICH_TEXT_RENDER_DEBUG_LOAD=1` | 输出路径、大小、mtime 和 SHA-256 审计信息 |
 | `RICH_TEXT_RENDER_DEBUG=1` | 输出渲染摘要和缓存命中信息 |
 | `RICH_TEXT_RENDER_IDLE_MS=<ms>` | 覆盖 worker 空闲退出时间 |
 

@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     }
 
     if (!filePath.isEmpty()) {
-        window.loadFile(filePath);
+        window.loadFile(filePath, false);
     }
 
     return app.exec();

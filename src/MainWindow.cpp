@@ -45,6 +45,7 @@
 #include <QTextBrowser>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QDebug>
@@ -83,16 +84,6 @@ QString fileSha256(const QString &path)
         return {};
     }
     return QString::fromLatin1(hash.result().toHex());
-}
-
-void logLoadOrigin(const QString &origin, const QString &path)
-{
-    if (qEnvironmentVariableIsSet("RICH_TEXT_RENDER_DEBUG_LOAD")) {
-        fprintf(stderr,
-                "[load-origin] %s %s\n",
-                origin.toUtf8().constData(),
-                path.toUtf8().constData());
-    }
 }
 
 void logLoadedFile(const LocalFileContent &loaded)
@@ -314,13 +305,14 @@ void MainWindow::configureRenderer()
                           m_settingsData.mermaidRequestTimeoutMs);
 }
 
-void MainWindow::loadFile(const QString &path)
+void MainWindow::loadFile(const QString &path, bool reportErrors)
 {
-    logLoadOrigin(QStringLiteral("command-line"), path);
-    openLocalFile(path,
-                  QString(),
-                  HistoryMode::Record,
-                  LoadErrorMode::StatusOnly);
+    const LoadErrorMode errorMode = reportErrors ? LoadErrorMode::Dialog
+                                                 : LoadErrorMode::StatusOnly;
+    if (!openLocalFile(path, QString(), HistoryMode::Record, errorMode)) {
+        return;
+    }
+    m_settingsData.lastDirectory = QFileInfo(path).absolutePath();
 }
 
 void MainWindow::chooseFile()
@@ -336,15 +328,7 @@ void MainWindow::chooseFile()
         return;
     }
 
-    logLoadOrigin(QStringLiteral("toolbar"), path);
-    m_settingsData.lastDirectory = QFileInfo(path).absolutePath();
-    syncViewSettingsFromUi();
-    m_settings->save(m_settingsData);
-
-    openLocalFile(path,
-                  QString(),
-                  HistoryMode::Record,
-                  LoadErrorMode::Dialog);
+    loadFile(path);
 }
 
 void MainWindow::showSettings()
@@ -496,6 +480,7 @@ bool MainWindow::openLocalFile(const QString &path,
 
     m_source->setPlainText(loaded.text);
     m_pendingAnchor = fragment;
+    m_loadAnchorRequested = !fragment.isEmpty();
 
     if (mode == HistoryMode::Record) {
         m_history.visit(loaded.path, displayName);
@@ -503,8 +488,7 @@ bool MainWindow::openLocalFile(const QString &path,
 
     renderNow();
     m_tabs->setCurrentWidget(m_preview);
-    m_preview->verticalScrollBar()->setValue(0);
-    m_preview->viewport()->update();
+    schedulePreviewRefresh();
     updateHistoryUi();
     return true;
 }
@@ -597,6 +581,36 @@ void MainWindow::showLoadError(const QString &path,
                          tr("Cannot open file"),
                          tr("This file cannot be displayed in the window:\n\n%1")
                              .arg(detail));
+}
+
+void MainWindow::schedulePreviewRefresh()
+{
+    const int generation = m_generation;
+    QTimer::singleShot(0, this, [this, generation] {
+        if (generation != m_generation) {
+            return;
+        }
+        finishPreviewLoad();
+    });
+}
+
+void MainWindow::finishPreviewLoad()
+{
+    m_preview->document()->documentLayout()->documentSize();
+    if (m_loadAnchorRequested) {
+        if (!m_pendingAnchor.isEmpty()) {
+            if (m_blockCount == 0) {
+                applyPendingAnchor();
+            } else {
+                // Keep the anchor pending so async embedding can reapply it.
+                MarkdownLinkHandler::scrollToAnchor(m_preview, m_pendingAnchor);
+            }
+        }
+    } else {
+        m_preview->setTextCursor(QTextCursor(m_preview->document()));
+        m_preview->verticalScrollBar()->setValue(0);
+    }
+    m_preview->viewport()->update();
 }
 
 void MainWindow::applyPendingAnchor()
@@ -724,7 +738,6 @@ void MainWindow::renderNow()
 
     if (prepared.blocks.isEmpty()) {
         m_status->setText(QStringLiteral("Markdown rendered; no math/mermaid blocks found."));
-        applyPendingAnchor();
         return;
     }
 
@@ -774,7 +787,10 @@ void MainWindow::renderNow()
                             static_cast<long long>(m_renderTimer.elapsed()),
                             m_cacheHits);
                 }
-                applyPendingAnchor();
+                m_preview->document()->documentLayout()->documentSize();
+                if (!m_pendingAnchor.isEmpty()) {
+                    applyPendingAnchor();
+                }
                 m_preview->viewport()->update();
             }
         };

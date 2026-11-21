@@ -31,8 +31,10 @@ sequenceDiagram
     W->>W: updateHistoryUi()（空历史）
     M->>W: show()
     opt 有 --file
-        M->>W: loadFile(path) → openLocalFile()
+        M->>W: loadFile(path, false) → openLocalFile()
         W->>W: history.visit() + renderNow()
+        W->>W: schedulePreviewRefresh()（0ms，generation 校验）
+        W->>W: finishPreviewLoad()（布局、光标、滚动和视口刷新）
     end
     opt 有 --toggle-theme
         M->>W: singleShot(1500) → setDarkMode(!isDarkMode())
@@ -43,6 +45,25 @@ sequenceDiagram
     M->>E: app.exec()
     E-->>W: QProcess / QTimer 回调
 ```
+
+### 1.1 文件加载入口
+
+```mermaid
+flowchart TD
+    A["--file"] --> C["MainWindow::loadFile(path, reportErrors)"]
+    B["Load 按钮"] --> D["QFileDialog"] --> C
+    C --> E["openLocalFile()"]
+    E --> F["renderNow()"]
+    E --> G["schedulePreviewRefresh()"]
+    G --> H["finishPreviewLoad()"]
+    H --> I["文档布局、光标复位、滚动复位、viewport 刷新"]
+```
+
+- `--file` 和 `Load` 共用同一条加载和收尾路径；`reportErrors` 只控制错误呈现方式；
+- `chooseFile()` 只负责选择路径，不处理加载状态；
+- `openLocalFile()` 负责读取、历史、base URL 和渲染编排；
+- `renderNow()` 只负责把 Source 转换为 Preview 并调度渲染；
+- `finishPreviewLoad()` 负责一次加载完成后的布局和视口收尾。
 
 ---
 

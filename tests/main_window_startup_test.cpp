@@ -5,12 +5,16 @@
 #include <QDockWidget>
 #include <QFile>
 #include <QPlainTextEdit>
+#include <QScrollBar>
 #include <QSettings>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QTextBlock>
+#include <QTextBrowser>
 #include <QTextStream>
 #include <QToolButton>
 #include <QTreeWidget>
+#include <QUrl>
 
 namespace {
 
@@ -87,6 +91,80 @@ int main(int argc, char **argv)
     if (outline->topLevelItemCount() == 1) {
         expect(outline->topLevelItem(0)->text(0) == QStringLiteral("Startup heading"),
                QStringLiteral("outline shows the heading title"));
+    }
+
+    window.show();
+    QCoreApplication::processEvents();
+
+    const QString visiblePath = directory.filePath(QStringLiteral("visible-load.md"));
+    const QString visibleContent =
+        QStringLiteral("# Visible load\n\n"
+                       "Intro paragraph.\n\n"
+                       "| A | B |\n"
+                       "|---|---|\n"
+                       "| 1 | 2 |\n\n"
+                       "## First section\n\n"
+                       "Body text.\n\n"
+                       "```cpp\n"
+                       "int main() { return 0; }\n"
+                       "```\n\n"
+                       "## Second section\n\n"
+                       "Final paragraph.\n");
+    QFile visibleFile(visiblePath);
+    expect(visibleFile.open(QIODevice::WriteOnly), QStringLiteral("write visible-load fixture"));
+    visibleFile.write(visibleContent.toUtf8());
+    visibleFile.close();
+
+    window.loadFile(visiblePath);
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    auto *preview = window.findChild<QTextBrowser *>(QStringLiteral("previewView"));
+    expect(preview != nullptr, QStringLiteral("preview view found"));
+    expect(source->toPlainText() == visibleContent,
+           QStringLiteral("visible-window load keeps the complete source"));
+    expect(outline->topLevelItemCount() == 1,
+           QStringLiteral("visible-window load updates the outline root"));
+    if (outline->topLevelItemCount() == 1) {
+        expect(outline->topLevelItem(0)->childCount() == 2,
+               QStringLiteral("visible-window load updates the outline children"));
+    }
+    if (preview) {
+        expect(preview->document()->toPlainText().contains(QStringLiteral("Second section")),
+               QStringLiteral("visible-window load keeps all preview sections"));
+        expect(preview->verticalScrollBar()->value() == 0,
+               QStringLiteral("visible-window load returns the preview to the top"));
+        expect(preview->textCursor().position() == 0,
+               QStringLiteral("visible-window load resets the preview cursor"));
+    }
+
+    const QString targetPath = directory.filePath(QStringLiteral("target.md"));
+    QString targetContent = QStringLiteral("# Target document\n\n");
+    for (int i = 0; i < 60; ++i) {
+        targetContent += QStringLiteral("target line %1\n\n").arg(i);
+    }
+    targetContent += QStringLiteral("## Details\n\nTarget body.\n");
+    QFile targetFile(targetPath);
+    expect(targetFile.open(QIODevice::WriteOnly), QStringLiteral("write anchor target"));
+    targetFile.write(targetContent.toUtf8());
+    targetFile.close();
+
+    const QString linkSourcePath = directory.filePath(QStringLiteral("link-source.md"));
+    QFile linkSourceFile(linkSourcePath);
+    expect(linkSourceFile.open(QIODevice::WriteOnly), QStringLiteral("write link source"));
+    linkSourceFile.write("# Link source\n\n[Open target](target.md#details)\n");
+    linkSourceFile.close();
+
+    window.loadFile(linkSourcePath);
+    QCoreApplication::processEvents();
+    if (preview) {
+        preview->anchorClicked(QUrl(QStringLiteral("target.md#details")));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        expect(preview->textCursor().block().text() == QStringLiteral("Details"),
+               QStringLiteral("anchor link opens the target heading"));
+        expect(preview->verticalScrollBar()->value() > 0,
+               QStringLiteral("anchor link remains positioned after load"));
     }
 
     const QString customSettingsPath = directory.filePath(QStringLiteral("custom-settings.ini"));

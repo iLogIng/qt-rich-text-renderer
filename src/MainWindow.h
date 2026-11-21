@@ -33,7 +33,7 @@ public:
                         const QString &settingsPath = QString(),
                         QWidget *parent = nullptr);
     ~MainWindow() override;
-    void loadFile(const QString &path);
+    void loadFile(const QString &path, bool reportErrors = true);
     void setDarkMode(bool dark);
     bool isDarkMode() const;
 
@@ -74,6 +74,8 @@ private:
     void showLoadError(const QString &path,
                        const QString &reason,
                        LoadErrorMode errorMode);
+    void schedulePreviewRefresh();
+    void finishPreviewLoad();
     void applyPendingAnchor();
     void scrollPreviewToBlock(int blockNumber);
     void applySettings(const AppSettingsData &previous);
@@ -107,6 +109,7 @@ private:
     MarkdownLinkHandler *m_linkHandler = nullptr;
     NavigationHistory m_history;
     QString m_pendingAnchor;
+    bool m_loadAnchorRequested = false;
     QUrl m_baseUrl;
     bool m_dark = false;
     QElapsedTimer m_renderTimer;

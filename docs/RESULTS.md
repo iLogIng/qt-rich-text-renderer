@@ -255,15 +255,13 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 
 ## 6.6 Load 与 --file 加载审计
 
-`Load` 和 `--file` 最终都调用 `MainWindow::openLocalFile()`。为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
+`Load` 和 `--file` 统一经过 `MainWindow::loadFile()`，再调用 `openLocalFile()`；加载完成后都由 `schedulePreviewRefresh()` 在布局稳定后执行一次 `finishPreviewLoad()`。为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
 
 ```text
-[load-origin] command-line <path>
-[load-origin] toolbar <path>
 [load] path=... size=... mtime=... fileSha256=... textSha256=...
 ```
 
-`Load` 已改用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。`Load` 与 `--file` 两条路径得到相同的审计字段：
+`Load` 使用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。`Load` 与 `--file` 两条路径得到相同的审计字段：
 
 - 路径；
 - 文件大小；
