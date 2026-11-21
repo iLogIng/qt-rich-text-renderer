@@ -789,6 +789,8 @@ void MainWindow::renderNow()
                 }
                 m_preview->document()->documentLayout()->documentSize();
                 if (!m_pendingAnchor.isEmpty()) {
+                    m_preview->setTextCursor(QTextCursor(m_preview->document()));
+                    m_preview->verticalScrollBar()->setValue(0);
                     applyPendingAnchor();
                 }
                 m_preview->viewport()->update();
