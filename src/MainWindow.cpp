@@ -140,6 +140,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     updateThemeButton();
     m_settingsButton = new QPushButton(QStringLiteral("Settings"), central);
     m_status = new QLabel(QStringLiteral("No document open"), central);
+    m_status->setObjectName(QStringLiteral("statusLabel"));
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_backButton = new QToolButton(central);
     m_backButton->setObjectName(QStringLiteral("historyBackButton"));
@@ -481,6 +482,7 @@ bool MainWindow::openLocalFile(const QString &path,
     m_source->setPlainText(loaded.text);
     m_pendingAnchor = fragment;
     m_loadAnchorRequested = !fragment.isEmpty();
+    ++m_loadGeneration;
 
     if (mode == HistoryMode::Record) {
         m_history.visit(loaded.path, displayName);
@@ -585,9 +587,9 @@ void MainWindow::showLoadError(const QString &path,
 
 void MainWindow::schedulePreviewRefresh()
 {
-    const int generation = m_generation;
-    QTimer::singleShot(0, this, [this, generation] {
-        if (generation != m_generation) {
+    const int loadGeneration = m_loadGeneration;
+    QTimer::singleShot(0, this, [this, loadGeneration] {
+        if (loadGeneration != m_loadGeneration) {
             return;
         }
         finishPreviewLoad();
@@ -596,11 +598,10 @@ void MainWindow::schedulePreviewRefresh()
 
 void MainWindow::finishPreviewLoad()
 {
-    m_preview->document()->documentLayout()->documentSize();
+    forcePreviewLayout();
     // A cached block callback may already have positioned a pending anchor.
     if (!m_loadAnchorRequested || !m_pendingAnchor.isEmpty()) {
-        m_preview->setTextCursor(QTextCursor(m_preview->document()));
-        m_preview->verticalScrollBar()->setValue(0);
+        resetPreviewToStart();
         if (!m_pendingAnchor.isEmpty()) {
             if (m_blockCount == 0) {
                 applyPendingAnchor();
@@ -610,7 +611,20 @@ void MainWindow::finishPreviewLoad()
             }
         }
     }
+    m_loadAnchorRequested = false;
     m_preview->viewport()->update();
+}
+
+void MainWindow::forcePreviewLayout()
+{
+    // Force layout so scrollbar ranges and anchor positions are current.
+    m_preview->document()->documentLayout()->documentSize();
+}
+
+void MainWindow::resetPreviewToStart()
+{
+    m_preview->setTextCursor(QTextCursor(m_preview->document()));
+    m_preview->verticalScrollBar()->setValue(0);
 }
 
 void MainWindow::applyPendingAnchor()
@@ -787,10 +801,9 @@ void MainWindow::renderNow()
                             static_cast<long long>(m_renderTimer.elapsed()),
                             m_cacheHits);
                 }
-                m_preview->document()->documentLayout()->documentSize();
+                forcePreviewLayout();
                 if (!m_pendingAnchor.isEmpty()) {
-                    m_preview->setTextCursor(QTextCursor(m_preview->document()));
-                    m_preview->verticalScrollBar()->setValue(0);
+                    resetPreviewToStart();
                     applyPendingAnchor();
                 }
                 m_preview->viewport()->update();

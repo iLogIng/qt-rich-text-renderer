@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFile>
+#include <QLabel>
 #include <QPlainTextEdit>
 #include <QScrollBar>
 #include <QSettings>
@@ -11,6 +12,7 @@
 #include <QTemporaryDir>
 #include <QTextBlock>
 #include <QTextBrowser>
+#include <QTextCursor>
 #include <QTextStream>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -97,7 +99,7 @@ int main(int argc, char **argv)
     QCoreApplication::processEvents();
 
     const QString visiblePath = directory.filePath(QStringLiteral("visible-load.md"));
-    const QString visibleContent =
+    QString visibleContent =
         QStringLiteral("# Visible load\n\n"
                        "Intro paragraph.\n\n"
                        "| A | B |\n"
@@ -110,6 +112,9 @@ int main(int argc, char **argv)
                        "```\n\n"
                        "## Second section\n\n"
                        "Final paragraph.\n");
+    for (int i = 0; i < 80; ++i) {
+        visibleContent += QStringLiteral("\nline %1\n").arg(i);
+    }
     QFile visibleFile(visiblePath);
     expect(visibleFile.open(QIODevice::WriteOnly), QStringLiteral("write visible-load fixture"));
     visibleFile.write(visibleContent.toUtf8());
@@ -136,6 +141,25 @@ int main(int argc, char **argv)
                QStringLiteral("visible-window load returns the preview to the top"));
         expect(preview->textCursor().position() == 0,
                QStringLiteral("visible-window load resets the preview cursor"));
+
+        const int maximumScroll = preview->verticalScrollBar()->maximum();
+        expect(maximumScroll > 0, QStringLiteral("visible-window fixture is scrollable"));
+        if (maximumScroll > 0) {
+            preview->verticalScrollBar()->setValue(maximumScroll);
+            QTextCursor endCursor(preview->document());
+            endCursor.movePosition(QTextCursor::End);
+            preview->setTextCursor(endCursor);
+            expect(preview->verticalScrollBar()->value() > 0,
+                   QStringLiteral("fixture is scrolled before reload"));
+
+            window.loadFile(visiblePath);
+            QCoreApplication::processEvents();
+            QCoreApplication::processEvents();
+            expect(preview->verticalScrollBar()->value() == 0,
+                   QStringLiteral("reload resets a previously scrolled preview"));
+            expect(preview->textCursor().position() == 0,
+                   QStringLiteral("reload resets a previously moved cursor"));
+        }
     }
 
     const QString targetPath = directory.filePath(QStringLiteral("target.md"));
@@ -165,7 +189,21 @@ int main(int argc, char **argv)
                QStringLiteral("anchor link opens the target heading"));
         expect(preview->verticalScrollBar()->value() > 0,
                QStringLiteral("anchor link remains positioned after load"));
+
+        preview->anchorClicked(QUrl(QStringLiteral("target.md#missing")));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        expect(preview->verticalScrollBar()->value() == 0,
+               QStringLiteral("unresolved anchor returns the preview to the top"));
+        expect(preview->textCursor().position() == 0,
+               QStringLiteral("unresolved anchor resets the preview cursor"));
     }
+
+    window.loadFile(directory.filePath(QStringLiteral("missing.md")), false);
+    QCoreApplication::processEvents();
+    auto *status = window.findChild<QLabel *>(QStringLiteral("statusLabel"));
+    expect(status && status->text().contains(QStringLiteral("Cannot open")),
+           QStringLiteral("status-only load failure is reported without a dialog"));
 
     const QString customSettingsPath = directory.filePath(QStringLiteral("custom-settings.ini"));
     {

@@ -76,6 +76,8 @@ private:
                        LoadErrorMode errorMode);
     void schedulePreviewRefresh();
     void finishPreviewLoad();
+    void forcePreviewLayout();
+    void resetPreviewToStart();
     void applyPendingAnchor();
     void scrollPreviewToBlock(int blockNumber);
     void applySettings(const AppSettingsData &previous);
@@ -114,6 +116,7 @@ private:
     bool m_dark = false;
     QElapsedTimer m_renderTimer;
     int m_generation = 0;
+    int m_loadGeneration = 0;
     int m_pending = 0;
     int m_cacheHits = 0;
     int m_blockCount = 0;

@@ -255,7 +255,7 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 
 ## 6.6 Load 与 --file 加载审计
 
-`Load` 和 `--file` 统一经过 `MainWindow::loadFile()`，再调用 `openLocalFile()`；加载完成后都由 `schedulePreviewRefresh()` 在布局稳定后执行一次 `finishPreviewLoad()`。为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
+`Load` 和 `--file` 统一经过 `MainWindow::loadFile()`，再调用 `openLocalFile()`；加载完成后由 `schedulePreviewRefresh()` 在布局稳定后执行一次 `finishPreviewLoad()`。普通加载复位到文档顶部，anchor 加载在异步 block 完成后再次校正位置。为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
 
 ```text
 [load] path=... size=... mtime=... fileSha256=... textSha256=...

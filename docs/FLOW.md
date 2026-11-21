@@ -33,7 +33,7 @@ sequenceDiagram
     opt 有 --file
         M->>W: loadFile(path, false) → openLocalFile()
         W->>W: history.visit() + renderNow()
-        W->>W: schedulePreviewRefresh()（0ms，generation 校验）
+        W->>W: schedulePreviewRefresh()（0ms，load generation 校验）
         W->>W: finishPreviewLoad()（布局、光标、滚动和视口刷新）
     end
     opt 有 --toggle-theme
@@ -56,14 +56,14 @@ flowchart TD
     E --> F["renderNow()"]
     E --> G["schedulePreviewRefresh()"]
     G --> H["finishPreviewLoad()"]
-    H --> I["文档布局、光标复位、滚动复位、viewport 刷新"]
+    H --> I["文档布局、普通加载复位、anchor 定位、viewport 刷新"]
 ```
 
 - `--file` 和 `Load` 共用同一条加载和收尾路径；`reportErrors` 只控制错误呈现方式；
 - `chooseFile()` 只负责选择路径，不处理加载状态；
 - `openLocalFile()` 负责读取、历史、base URL 和渲染编排；
 - `renderNow()` 只负责把 Source 转换为 Preview 并调度渲染；
-- `finishPreviewLoad()` 负责一次加载完成后的布局和视口收尾。
+- `finishPreviewLoad()` 负责一次加载完成后的布局、位置和视口收尾；异步 block 完成后再次校正 anchor。
 
 ---
 
@@ -206,7 +206,9 @@ flowchart TD
     I -- 否 --> J["提示错误，保留当前文档"]
     I -- 是 --> K["MainWindow::openLocalFile"]
     K --> L["NavigationHistory::visit"]
-    K --> M["renderNow + applyPendingAnchor"]
+    K --> M["renderNow()"]
+    K --> P["schedulePreviewRefresh() → finishPreviewLoad()"]
+    P --> Q["普通加载复位到顶部；anchor 加载在异步 block 完成后重新定位"]
     C -- "mailto" --> N["确认后邮件客户端"]
     C -- "javascript/data/..." --> O["拒绝"]
 ```
