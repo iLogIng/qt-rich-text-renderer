@@ -16,5 +16,7 @@ if [[ ! -f renderer/dist/mathjax-qjs.mjs || ! -f renderer/dist/mermaid-qjs.mjs ]
   exit 1
 fi
 
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+BUILD_TYPE="${BUILD_TYPE:-RelWithDebInfo}"
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
 cmake --build build -j"$(nproc)"

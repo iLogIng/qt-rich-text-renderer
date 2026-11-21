@@ -6,6 +6,7 @@ cd "$ROOT"
 
 LINUXDEPLOY="${LINUXDEPLOY:-linuxdeploy}"
 APPIMAGETOOL="${APPIMAGETOOL:-appimagetool}"
+APPIMAGE_RUNTIME="${APPIMAGE_RUNTIME:-}"
 
 if ! command -v "$LINUXDEPLOY" >/dev/null 2>&1; then
   echo "linuxdeploy not found: $LINUXDEPLOY" >&2
@@ -17,6 +18,19 @@ if ! command -v "$APPIMAGETOOL" >/dev/null 2>&1; then
   echo "appimagetool not found: $APPIMAGETOOL" >&2
   echo "Download the AppImage from https://github.com/AppImage/appimagetool/releases" >&2
   echo "or set APPIMAGETOOL=/path/to/appimagetool" >&2
+  exit 1
+fi
+
+if [[ ! -f build/CMakeCache.txt ]] \
+   || ! grep -q '^CMAKE_BUILD_TYPE:STRING=Release$' build/CMakeCache.txt \
+   || [[ ! -x build/rich-text-renderer ]]; then
+  echo "AppImage packaging requires a Release build." >&2
+  echo "Run: BUILD_TYPE=Release scripts/build.sh" >&2
+  exit 1
+fi
+
+if [[ -n "$APPIMAGE_RUNTIME" && ! -f "$APPIMAGE_RUNTIME" ]]; then
+  echo "AppImage runtime not found: $APPIMAGE_RUNTIME" >&2
   exit 1
 fi
 
@@ -60,5 +74,12 @@ EOF
 chmod +x AppDir/AppRun
 
 mkdir -p dist
-ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run AppDir dist/rich-text-renderer-x86_64.AppImage
+if [[ -n "$APPIMAGE_RUNTIME" ]]; then
+  ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run \
+    --runtime-file "$APPIMAGE_RUNTIME" \
+    AppDir dist/rich-text-renderer-x86_64.AppImage
+else
+  ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run \
+    AppDir dist/rich-text-renderer-x86_64.AppImage
+fi
 ls -lh dist/rich-text-renderer-x86_64.AppImage

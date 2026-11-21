@@ -1,0 +1,254 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [master, main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_QPA_PLATFORM: offscreen
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    steps:
+      - name: Install checkout prerequisites
+        run: dnf install -y git tar gzip
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y \
+            gcc-c++ cmake make \
+            qt6-qtbase-devel qt6-qtsvg-devel \
+            nodejs22 nodejs22-npm nodejs22-npm-bin \
+            python3 findutils
+
+      - name: Build QuickJS-ng
+        run: scripts/setup-quickjs.sh
+
+      - name: Build renderer bundles
+        run: scripts/setup-renderer.sh
+
+      - name: Build project
+        env:
+          BUILD_TYPE: Release
+          CXXFLAGS: "-Wall -Wextra -Wpedantic -Werror"
+        run: scripts/build.sh
+
+      - name: Verify Release build
+        run: grep -q '^CMAKE_BUILD_TYPE:STRING=Release$' build/CMakeCache.txt
+
+      - name: Create build artifact
+        run: |
+          tar -czf build-artifact.tar.gz \
+            build \
+            third_party/quickjs-ng/build/qjs \
+            renderer/dist
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: build-artifact.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  test:
+    name: Test Release build
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    steps:
+      - name: Install checkout prerequisites
+        run: dnf install -y git tar gzip
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          dnf install -y \
+            cmake qt6-qtbase-gui qt6-qtsvg \
+            python3 findutils
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: .
+
+      - name: Extract build artifact
+        run: |
+          tar -xzf build-artifact.tar.gz
+          chmod +x third_party/quickjs-ng/build/qjs
+
+      - name: Run tests
+        run: |
+          scripts/test.sh
+          scripts/test-markdown.sh
+          scripts/test-mermaid-full.py
+          scripts/test-process-bound.sh
+          scripts/test-idle.sh
+
+  package:
+    name: Package Linux artifacts
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    env:
+      LINUXDEPLOY: ${{ github.workspace }}/.ci-tools/linuxdeploy-x86_64.AppImage
+      APPIMAGETOOL: ${{ github.workspace }}/.ci-tools/appimagetool-x86_64.AppImage
+      APPIMAGE_RUNTIME: ${{ github.workspace }}/.ci-tools/runtime-x86_64
+      LINUXDEPLOY_SHA256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
+      APPIMAGETOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+      APPIMAGE_RUNTIME_SHA256: 2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
+    steps:
+      - name: Install checkout prerequisites
+        run: dnf install -y git tar gzip
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install packaging dependencies
+        run: |
+          dnf install -y \
+            qt6-qtbase-devel qt6-qtsvg-devel \
+            patchelf binutils file desktop-file-utils \
+            gtk-update-icon-cache fuse-libs curl
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: .
+
+      - name: Extract build artifact
+        run: |
+          tar -xzf build-artifact.tar.gz
+          chmod +x third_party/quickjs-ng/build/qjs
+
+      - name: Download AppImage tools
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-tools
+          curl -fL --retry 3 -o "$LINUXDEPLOY" \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
+          echo "$LINUXDEPLOY_SHA256  $LINUXDEPLOY" | sha256sum -c -
+          chmod +x "$LINUXDEPLOY"
+
+          curl -fL --retry 3 -o "$APPIMAGETOOL" \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "$APPIMAGETOOL_SHA256  $APPIMAGETOOL" | sha256sum -c -
+          chmod +x "$APPIMAGETOOL"
+
+          curl -fL --retry 3 -o "$APPIMAGE_RUNTIME" \
+            https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64
+          echo "$APPIMAGE_RUNTIME_SHA256  $APPIMAGE_RUNTIME" | sha256sum -c -
+
+      - name: Set version
+        run: echo "VERSION=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
+
+      - name: Build AppImage
+        run: scripts/package-appimage.sh
+
+      - name: Verify AppImage
+        run: |
+          mkdir -p out
+          QT_QPA_PLATFORM=offscreen timeout 30 ./dist/rich-text-renderer-x86_64.AppImage \
+            --appimage-extract-and-run \
+            --file samples/sample.md \
+            --screenshot out/appimage-ci.png
+          test -s out/appimage-ci.png
+
+      - name: Create source archive
+        run: |
+          set -euo pipefail
+          staging="$(mktemp -d)"
+          name="rich-text-renderer-${VERSION}"
+          mkdir -p "$staging/$name"
+          tar -cf - \
+            --exclude=./.git \
+            --exclude=./.cache \
+            --exclude=./.ci-tools \
+            --exclude=./build \
+            --exclude=./build-artifact.tar.gz \
+            --exclude=./AppDir \
+            --exclude=./dist \
+            --exclude=./out \
+            --exclude=./renderer/node_modules \
+            --exclude=./renderer/dist \
+            --exclude=./third_party/quickjs-ng/.git \
+            --exclude=./third_party/quickjs-ng/build \
+            . | tar -xf - -C "$staging/$name"
+          tar -C "$staging" -czf "dist/${name}-source.tar.gz" "$name"
+          rm -rf "$staging"
+
+          tar -tzf "dist/${name}-source.tar.gz" | grep -F 'README.md' >/dev/null
+          tar -tzf "dist/${name}-source.tar.gz" | grep -F 'src/main.cpp' >/dev/null
+          tar -tzf "dist/${name}-source.tar.gz" | grep -F 'third_party/quickjs-ng/CMakeLists.txt' >/dev/null
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum \
+            rich-text-renderer-x86_64.AppImage \
+            "rich-text-renderer-${VERSION}-source.tar.gz" \
+            > SHA256SUMS
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Verify release assets
+        run: |
+          ls -lh dist
+          test -s dist/rich-text-renderer-x86_64.AppImage
+          test -s dist/SHA256SUMS
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: rich-text-renderer ${{ github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
