@@ -21,8 +21,10 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QDockWidget>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
@@ -33,6 +35,7 @@
 #include <QPalette>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -67,6 +70,47 @@ QString qjsPath()
         return bundled;
     }
     return runtimeRoot() + QStringLiteral("/third_party/quickjs-ng/build/qjs");
+}
+
+QString fileSha256(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    if (!hash.addData(&file)) {
+        return {};
+    }
+    return QString::fromLatin1(hash.result().toHex());
+}
+
+void logLoadOrigin(const QString &origin, const QString &path)
+{
+    if (qEnvironmentVariableIsSet("RICH_TEXT_RENDER_DEBUG_LOAD")) {
+        fprintf(stderr,
+                "[load-origin] %s %s\n",
+                origin.toUtf8().constData(),
+                path.toUtf8().constData());
+    }
+}
+
+void logLoadedFile(const LocalFileContent &loaded)
+{
+    if (!qEnvironmentVariableIsSet("RICH_TEXT_RENDER_DEBUG_LOAD")) {
+        return;
+    }
+
+    const QFileInfo info(loaded.path);
+    const QString textHash = QString::fromLatin1(
+        QCryptographicHash::hash(loaded.text.toUtf8(), QCryptographicHash::Sha256).toHex());
+    fprintf(stderr,
+            "[load] path=%s size=%lld mtime=%s fileSha256=%s textSha256=%s\n",
+            loaded.path.toUtf8().constData(),
+            static_cast<long long>(info.size()),
+            info.lastModified().toString(Qt::ISODateWithMs).toUtf8().constData(),
+            fileSha256(loaded.path).toUtf8().constData(),
+            textHash.toUtf8().constData());
 }
 
 } // namespace
@@ -273,6 +317,7 @@ void MainWindow::configureRenderer()
 
 void MainWindow::loadFile(const QString &path)
 {
+    logLoadOrigin(QStringLiteral("command-line"), path);
     openLocalFile(path,
                   QString(),
                   HistoryMode::Record,
@@ -285,11 +330,14 @@ void MainWindow::chooseFile()
         this,
         tr("Open file"),
         m_settingsData.lastDirectory,
-        tr("Markdown files (*.md *.markdown);;Text files (*.txt);;All files (*)"));
+        tr("Markdown files (*.md *.markdown);;Text files (*.txt);;All files (*)"),
+        nullptr,
+        QFileDialog::DontUseNativeDialog);
     if (path.isEmpty()) {
         return;
     }
 
+    logLoadOrigin(QStringLiteral("toolbar"), path);
     m_settingsData.lastDirectory = QFileInfo(path).absolutePath();
     syncViewSettingsFromUi();
     m_settings->save(m_settingsData);
@@ -434,6 +482,7 @@ bool MainWindow::openLocalFile(const QString &path,
         return false;
     }
 
+    logLoadedFile(loaded);
     const QFileInfo info(loaded.path);
     const QString displayName = info.fileName().isEmpty() ? loaded.path : info.fileName();
 
@@ -454,6 +503,9 @@ bool MainWindow::openLocalFile(const QString &path,
     }
 
     renderNow();
+    m_tabs->setCurrentWidget(m_preview);
+    m_preview->verticalScrollBar()->setValue(0);
+    m_preview->viewport()->update();
     updateHistoryUi();
     return true;
 }
@@ -569,7 +621,12 @@ void MainWindow::scrollPreviewToBlock(int blockNumber)
     m_tabs->setCurrentWidget(m_preview);
     QTextCursor cursor(block);
     m_preview->setTextCursor(cursor);
-    m_preview->ensureCursorVisible();
+
+    const QRectF blockRect =
+        m_preview->document()->documentLayout()->blockBoundingRect(block);
+    const int target = qRound(blockRect.top()) - 8;
+    m_preview->verticalScrollBar()->setValue(qMax(0, target));
+    m_preview->viewport()->update();
 }
 
 void MainWindow::previewImageUrl(const QUrl &url)
@@ -719,6 +776,7 @@ void MainWindow::renderNow()
                             m_cacheHits);
                 }
                 applyPendingAnchor();
+                m_preview->viewport()->update();
             }
         };
 
