@@ -41,7 +41,8 @@ mkdir -p \
 
 cp third_party/quickjs-ng/build/qjs AppDir/usr/bin/qjs
 chmod +x AppDir/usr/bin/qjs
-cp renderer/dist/*.mjs AppDir/usr/share/rich-text-render/renderer/dist/
+cp renderer/dist/mathjax-worker.mjs AppDir/usr/share/rich-text-render/renderer/dist/
+cp renderer/dist/mermaid-full-worker.mjs AppDir/usr/share/rich-text-render/renderer/dist/
 cp config/settings.ini AppDir/usr/share/rich-text-render/config/settings.ini
 cp packaging/rich-text-render.desktop AppDir/rich-text-render.desktop
 cp packaging/rich-text-render.png AppDir/rich-text-render.png
