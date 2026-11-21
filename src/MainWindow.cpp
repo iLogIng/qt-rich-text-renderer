@@ -597,7 +597,10 @@ void MainWindow::schedulePreviewRefresh()
 void MainWindow::finishPreviewLoad()
 {
     m_preview->document()->documentLayout()->documentSize();
-    if (m_loadAnchorRequested) {
+    // A cached block callback may already have positioned a pending anchor.
+    if (!m_loadAnchorRequested || !m_pendingAnchor.isEmpty()) {
+        m_preview->setTextCursor(QTextCursor(m_preview->document()));
+        m_preview->verticalScrollBar()->setValue(0);
         if (!m_pendingAnchor.isEmpty()) {
             if (m_blockCount == 0) {
                 applyPendingAnchor();
@@ -606,9 +609,6 @@ void MainWindow::finishPreviewLoad()
                 MarkdownLinkHandler::scrollToAnchor(m_preview, m_pendingAnchor);
             }
         }
-    } else {
-        m_preview->setTextCursor(QTextCursor(m_preview->document()));
-        m_preview->verticalScrollBar()->setValue(0);
     }
     m_preview->viewport()->update();
 }
