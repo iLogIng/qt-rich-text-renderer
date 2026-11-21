@@ -19,27 +19,6 @@ constexpr int kMaxIdleTimeoutMs = 60 * 60 * 1000;
 constexpr int kMinRequestTimeoutMs = 1000;
 constexpr int kMaxRequestTimeoutMs = 5 * 60 * 1000;
 
-QVariant readSetting(const QSettings &user,
-                     const QSettings &defaults,
-                     const QString &key,
-                     const QVariant &fallback)
-{
-    if (user.contains(key)) {
-        return user.value(key);
-    }
-    if (defaults.contains(key)) {
-        return defaults.value(key);
-    }
-    return fallback;
-}
-
-QVariant readDefault(const QSettings &defaults,
-                     const QString &key,
-                     const QVariant &fallback)
-{
-    return defaults.contains(key) ? defaults.value(key) : fallback;
-}
-
 AppSettingsData::Theme parseTheme(const QString &value)
 {
     return value.compare(QStringLiteral("dark"), Qt::CaseInsensitive) == 0
@@ -51,6 +30,86 @@ QString themeName(AppSettingsData::Theme theme)
 {
     return theme == AppSettingsData::Theme::Dark ? QStringLiteral("dark")
                                                   : QStringLiteral("light");
+}
+
+struct SettingsSource {
+    const QSettings *user = nullptr;
+    const QSettings &defaults;
+
+    QVariant value(const QString &key, const QVariant &fallback) const
+    {
+        if (user && user->contains(key)) {
+            return user->value(key);
+        }
+        return defaults.contains(key) ? defaults.value(key) : fallback;
+    }
+};
+
+int clampedInt(const SettingsSource &source,
+               const QString &key,
+               int fallback,
+               int minimum,
+               int maximum)
+{
+    return qBound(minimum, source.value(key, fallback).toInt(), maximum);
+}
+
+AppSettingsData readSettings(const QSettings *user, const QSettings &defaults)
+{
+    const SettingsSource source{user, defaults};
+    const AppSettingsData fallback;
+    AppSettingsData data;
+
+    data.theme = parseTheme(source.value(QStringLiteral("appearance/theme"),
+                                         themeName(fallback.theme))
+                                .toString());
+    data.uiFontPointSize = clampedInt(source,
+                                      QStringLiteral("appearance/uiFontPointSize"),
+                                      fallback.uiFontPointSize,
+                                      kMinUiFontPointSize,
+                                      kMaxUiFontPointSize);
+    data.sourceFontPointSize = clampedInt(source,
+                                          QStringLiteral("appearance/sourceFontPointSize"),
+                                          fallback.sourceFontPointSize,
+                                          kMinSourceFontPointSize,
+                                          kMaxSourceFontPointSize);
+    data.sourceHighlighting = source.value(QStringLiteral("appearance/sourceHighlighting"),
+                                           fallback.sourceHighlighting)
+                                  .toBool();
+    data.outlineVisible = source.value(QStringLiteral("view/outlineVisible"),
+                                       fallback.outlineVisible)
+                              .toBool();
+    data.sourceVisible = source.value(QStringLiteral("view/sourceVisible"),
+                                      fallback.sourceVisible)
+                             .toBool();
+    data.maxSvgWidth = clampedInt(source,
+                                  QStringLiteral("preview/maxSvgWidth"),
+                                  fallback.maxSvgWidth,
+                                  kMinSvgWidth,
+                                  kMaxSvgWidth);
+    data.rendererIdleTimeoutMs = clampedInt(source,
+                                            QStringLiteral("renderer/idleTimeoutMs"),
+                                            fallback.rendererIdleTimeoutMs,
+                                            kMinIdleTimeoutMs,
+                                            kMaxIdleTimeoutMs);
+    data.mathRequestTimeoutMs = clampedInt(source,
+                                           QStringLiteral("renderer/mathRequestTimeoutMs"),
+                                           fallback.mathRequestTimeoutMs,
+                                           kMinRequestTimeoutMs,
+                                           kMaxRequestTimeoutMs);
+    data.mermaidRequestTimeoutMs =
+        clampedInt(source,
+                   QStringLiteral("renderer/mermaidRequestTimeoutMs"),
+                   fallback.mermaidRequestTimeoutMs,
+                   kMinRequestTimeoutMs,
+                   kMaxRequestTimeoutMs);
+    data.lastDirectory = source.value(QStringLiteral("files/lastDirectory"),
+                                      fallback.lastDirectory)
+                             .toString();
+    data.windowGeometry = source.value(QStringLiteral("window/geometry"),
+                                       fallback.windowGeometry)
+                              .toByteArray();
+    return data;
 }
 
 } // namespace
@@ -71,145 +130,13 @@ AppSettingsData AppSettings::load() const
 {
     const QSettings user(m_userPath, QSettings::IniFormat);
     const QSettings defaults(m_defaultsPath, QSettings::IniFormat);
-
-    AppSettingsData data;
-    data.theme = parseTheme(readSetting(user,
-                                        defaults,
-                                        QStringLiteral("appearance/theme"),
-                                        themeName(data.theme))
-                                .toString());
-    data.uiFontPointSize = qBound(kMinUiFontPointSize,
-                                  readSetting(user,
-                                              defaults,
-                                              QStringLiteral("appearance/uiFontPointSize"),
-                                              data.uiFontPointSize)
-                                      .toInt(),
-                                  kMaxUiFontPointSize);
-    data.sourceFontPointSize = qBound(kMinSourceFontPointSize,
-                                      readSetting(user,
-                                                  defaults,
-                                                  QStringLiteral("appearance/sourceFontPointSize"),
-                                                  data.sourceFontPointSize)
-                                          .toInt(),
-                                      kMaxSourceFontPointSize);
-    data.sourceHighlighting = readSetting(user,
-                                          defaults,
-                                          QStringLiteral("appearance/sourceHighlighting"),
-                                          data.sourceHighlighting)
-                                  .toBool();
-    data.outlineVisible = readSetting(user,
-                                      defaults,
-                                      QStringLiteral("view/outlineVisible"),
-                                      data.outlineVisible)
-                              .toBool();
-    data.sourceVisible = readSetting(user,
-                                     defaults,
-                                     QStringLiteral("view/sourceVisible"),
-                                     data.sourceVisible)
-                             .toBool();
-    data.maxSvgWidth = qBound(kMinSvgWidth,
-                              readSetting(user,
-                                          defaults,
-                                          QStringLiteral("preview/maxSvgWidth"),
-                                          data.maxSvgWidth)
-                                  .toInt(),
-                              kMaxSvgWidth);
-    data.rendererIdleTimeoutMs = qBound(
-        kMinIdleTimeoutMs,
-        readSetting(user,
-                    defaults,
-                    QStringLiteral("renderer/idleTimeoutMs"),
-                    data.rendererIdleTimeoutMs)
-            .toInt(),
-        kMaxIdleTimeoutMs);
-    data.mathRequestTimeoutMs = qBound(
-        kMinRequestTimeoutMs,
-        readSetting(user,
-                    defaults,
-                    QStringLiteral("renderer/mathRequestTimeoutMs"),
-                    data.mathRequestTimeoutMs)
-            .toInt(),
-        kMaxRequestTimeoutMs);
-    data.mermaidRequestTimeoutMs = qBound(
-        kMinRequestTimeoutMs,
-        readSetting(user,
-                    defaults,
-                    QStringLiteral("renderer/mermaidRequestTimeoutMs"),
-                    data.mermaidRequestTimeoutMs)
-            .toInt(),
-        kMaxRequestTimeoutMs);
-    data.lastDirectory = readSetting(user,
-                                     defaults,
-                                     QStringLiteral("files/lastDirectory"),
-                                     data.lastDirectory)
-                             .toString();
-    data.windowGeometry = readSetting(user,
-                                      defaults,
-                                      QStringLiteral("window/geometry"),
-                                      data.windowGeometry)
-                              .toByteArray();
-    return data;
+    return readSettings(&user, defaults);
 }
 
 AppSettingsData AppSettings::defaults() const
 {
     const QSettings defaults(m_defaultsPath, QSettings::IniFormat);
-    const AppSettingsData fallback;
-
-    AppSettingsData data;
-    data.theme = parseTheme(readDefault(defaults, QStringLiteral("appearance/theme"),
-                                        themeName(fallback.theme))
-                                .toString());
-    data.uiFontPointSize = qBound(kMinUiFontPointSize,
-                                  readDefault(defaults, QStringLiteral("appearance/uiFontPointSize"),
-                                              fallback.uiFontPointSize)
-                                      .toInt(),
-                                  kMaxUiFontPointSize);
-    data.sourceFontPointSize = qBound(
-        kMinSourceFontPointSize,
-        readDefault(defaults, QStringLiteral("appearance/sourceFontPointSize"),
-                    fallback.sourceFontPointSize)
-            .toInt(),
-        kMaxSourceFontPointSize);
-    data.sourceHighlighting = readDefault(defaults, QStringLiteral("appearance/sourceHighlighting"),
-                                          fallback.sourceHighlighting)
-                                  .toBool();
-    data.outlineVisible = readDefault(defaults, QStringLiteral("view/outlineVisible"),
-                                      fallback.outlineVisible)
-                              .toBool();
-    data.sourceVisible = readDefault(defaults, QStringLiteral("view/sourceVisible"),
-                                     fallback.sourceVisible)
-                             .toBool();
-    data.maxSvgWidth = qBound(kMinSvgWidth,
-                              readDefault(defaults, QStringLiteral("preview/maxSvgWidth"),
-                                          fallback.maxSvgWidth)
-                                  .toInt(),
-                              kMaxSvgWidth);
-    data.rendererIdleTimeoutMs = qBound(
-        kMinIdleTimeoutMs,
-        readDefault(defaults, QStringLiteral("renderer/idleTimeoutMs"),
-                    fallback.rendererIdleTimeoutMs)
-            .toInt(),
-        kMaxIdleTimeoutMs);
-    data.mathRequestTimeoutMs = qBound(
-        kMinRequestTimeoutMs,
-        readDefault(defaults, QStringLiteral("renderer/mathRequestTimeoutMs"),
-                    fallback.mathRequestTimeoutMs)
-            .toInt(),
-        kMaxRequestTimeoutMs);
-    data.mermaidRequestTimeoutMs = qBound(
-        kMinRequestTimeoutMs,
-        readDefault(defaults, QStringLiteral("renderer/mermaidRequestTimeoutMs"),
-                    fallback.mermaidRequestTimeoutMs)
-            .toInt(),
-        kMaxRequestTimeoutMs);
-    data.lastDirectory = readDefault(defaults, QStringLiteral("files/lastDirectory"),
-                                     fallback.lastDirectory)
-                             .toString();
-    data.windowGeometry = readDefault(defaults, QStringLiteral("window/geometry"),
-                                      fallback.windowGeometry)
-                              .toByteArray();
-    return data;
+    return readSettings(nullptr, defaults);
 }
 
 void AppSettings::save(const AppSettingsData &data)
