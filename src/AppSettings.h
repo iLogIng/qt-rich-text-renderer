@@ -33,9 +33,6 @@ public:
     AppSettingsData defaults() const;
     void save(const AppSettingsData &data);
 
-    QString userPath() const;
-    QString defaultsPath() const;
-
 private:
     QString m_userPath;
     QString m_defaultsPath;

@@ -13,7 +13,6 @@ public:
 
     void setDark(bool dark);
     void setEnabled(bool enabled);
-    bool isEnabled() const;
 
 protected:
     void highlightBlock(const QString &text) override;

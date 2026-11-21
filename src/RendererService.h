@@ -33,8 +33,6 @@ public:
     void cancelAll();
     void shutdown();
 
-    int pendingCount() const;
-
 private:
     struct Inflight {
         quint64 generation = 0;

@@ -84,11 +84,6 @@ void MarkdownLinkHandler::setBaseUrl(const QUrl &baseUrl)
     }
 }
 
-QUrl MarkdownLinkHandler::baseUrl() const
-{
-    return m_baseUrl;
-}
-
 void MarkdownLinkHandler::scrollToAnchor(QTextBrowser *view, const QString &fragment)
 {
     if (!view || fragment.isEmpty()) {

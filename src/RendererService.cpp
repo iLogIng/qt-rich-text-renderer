@@ -67,11 +67,6 @@ void RendererService::shutdown()
     m_mermaidWorker->shutdown();
 }
 
-int RendererService::pendingCount() const
-{
-    return m_mathWorker->pendingCount() + m_mermaidWorker->pendingCount();
-}
-
 void RendererService::render(const QString &kind,
                              const QString &source,
                              bool display,

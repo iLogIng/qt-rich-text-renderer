@@ -233,13 +233,3 @@ void AppSettings::save(const AppSettingsData &data)
     user.setValue(QStringLiteral("window/geometry"), data.windowGeometry);
     user.sync();
 }
-
-QString AppSettings::userPath() const
-{
-    return m_userPath;
-}
-
-QString AppSettings::defaultsPath() const
-{
-    return m_defaultsPath;
-}

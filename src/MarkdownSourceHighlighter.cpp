@@ -46,11 +46,6 @@ void MarkdownSourceHighlighter::setEnabled(bool enabled)
     rehighlight();
 }
 
-bool MarkdownSourceHighlighter::isEnabled() const
-{
-    return m_enabled;
-}
-
 void MarkdownSourceHighlighter::rebuildFormats()
 {
     if (m_dark) {

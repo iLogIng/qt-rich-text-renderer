@@ -80,14 +80,6 @@ QString NavigationHistory::currentPath() const
     return m_current->path;
 }
 
-QString NavigationHistory::currentDisplayName() const
-{
-    if (!m_hasCurrent || m_current == m_entries.end()) {
-        return {};
-    }
-    return m_current->displayName;
-}
-
 QVector<NavigationEntry> NavigationHistory::entriesNewestFirst() const
 {
     QVector<NavigationEntry> entries;

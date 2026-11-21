@@ -35,10 +35,6 @@ public:
     void cancelGeneration(quint64 generation);
     void shutdown();
 
-    bool isRunning() const;
-    bool isReady() const;
-    int pendingCount() const;
-
 signals:
     void logLine(const QString &line);
 

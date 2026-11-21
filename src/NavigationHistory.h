@@ -31,7 +31,6 @@ public:
     QString forward();
 
     QString currentPath() const;
-    QString currentDisplayName() const;
 
     QVector<NavigationEntry> entriesNewestFirst() const;
     int currentIndexNewestFirst() const;

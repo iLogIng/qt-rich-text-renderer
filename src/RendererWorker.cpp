@@ -137,21 +137,6 @@ void RendererWorker::shutdown()
     }
 }
 
-bool RendererWorker::isRunning() const
-{
-    return m_process && m_process->state() != QProcess::NotRunning;
-}
-
-bool RendererWorker::isReady() const
-{
-    return m_ready;
-}
-
-int RendererWorker::pendingCount() const
-{
-    return m_queue.size() + (m_hasCurrent ? 1 : 0);
-}
-
 void RendererWorker::ensureStarted()
 {
     if (m_process && m_process->state() != QProcess::NotRunning) {

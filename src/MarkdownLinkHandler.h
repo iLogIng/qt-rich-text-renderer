@@ -14,7 +14,6 @@ public:
     MarkdownLinkHandler(QTextBrowser *view, QWidget *dialogParent, QObject *parent = nullptr);
 
     void setBaseUrl(const QUrl &baseUrl);
-    QUrl baseUrl() const;
 
     static void scrollToAnchor(QTextBrowser *view, const QString &fragment);
 
