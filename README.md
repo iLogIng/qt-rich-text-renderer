@@ -178,6 +178,20 @@ Markdown
 | `rich-text-renderer-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets`、`Qt6::SvgWidgets` |
 | `rich-text-renderer` | 应用入口 | `rich-text-renderer-ui` |
 
+### 文件加载与预览刷新
+
+`Load` 和 `--file` 共用同一条加载链路：
+
+```text
+loadFile()
+  -> openLocalFile()
+  -> renderNow()
+  -> schedulePreviewRefresh()
+  -> finishPreviewLoad()
+```
+
+`finishPreviewLoad()` 先通过重新设置文档文本宽度强制完成整篇 `QTextDocument` 布局，再执行普通加载复位或 anchor 定位，最后刷新 Preview viewport。异步数学/Mermaid block 嵌入完成后会再次校正布局和 anchor。
+
 更完整的模块说明见 [docs/FLOW.md](docs/FLOW.md) 和 [docs/ADR-0001-rendering-pipeline.md](docs/ADR-0001-rendering-pipeline.md)。
 
 ## 测试
@@ -197,7 +211,7 @@ scripts/test-idle.sh
 - 设置模板、用户覆盖和设置对话框；
 - Markdown 预处理、目录提取和文档渲染；
 - SVG 缓存、SVG 归一化和对象嵌入；
-- 启动、Outline 和设置应用；
+- 启动、Outline、设置应用和加载后的完整文档布局；
 - 媒体预览的缩放与另存。
 
 其他检查：

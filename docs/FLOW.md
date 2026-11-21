@@ -34,7 +34,8 @@ sequenceDiagram
         M->>W: loadFile(path, false) → openLocalFile()
         W->>W: history.visit() + renderNow()
         W->>W: schedulePreviewRefresh()（0ms，load generation 校验）
-        W->>W: finishPreviewLoad()（布局、光标、滚动和视口刷新）
+        W->>W: finishPreviewLoad() → forcePreviewLayout()
+        W->>W: 光标/滚动复位或 anchor 定位 + viewport 刷新
     end
     opt 有 --toggle-theme
         M->>W: singleShot(1500) → setDarkMode(!isDarkMode())
@@ -54,16 +55,19 @@ flowchart TD
     B["Load 按钮"] --> D["QFileDialog"] --> C
     C --> E["openLocalFile()"]
     E --> F["renderNow()"]
-    E --> G["schedulePreviewRefresh()"]
+    E --> G["schedulePreviewRefresh()（load generation）"]
     G --> H["finishPreviewLoad()"]
-    H --> I["文档布局、普通加载复位、anchor 定位、viewport 刷新"]
+    H --> J["forcePreviewLayout()<br/>setTextWidth(viewport) + documentSize"]
+    J --> I["普通加载复位 / anchor 定位"]
+    I --> K["viewport()->update()"]
 ```
 
 - `--file` 和 `Load` 共用同一条加载和收尾路径；`reportErrors` 只控制错误呈现方式；
 - `chooseFile()` 只负责选择路径，不处理加载状态；
 - `openLocalFile()` 负责读取、历史、base URL 和渲染编排；
 - `renderNow()` 只负责把 Source 转换为 Preview 并调度渲染；
-- `finishPreviewLoad()` 负责一次加载完成后的布局、位置和视口收尾；异步 block 完成后再次校正 anchor。
+- `finishPreviewLoad()` 必须强制完成整篇文档布局，再执行位置收尾；仅查询 `documentSize()` 不会使部分布局失效；
+- 异步 block 完成后再次执行布局校正，并在存在 pending anchor 时重新定位。
 
 ---
 
@@ -114,7 +118,12 @@ sequenceDiagram
     TD->>TD: 绘制时调用 SvgObjectHandler::drawObject()
     SvgObjectHandler->>SvgObjectHandler: QSvgRenderer::render() 可见对象
     MW->>MW: pending == 0 → 状态栏显示耗时与命中数
+    MW->>TD: forcePreviewLayout()
+    MW->>MW: 有 pending anchor 时复位并重新定位
+    MW->>MW: viewport()->update()
 ```
+
+block 为空时，`renderNow()` 在更新状态后返回；加载收尾仍通过 `schedulePreviewRefresh()` 完成完整布局和视口刷新。
 
 ---
 

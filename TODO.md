@@ -288,6 +288,10 @@
 - [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
 - [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`、`media-preview-test`
 - [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
+- [x] `Load` 与 `--file` 统一经过 `loadFile()`、`openLocalFile()` 和加载后收尾
+- [x] 加载后强制完成整篇文档布局，修复长文档后续 block 零高度问题
+- [x] 普通加载复位、有效/无效 anchor 和异步 block 完成后的定位行为
+- [x] visible-window 加载、README 完整布局、anchor 和 status-only 错误回归测试
 - [x] 删除未使用的运行时 accessor，并合并 `AppSettings` 的模板/用户覆盖解析
 - [x] 删除未使用的 TeX/Mermaid fixtures 和 slim Mermaid worker
 - [x] AppImage 只打包运行时使用的 MathJax worker 与 Mermaid full worker，不包含测试用 one-shot bundle

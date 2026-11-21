@@ -40,6 +40,15 @@
 - 标题目录必须从 `QTextDocument` 的标题层级生成；点击条目把目标 block 对齐到 Preview 顶部。
 - Outline 固定在主窗口左侧，只能隐藏，不能浮动或取下。
 
+### 2.3 加载与布局
+
+- `Load` 与 `--file` 必须共用同一条加载入口；错误呈现方式可以不同。
+- 加载完成后必须完成整篇文档布局，再执行滚动复位或 anchor 定位。
+- 只查询 `documentSize()` 不足以完成布局；加载收尾必须使文档重新布局，避免长文档只得到部分 block 高度。
+- 普通加载必须复位到文档顶部；有效 fragment 必须定位到对应标题；无效 fragment 必须回到顶部。
+- 异步数学/Mermaid block 嵌入完成后，必须重新完成布局并再次校正 anchor。
+- 加载收尾必须刷新完整 Preview viewport。
+
 ## 3. 数学、Mermaid 与 SVG
 
 ### 3.1 数学
@@ -187,6 +196,7 @@ scripts/test-idle.sh
 | 导航历史 | `NavigationHistory` | `navigation-history-test` |
 | 设置 | `AppSettings`、`SettingsDialog` | `app-settings-test`、`settings-dialog-test` |
 | 目录与启动 | `MarkdownOutline`、`MainWindow` | `markdown-outline-test`、`main-window-startup-test` |
+| 加载与布局收尾 | `MainWindow::loadFile()`、`openLocalFile()`、`finishPreviewLoad()` | `main-window-startup-test` |
 | 媒体预览 | `MediaPreviewWindow` | `media-preview-test` |
 | 进程与资源 | `RendererService`、`RendererWorker` | `scripts/test-process-bound.sh`、`scripts/test-idle.sh` |
 

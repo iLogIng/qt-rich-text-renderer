@@ -253,9 +253,20 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 
 图片点击、SVG 点击、图片链接预览、缩放控制和另存路径均已验证可用。
 
-## 6.6 Load 与 --file 加载审计
+## 6.6 Load 与 --file 加载、布局与审计
 
-`Load` 和 `--file` 统一经过 `MainWindow::loadFile()`，再调用 `openLocalFile()`；加载完成后由 `schedulePreviewRefresh()` 在布局稳定后执行一次 `finishPreviewLoad()`。普通加载复位到文档顶部，anchor 加载在异步 block 完成后再次校正位置。为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
+`Load` 和 `--file` 统一经过 `MainWindow::loadFile()`，再调用 `openLocalFile()`；加载完成后由 `schedulePreviewRefresh()` 在 0ms 收尾中执行 `finishPreviewLoad()`。普通加载复位到文档顶部，anchor 加载在异步 block 完成后再次校正位置。
+
+长文档的 `QTextDocument` 布局可能是惰性的。仅查询 `documentLayout()->documentSize()` 会返回部分布局，导致后续 block 高度为 0。`finishPreviewLoad()` 必须先执行 `forcePreviewLayout()`：
+
+```text
+document()->setTextWidth(viewport()->width());
+documentLayout()->documentSize();
+```
+
+该操作使文档重新布局后再进行滚动复位、anchor 定位和 viewport 刷新。README 加载后的文档高度从约 3159px 恢复为 5407px，最后一个标题“第三方与许可证”的布局高度从 0 恢复为 29px。
+
+为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
 
 ```text
 [load] path=... size=... mtime=... fileSha256=... textSha256=...
@@ -269,7 +280,7 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 - 文件 SHA-256；
 - 解码文本 SHA-256。
 
-加载后 Preview 会切回 Preview tab、回到顶部并强制刷新视口。Outline 跳转也会把目标标题 block 对齐到视口顶部，而不是只做最小可见滚动。
+加载后 Preview 会切回 Preview tab，完成整篇文档布局，再回到顶部并刷新视口。Outline 跳转也会把目标标题 block 对齐到视口顶部，而不是只做最小可见滚动。
 
 ## 7. 缓存与“渲染是纯函数”
 
