@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg SvgWidgets)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -72,6 +72,7 @@ target_include_directories(rich-text-renderer-ui PUBLIC ${CMAKE_CURRENT_SOURCE_D
 target_link_libraries(rich-text-renderer-ui PUBLIC
     rich-text-renderer-core
     rich-text-renderer-document
+    Qt6::SvgWidgets
     Qt6::Widgets
 )
 target_compile_definitions(rich-text-renderer-ui PRIVATE
@@ -154,6 +155,11 @@ add_executable(local-file-loader-test
 )
 target_link_libraries(local-file-loader-test PRIVATE rich-text-renderer-core)
 
+add_executable(media-preview-test
+    tests/media_preview_test.cpp
+)
+target_link_libraries(media-preview-test PRIVATE rich-text-renderer-ui)
+
 if(BUILD_TESTING)
     add_test(NAME link-resolver-test COMMAND link-resolver-test)
     add_test(NAME link-handler-test COMMAND link-handler-test)
@@ -187,4 +193,9 @@ if(BUILD_TESTING)
 
     add_test(NAME navigation-history-test COMMAND navigation-history-test)
     add_test(NAME local-file-loader-test COMMAND local-file-loader-test)
+
+    add_test(NAME media-preview-test COMMAND media-preview-test)
+    set_tests_properties(media-preview-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
 endif()
