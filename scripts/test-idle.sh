@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-idle.XXXXXX")"
+CACHE="$HOME/.cache/rich-text-renderer/rich-text-renderer"
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-renderer-idle.XXXXXX")"
 CONFIG="$RUN_DIR/config"
 LOG="$RUN_DIR/idle.log"
 
@@ -19,7 +19,7 @@ trap cleanup EXIT
 
 rm -rf "$CACHE"
 
-XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
+XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-renderer \
   --file tests/sources/bench.md --screenshot "$RUN_DIR/idle.png" \
   >"$LOG" 2>&1 &
 app_pid=$!

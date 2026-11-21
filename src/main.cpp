@@ -8,8 +8,8 @@
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("rich-text-render-spike"));
-    app.setOrganizationName(QStringLiteral("locvas-spike"));
+    app.setApplicationName(QStringLiteral("rich-text-renderer"));
+    app.setOrganizationName(QStringLiteral("rich-text-renderer"));
 
     QString screenshotPath;
     QString filePath;

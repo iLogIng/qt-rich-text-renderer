@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Rich Text Render Spike
+Name=Rich Text Renderer
 Comment=QuickJS + MathJax + Mermaid to SVG in Qt Widgets
-Exec=rich-text-render
-Icon=rich-text-render
+Exec=rich-text-renderer
+Icon=rich-text-renderer
 Categories=Utility;
 Terminal=false

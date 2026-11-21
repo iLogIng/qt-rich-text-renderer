@@ -3,12 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-math.XXXXXX")"
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-renderer-math.XXXXXX")"
 trap 'rm -rf "$RUN_DIR"' EXIT
 
 LOG="$RUN_DIR/math-delimiters.log"
-rm -rf "$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-if ! XDG_CONFIG_HOME="$RUN_DIR/config" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
+rm -rf "$HOME/.cache/rich-text-renderer/rich-text-renderer"
+if ! XDG_CONFIG_HOME="$RUN_DIR/config" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-renderer \
   --file tests/sources/math-delimiters.md \
   --screenshot "$RUN_DIR/math-delimiters.png" >"$LOG" 2>&1; then
   cat "$LOG" >&2

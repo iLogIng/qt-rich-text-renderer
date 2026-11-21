@@ -10,8 +10,8 @@ WARM="${WARM:-0}"
 MAX_TOTAL_MB="${MAX_TOTAL_MB:-128}"
 MAX_WORKERS="${MAX_WORKERS:-2}"
 
-CACHE="$HOME/.cache/locvas-spike/rich-text-render-spike/rich-text-render-spike"
-RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-render-mem.XXXXXX")"
+CACHE="$HOME/.cache/rich-text-renderer/rich-text-renderer"
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-renderer-mem.XXXXXX")"
 CONFIG="$RUN_DIR/config"
 LOG="$RUN_DIR/mem-${LABEL}.log"
 
@@ -27,7 +27,7 @@ if [[ "$WARM" != "1" ]]; then
   rm -rf "$CACHE"
 fi
 
-XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-render \
+XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_DEBUG=1 QT_QPA_PLATFORM=offscreen ./build/rich-text-renderer \
   --file "$FILE" --screenshot "$RUN_DIR/mem-${LABEL}.png" \
   >"$LOG" 2>&1 &
 app_pid=$!

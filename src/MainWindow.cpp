@@ -55,7 +55,7 @@ namespace {
 QString runtimeRoot()
 {
     const QString appDir = QCoreApplication::applicationDirPath();
-    const QString appImageRoot = QDir(appDir).absoluteFilePath(QStringLiteral("../share/rich-text-render"));
+    const QString appImageRoot = QDir(appDir).absoluteFilePath(QStringLiteral("../share/rich-text-renderer"));
     if (QFileInfo::exists(appImageRoot + QStringLiteral("/renderer/dist/mathjax-worker.mjs"))) {
         return QDir(appImageRoot).absolutePath();
     }
@@ -130,7 +130,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     applyApplicationFont(m_settingsData.uiFontPointSize);
     applyTheme(m_dark);
 
-    setWindowTitle(QStringLiteral("rich-text-render spike"));
+    setWindowTitle(QStringLiteral("rich-text-renderer"));
     resize(1280, 860);
     if (!m_settingsData.windowGeometry.isEmpty()) {
         restoreGeometry(m_settingsData.windowGeometry);
@@ -246,7 +246,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     });
     m_outlineDock->setVisible(m_settingsData.outlineVisible);
 
-    statusBar()->showMessage(QStringLiteral("Spike: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
+    statusBar()->showMessage(QStringLiteral("rich-text-renderer: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
 
     m_renderer = new RendererService(this);
     configureRenderer();
@@ -300,8 +300,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::configureRenderer()
 {
     const QString root = runtimeRoot();
-    const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
-                             + QStringLiteral("/rich-text-render-spike");
+    const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     bool idleOk = false;
     const int idleEnv = qEnvironmentVariableIntValue("RICH_TEXT_RENDER_IDLE_MS", &idleOk);
     const int idleMs = idleOk && idleEnv > 0 ? idleEnv : m_settingsData.rendererIdleTimeoutMs;
