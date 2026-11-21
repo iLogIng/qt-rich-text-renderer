@@ -21,10 +21,8 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QCoreApplication>
-#include <QCryptographicHash>
 #include <QDir>
 #include <QDockWidget>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
@@ -73,19 +71,6 @@ QString qjsPath()
     return runtimeRoot() + QStringLiteral("/third_party/quickjs-ng/build/qjs");
 }
 
-QString fileSha256(const QString &path)
-{
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        return {};
-    }
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    if (!hash.addData(&file)) {
-        return {};
-    }
-    return QString::fromLatin1(hash.result().toHex());
-}
-
 void logLoadedFile(const LocalFileContent &loaded)
 {
     if (!qEnvironmentVariableIsSet("RICH_TEXT_RENDER_DEBUG_LOAD")) {
@@ -93,15 +78,11 @@ void logLoadedFile(const LocalFileContent &loaded)
     }
 
     const QFileInfo info(loaded.path);
-    const QString textHash = QString::fromLatin1(
-        QCryptographicHash::hash(loaded.text.toUtf8(), QCryptographicHash::Sha256).toHex());
     fprintf(stderr,
-            "[load] path=%s size=%lld mtime=%s fileSha256=%s textSha256=%s\n",
+            "[load] path=%s size=%lld mtime=%s\n",
             loaded.path.toUtf8().constData(),
             static_cast<long long>(info.size()),
-            info.lastModified().toString(Qt::ISODateWithMs).toUtf8().constData(),
-            fileSha256(loaded.path).toUtf8().constData(),
-            textHash.toUtf8().constData());
+            info.lastModified().toString(Qt::ISODateWithMs).toUtf8().constData());
 }
 
 } // namespace
