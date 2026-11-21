@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 
+await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
 
 const common = {
@@ -30,12 +31,6 @@ await build({
   ...common,
   entryPoints: ['src/mathjax-worker.mjs'],
   outfile: 'dist/mathjax-worker.mjs',
-});
-
-await build({
-  ...common,
-  entryPoints: ['src/mermaid-worker.mjs'],
-  outfile: 'dist/mermaid-worker.mjs',
 });
 
 await build({

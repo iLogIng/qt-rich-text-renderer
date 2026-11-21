@@ -184,7 +184,7 @@ cache key = SHA256(
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
 | MathJax 核心     | `renderer/src/mathjax-core.mjs`       | `liteAdaptor` + TeX + SVG                            |
 | MathJax worker   | `renderer/src/mathjax-worker.mjs`     | NDJSON worker、常驻渲染 MathJax                       |
-| Mermaid worker   | `renderer/src/mermaid-worker.mjs` / `mermaid-full-worker.mjs` | NDJSON worker；full 版本启用完整图集 |
+| Mermaid worker   | `renderer/src/mermaid-full-worker.mjs` | NDJSON worker；启用完整图集                       |
 | 旧 qjs 入口      | `renderer/src/mathjax-qjs.mjs` 等     | 一次性脚本，用于对照测试                             |
 | JS 构建          | `renderer/build.mjs`                  | esbuild 打包为 QuickJS 可执行 bundle                 |
 | SVG 检查工具     | `tools/svgcheck.cpp`                  | SVG → PNG，验证 QtSvg 兼容性                         |

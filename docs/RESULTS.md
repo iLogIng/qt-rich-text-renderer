@@ -20,7 +20,7 @@
 | 项 | 结果 | 证据 |
 |---|---|---|
 | QuickJS-ng 运行 MathJax | ✅ | `qjs --std mathjax-qjs.mjs formula.tex display` 输出 SVG |
-| QuickJS-ng 运行 Mermaid v13 alpha | ✅ | `qjs --std mermaid-qjs.mjs diagram.mmd` 输出 SVG |
+| QuickJS-ng 运行 Mermaid v13 alpha | ✅ | `qjs --std mermaid-qjs.mjs diagram2.mmd` 输出 SVG |
 | MathJax SVG → QSvgRenderer | ✅ | `svgcheck` 输出 PNG，公式正确 |
 | Mermaid SVG → QSvgRenderer | ⚠️ 需清洗 | 原始 SVG 出现黑块；归一化 CSS 变量/颜色后正常 |
 | `QTextDocument` 嵌入 SVG | ✅ | `SvgObjectHandler` + `QTextObjectInterface`，绘制时直接渲染 SVG |
