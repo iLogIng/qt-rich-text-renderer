@@ -5,7 +5,7 @@
 环境：
 
 - Fedora Linux，x86_64；
-- Qt 6.11.2（Widgets、Svg）；
+- Qt 6.11.2（Widgets、Svg、SvgWidgets）；
 - CMake 4.3.0，GCC 16.2.1；
 - QuickJS-ng 0.18.0；
 - Node.js 22.23.1，npm 11.18.0；
@@ -245,11 +245,13 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 
 `MediaPreviewWindow` 使用独立非模态窗口：
 
-- 本地图片通过 `QImageReader` 解码；
-- SVG 通过 `QSvgRenderer` 按屏幕尺寸和 device pixel ratio 渲染；
+- 本地图片通过 `QImageReader` 解码，原始 `QImage` 保留给缩放和另存；
+- SVG 通过 `QGraphicsSvgItem` + `QSvgRenderer` 矢量渲染；
+- 预览窗口支持 5%–800% 缩放、Fit、1:1、`Ctrl`+滚轮和拖拽平移；
+- `Save As` 对同格式栅格图片直接复制原文件，其他格式用 `QImageWriter` 重编码；SVG 可保存原始 SVG 或导出 PNG；
 - 远程图片不下载，只提示仅支持本地图片。
 
-图片点击、SVG 点击、图片链接预览和预览窗口创建均已验证可用。
+图片点击、SVG 点击、图片链接预览、缩放控制和另存路径均已验证可用。
 
 ## 6.6 Load 与 --file 加载审计
 

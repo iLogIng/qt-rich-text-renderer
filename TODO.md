@@ -282,10 +282,11 @@
 - [x] Outline 跳转把目标 block 对齐到 Preview 顶部
 - [x] Load 使用 Qt 文件对话框，避免 KDE KIO/KDirModel 差异，并增加路径/SHA-256 审计
 - [x] 点击 Markdown 图片、本地图片链接和渲染 SVG，在独立窗口预览
+- [x] 图片/SVG 预览支持 5%–800% 缩放、Fit、1:1、Ctrl+滚轮、拖拽平移和另存为
 - [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
 - [x] `config/settings.ini` 完整配置模板，打包进 AppImage
 - [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
-- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
+- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`、`media-preview-test`
 - [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
 - [x] 删除未使用的运行时 accessor，并合并 `AppSettings` 的模板/用户覆盖解析
 - [x] 删除未使用的 TeX/Mermaid fixtures 和 slim Mermaid worker
@@ -311,7 +312,7 @@ scripts/package-appimage.sh
 - 代码高亮继续使用 Qt `QSyntaxHighlighter` 和 `CodeHighlighter`，不在当前阶段引入 KSyntaxHighlighting；
 - 配置系统使用只读 `config/settings.ini` 模板和 QSettings 用户覆盖，不新增其他配置框架；
 - 维护期只处理正确性 bug、安全问题、依赖升级、Qt/发行版兼容、性能回归、测试和打包；
-- 已记录但暂不实现的能力：代码块复制、跨消息选区、远程图片下载、图片预览缩放、可见区域优先队列、当前节滚动高亮、KSyntaxHighlighting 替换。
+- 已记录但暂不实现的能力：代码块复制、跨消息选区、远程图片下载、图片预览旋转、可见区域优先队列、当前节滚动高亮、KSyntaxHighlighting 替换。
 
 ## 非目标 / 不再讨论
 

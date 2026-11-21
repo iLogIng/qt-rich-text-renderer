@@ -180,7 +180,7 @@ cache key = SHA256(
 | 代码高亮         | `src/CodeHighlighter.*`               | `BlockCodeLanguage` + `QSyntaxHighlighter`           |
 | 目录面板         | `src/OutlinePanel.*`                  | 左侧标题树、层级组织和 block 跳转信号                |
 | Preview 点击     | `src/PreviewBrowser.*`                | 识别图片与渲染 SVG 点击，发出预览请求                |
-| 媒体预览窗口     | `src/MediaPreviewWindow.*`            | 本地图片与 SVG 的独立预览窗口                        |
+| 媒体预览窗口     | `src/MediaPreviewWindow.*`            | 本地图片与 SVG 预览、缩放、平移和另存                |
 | SVG 对象绘制     | `src/SvgObjectHandler.*`              | `QTextObjectInterface` 直接绘制 SVG，不常驻 QImage   |
 | SVG 归一化       | `src/SvgSanitizer.*`                  | CSS 变量、颜色、尺寸、深色主题、基础安全清理         |
 | 主题             | `src/Theme.*`                         | 浅色/深色 QPalette                                   |
@@ -202,7 +202,7 @@ cache key = SHA256(
 |---|---|---|
 | `rich-text-renderer-core` | Markdown 预处理、应用设置、链接解析、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
 | `rich-text-renderer-document` | 文档构建、标题目录、Source 高亮、SVG 归一化、SVG 对象、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
-| `rich-text-renderer-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets` |
+| `rich-text-renderer-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets`、`Qt6::SvgWidgets` |
 | `rich-text-renderer` | 应用入口 | `rich-text-renderer-ui` |
 
 依赖方向固定为：
@@ -302,7 +302,8 @@ scripts/mem-bench.sh
 - `svg-sanitizer-test`：CSS 变量、颜色、尺寸、脚本和事件属性清理；
 - `document-rendering-test`：代码高亮、Source 高亮、fenced code 状态、SVG 插入和错误替换；
 - `navigation-history-test`：back/forward、forward 截断和 64 条上限；
-- `local-file-loader-test`：文本/二进制/目录/缺失文件/UTF-16/大小限制。
+- `local-file-loader-test`：文本/二进制/目录/缺失文件/UTF-16/大小限制；
+- `media-preview-test`：缩放范围、Fit、1:1、Ctrl+滚轮、栅格与 SVG 另存。
 
 `tests/sources/link-source.md` 可用于手动验证本地文件、锚点、远程链接和危险 scheme。
 
@@ -408,7 +409,9 @@ Source 行为：
 - 点击 Markdown 内嵌图片，在新的预览窗口打开；
 - 点击本地图片链接（包括图片链接语法）打开预览窗口，不替换当前文档；
 - 点击已渲染的 MathJax/Mermaid SVG，在新的预览窗口打开；
-- 图片按屏幕可用区域缩放，SVG 以当前主题的归一化结果渲染；
+- 预览窗口支持 Fit、1:1、工具栏按钮和 `Ctrl`+滚轮缩放（5%–800%），可拖拽平移；
+- SVG 以当前主题的归一化结果渲染，并保持矢量缩放；
+- `Save As` 保存原始栅格图片或 SVG；栅格图片可另存为其他支持格式，SVG 可导出 PNG；
 - 远程图片不下载，只提示仅支持本地图片。
 
 链接行为：
@@ -569,7 +572,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-renderer-x86_64.AppImage \
 ### 交互
 
 - Source 只读，没有编辑、保存或外部修改同步；
-- 图片/SVG 预览不提供缩放、旋转或拖拽，远程图片不下载；
+- 图片/SVG 预览支持缩放和平移，不提供旋转；远程图片不下载；
 - 没有每条消息复制；
 - 没有代码块复制；
 - 没有跨消息任意拖选；
