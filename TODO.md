@@ -156,7 +156,9 @@
 
 ### 6. AppImage CI 与干净环境验证
 
-- [ ] 固定 Qt、QuickJS、Node、linuxdeploy、appimagetool 版本
+- [x] GitHub Actions CI/CD：Release 构建、测试、AppImage、源码包和 tag 发布
+- [x] 固定 Qt、QuickJS、Node、linuxdeploy、appimagetool 和 AppImage runtime 版本
+- [x] AppImage 打包强制要求 Release 构建
 - [ ] 在干净 Fedora/Ubuntu 虚拟机跑 AppImage smoke test
 - [ ] 处理 `linuxdeploy` 在 Fedora `.relr.dyn` 上的 strip 报错
 - [ ] 校验 AppImage 内 `qjs` / JS bundles / sample 路径
@@ -280,7 +282,7 @@
 - [x] `MarkdownOutline` 从 `QTextDocument` 提取标题，左侧 Outline dock 点击跳转
 - [x] Outline dock 固定左侧，通过 `Outline` 按钮/设置隐藏或显示，不允许浮动或取下
 - [x] Outline 跳转把目标 block 对齐到 Preview 顶部
-- [x] Load 使用 Qt 文件对话框，避免 KDE KIO/KDirModel 差异，并增加路径/SHA-256 审计
+- [x] Load 使用 Qt 文件对话框，避免 KDE KIO/KDirModel 差异，并增加路径/大小/mtime 审计
 - [x] 点击 Markdown 图片、本地图片链接和渲染 SVG，在独立窗口预览
 - [x] 图片/SVG 预览支持 5%–800% 缩放、Fit、1:1、Ctrl+滚轮、拖拽平移和另存为
 - [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
@@ -292,6 +294,8 @@
 - [x] 加载后强制完成整篇文档布局，修复长文档后续 block 零高度问题
 - [x] 普通加载复位、有效/无效 anchor 和异步 block 完成后的定位行为
 - [x] visible-window 加载、README 完整布局、anchor 和 status-only 错误回归测试
+- [x] 删除 Lecture-03-04 排查用的文件 hash 审计，保留路径/大小/mtime 日志
+- [x] GitHub Actions：Release 构建/测试、AppImage、源码包、SHA256SUMS 和 tag Release
 - [x] 删除未使用的运行时 accessor，并合并 `AppSettings` 的模板/用户覆盖解析
 - [x] 删除未使用的 TeX/Mermaid fixtures 和 slim Mermaid worker
 - [x] AppImage 只打包运行时使用的 MathJax worker 与 Mermaid full worker，不包含测试用 one-shot bundle

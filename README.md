@@ -46,6 +46,12 @@ scripts/setup-renderer.sh
 scripts/build.sh
 ```
 
+`scripts/build.sh` 默认使用 `RelWithDebInfo`。发布 AppImage 前必须显式构建 Release：
+
+```bash
+BUILD_TYPE=Release scripts/build.sh
+```
+
 ### 手动方式
 
 构建 QuickJS-ng：
@@ -103,7 +109,7 @@ cmake --build build -j"$(nproc)"
 
 | 环境变量 | 作用 |
 |---|---|
-| `RICH_TEXT_RENDER_DEBUG_LOAD=1` | 输出路径、大小、mtime 和 SHA-256 审计信息 |
+| `RICH_TEXT_RENDER_DEBUG_LOAD=1` | 输出路径、大小和 mtime 审计信息 |
 | `RICH_TEXT_RENDER_DEBUG=1` | 输出渲染摘要和缓存命中信息 |
 | `RICH_TEXT_RENDER_IDLE_MS=<ms>` | 覆盖 worker 空闲退出时间 |
 
@@ -225,9 +231,14 @@ scripts/test-idle.sh
 
 ## 打包
 
+AppImage 只接受 Release 构建：
+
 ```bash
+BUILD_TYPE=Release scripts/build.sh
 scripts/package-appimage.sh
 ```
+
+`package-appimage.sh` 会检查 `build/CMakeCache.txt`，如果当前不是 Release 构建会直接退出。
 
 脚本使用 `linuxdeploy --plugin qt` 部署 Qt 依赖，复制 `qjs`、运行时 worker 和默认设置模板，再由 `appimagetool` 生成：
 
@@ -235,15 +246,16 @@ scripts/package-appimage.sh
 dist/rich-text-renderer-x86_64.AppImage
 ```
 
-`linuxdeploy` 和 `appimagetool` 默认从 `PATH` 查找，也可以通过环境变量指定：
+`linuxdeploy` 和 `appimagetool` 默认从 `PATH` 查找，也可以通过环境变量指定。`APPIMAGE_RUNTIME` 可选；设置后 `appimagetool` 不再临时下载 runtime：
 
 ```bash
 LINUXDEPLOY=/path/to/linuxdeploy \
 APPIMAGETOOL=/path/to/appimagetool \
+APPIMAGE_RUNTIME=/path/to/runtime-x86_64 \
 scripts/package-appimage.sh
 ```
 
-脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 AppImage 约 34.3MB / 32.7MiB。
+脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.3MB / 32.7MiB。
 
 验证：
 
@@ -253,9 +265,23 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-renderer-x86_64.AppImage \
   --screenshot out/appimage-dark.png
 ```
 
+## CI/CD
+
+GitHub Actions 工作流位于 `.github/workflows/ci.yml`。
+
+- pull request、分支 push 和手动触发：Release 构建与测试；
+- `master` / `main` push：生成 AppImage、源码包和校验和的 CI artifacts；
+- `v*` tag：创建 GitHub Release，上传：
+  - `rich-text-renderer-x86_64.AppImage`
+  - `rich-text-renderer-<version>-source.tar.gz`
+  - `SHA256SUMS`
+
+源码包包含 QuickJS-ng submodule 源码，并排除构建目录、`node_modules`、AppImage 中间产物和测试输出。
+
 ## 项目结构
 
 ```text
+.github/workflows/      GitHub Actions CI/CD 流水线
 src/                    Qt Widgets 应用与渲染、缓存、交互逻辑
 renderer/               MathJax / Mermaid 的 QuickJS bundle 与构建脚本
 third_party/quickjs-ng  QuickJS-ng 子模块

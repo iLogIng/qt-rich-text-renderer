@@ -27,7 +27,7 @@
 - 目录、二进制文件、超过 32MiB 的文件必须被拒绝，且不得替换当前文档。
 - 文本解码必须覆盖 UTF-8（含 BOM）、带 BOM 的 UTF-16 LE/BE 和 Latin-1。
 - 无 BOM 的 UTF-16 与 UTF-32 必须按二进制处理。
-- 文件大小、mtime、原始文件 SHA-256 和解码文本 SHA-256 可用于加载审计。
+- 文件大小和 mtime 可用于加载审计。
 
 ### 2.2 渲染
 
@@ -138,7 +138,7 @@
 
 ## 7. 打包
 
-- 必须生成 `dist/rich-text-renderer-x86_64.AppImage`。
+- 必须使用 Release 构建生成 `dist/rich-text-renderer-x86_64.AppImage`；打包脚本不得接受 `RelWithDebInfo` 或其他构建类型。
 - AppImage 必须包含：
   - `qjs`；
   - `mathjax-worker.mjs`；
@@ -147,6 +147,7 @@
 - AppImage 不得包含测试用 one-shot bundle 或 WebEngine。
 - 当前 AppImage 约 34.3MB / 32.7MiB。
 - 打包脚本使用 `linuxdeploy --plugin qt` 和 `appimagetool`；`--appimage-extract-and-run` 路径不要求宿主安装 FUSE。
+- CI 必须固定 linuxdeploy、appimagetool、AppImage runtime 和打包基础镜像版本。
 - 当前只在 Fedora Linux x86_64 环境验证；干净虚拟机和其他发行版验证仍待完成。
 
 ## 8. 安全边界

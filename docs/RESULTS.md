@@ -266,19 +266,13 @@ documentLayout()->documentSize();
 
 该操作使文档重新布局后再进行滚动复位、anchor 定位和 viewport 刷新。README 加载后的文档高度从约 3159px 恢复为 5407px，最后一个标题“第三方与许可证”的布局高度从 0 恢复为 29px。
 
-为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
+加载诊断使用 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 输出：
 
 ```text
-[load] path=... size=... mtime=... fileSha256=... textSha256=...
+[load] path=... size=... mtime=...
 ```
 
-`Load` 使用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。`Load` 与 `--file` 两条路径得到相同的审计字段：
-
-- 路径；
-- 文件大小；
-- mtime；
-- 文件 SHA-256；
-- 解码文本 SHA-256。
+`Load` 使用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。`Load` 与 `--file` 两条路径得到相同的路径、文件大小和 mtime。
 
 加载后 Preview 会切回 Preview tab，完成整篇文档布局，再回到顶部并刷新视口。Outline 跳转也会把目标标题 block 对齐到视口顶部，而不是只做最小可见滚动。
 
@@ -312,14 +306,15 @@ key = SHA256(
 
 ## 8. AppImage
 
-> 当前 AppImage 已包含 renderer service、worker 脚本和 `config/settings.ini` 默认模板；代码改动后重新执行 `scripts/package-appimage.sh`。
+> 当前 AppImage 已包含 renderer service、worker 脚本和 `config/settings.ini` 默认模板；代码改动后重新执行 `scripts/package-appimage.sh`。打包只接受 Release 构建。
 
 构建方式：
 
-1. `linuxdeploy` 部署 Qt 依赖到 `AppDir`；
-2. 复制 `qjs` 到 `usr/bin`，只复制运行时使用的 MathJax 和 Mermaid full worker 到 `usr/share/rich-text-renderer/renderer/dist`；
-3. 复制 `config/settings.ini` 默认模板；
-4. `appimagetool` 生成 AppImage。
+1. 使用 `BUILD_TYPE=Release scripts/build.sh` 生成 Release 二进制；`package-appimage.sh` 校验 `CMAKE_BUILD_TYPE=Release`；
+2. `linuxdeploy` 部署 Qt 依赖到 `AppDir`；
+3. 复制 `qjs` 到 `usr/bin`，只复制运行时使用的 MathJax 和 Mermaid full worker 到 `usr/share/rich-text-renderer/renderer/dist`；
+4. 复制 `config/settings.ini` 默认模板；
+5. `appimagetool` 生成 AppImage；CI 使用固定版本的 AppImage runtime。
 
 结果：
 
@@ -342,7 +337,7 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-renderer-x86_64.AppImage \
 
 - `linuxdeploy` 的 strip 步骤在 Fedora 的 `.relr.dyn` section 上报错；
 - 但 AppDir 已填充，`appimagetool` 仍可打包；
-- 生产版应使用固定版本的 linuxdeploy/CI 环境，不要依赖宿主 strip。
+- CI 固定 linuxdeploy、appimagetool 和 AppImage runtime 版本；仍需固定打包基础镜像，避免宿主 strip 差异。
 
 ## 9. 未完成/未验证
 
