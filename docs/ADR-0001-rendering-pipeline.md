@@ -75,7 +75,7 @@ Qt Widgets 的 Markdown 渲染在 AI 聊天场景下不完整：没有语法高�
 - 30 blocks 总 PSS 约 62.2MB；400 blocks 总 PSS 约 72.0MB（full Mermaid 图集）；
 - qjs worker 数上限 2，空闲 60s 退出；
 - 自定义 SVG 对象避免了 400 个 QImage 常驻；
-- AppImage 约 35.3MB，无 WebEngine；
+- AppImage 约 34.3MB，无 WebEngine；
 - 无 WebEngine、无 Node 运行时；
 - MathJax SVG 在 QSvgRenderer 下工作良好；
 - Mermaid v13 alpha 的 DOM-free 渲染在 QuickJS 中可运行。

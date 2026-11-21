@@ -30,7 +30,7 @@
 - 本地链接：非二进制、非目录文件在当前窗口内打开，不再拉起系统编辑器；
 - 历史：双向链表记录最多 64 个本地文件，工具栏右侧提供 back/forward 和下拉列表；
 - 内存：30 blocks 总 PSS 约 62.2MB，400 blocks 约 72.0MB；
-- AppImage：可用，约 **35.3MB / 34MiB**，无需 WebEngine；
+- AppImage：可用，约 **34.3MB / 32.7MiB**，无需 WebEngine；
 - 不需要 QtWebEngine，不需要 Node 运行时。
 
 当前最大缺口是**复制/选区**、**安全清洗**和**可见区域优先队列**；代码块语法高亮、本地链接与历史导航已完成。
@@ -488,7 +488,7 @@ scripts/package-appimage.sh
 
 1. 用 `linuxdeploy --plugin qt` 把 Qt 依赖/插件部署到 `AppDir`；
 2. 复制 `qjs` 到 `AppDir/usr/bin/qjs`；
-3. 复制 `renderer/dist/*.mjs` 到 `AppDir/usr/share/rich-text-render/renderer/dist/`；
+3. 只复制运行时使用的 `mathjax-worker.mjs` 和 `mermaid-full-worker.mjs` 到 `AppDir/usr/share/rich-text-render/renderer/dist/`；
 4. 复制 `config/settings.ini` 到 `AppDir/usr/share/rich-text-render/config/`；
 5. 写入 `AppRun`、desktop、icon；
 6. 用 `appimagetool` 生成 `dist/rich-text-render-x86_64.AppImage`。
@@ -530,11 +530,11 @@ QT_QPA_PLATFORM=offscreen ./dist/rich-text-render-x86_64.AppImage \
 | 项                         |       大小 |
 | -------------------------- | ---------: |
 | qjs                        |      1.5MB |
-| MathJax bundle             |      1.8MB |
-| Mermaid bundle             |      664KB |
-| AppImage                   | **35.3MB / 34MiB** |
+| MathJax worker bundle      |      1.8MB |
+| Mermaid full worker bundle |      2.1MB |
+| AppImage                   | **34.3MB / 32.7MiB** |
 | AppDir（未压缩）           |      约 85MB |
-| 渲染链（qjs + JS bundles） |      约 7MB |
+| 运行时渲染链（qjs + 两个 worker） | 约 5.4MB |
 
 ### CI 建议
 

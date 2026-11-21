@@ -25,7 +25,7 @@
 | Mermaid SVG → QSvgRenderer | ⚠️ 需清洗 | 原始 SVG 出现黑块；归一化 CSS 变量/颜色后正常 |
 | `QTextDocument` 嵌入 SVG | ✅ | `SvgObjectHandler` + `QTextObjectInterface`，绘制时直接渲染 SVG |
 | 文件缓存 | ✅ | 二次渲染 30 blocks 约 30–50ms |
-| AppImage | ✅ | 35.3MB，含 Qt + qjs + MathJax + Mermaid full，无 WebEngine |
+| AppImage | ✅ | 34.3MB，含 Qt + qjs + MathJax + Mermaid full，无 WebEngine |
 
 ## 2. 体积
 
@@ -37,7 +37,7 @@
 | Mermaid full worker bundle | 2.1MB |
 | Qt 应用二进制 | 6.7MB |
 | AppDir（含 Qt 依赖/插件） | 约 85MB |
-| AppImage（完整） | **35.3MB / 34MiB** |
+| AppImage（完整） | **34.3MB / 32.7MiB** |
 | qjs + 4 个 JS bundle | 约 5MB |
 
 对比：QtWebEngine 通常会带来 130–180MB 的额外体积。这个方案避开了它。
@@ -306,15 +306,15 @@ key = SHA256(
 构建方式：
 
 1. `linuxdeploy` 部署 Qt 依赖到 `AppDir`；
-2. 复制 `qjs` 到 `usr/bin`，MathJax/Mermaid bundle 到 `usr/share/rich-text-render/renderer/dist`；
-3. 复制 sample；
+2. 复制 `qjs` 到 `usr/bin`，只复制运行时使用的 MathJax 和 Mermaid full worker 到 `usr/share/rich-text-render/renderer/dist`；
+3. 复制 `config/settings.ini` 默认模板；
 4. `appimagetool` 生成 AppImage。
 
 结果：
 
-- 完整 AppImage：**35.3MB / 34MiB**；
+- 完整 AppImage：**34.3MB / 32.7MiB**；
 - AppDir（未压缩）：约 85MB；
-- 渲染链（qjs + 4 个 JS bundle）：约 5MB；
+- 运行时渲染链（qjs + MathJax worker + Mermaid full worker）：约 5.4MB；
 - 不再包含 WebEngine。
 
 运行验证：

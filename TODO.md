@@ -294,6 +294,9 @@
 - [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
 - [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`
 - [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
+- [x] 删除未使用的运行时 accessor，并合并 `AppSettings` 的模板/用户覆盖解析
+- [x] 删除未使用的 TeX/Mermaid fixtures 和 slim Mermaid worker
+- [x] AppImage 只打包运行时使用的 MathJax worker 与 Mermaid full worker，不包含测试用 one-shot bundle
 - [x] 记录 KSyntaxHighlighting 的未来依赖和迁移边界；当前只使用 Qt `QSyntaxHighlighter`
 
 ## 验证命令
