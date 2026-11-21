@@ -251,6 +251,26 @@ Markdown 相对链接的根目录改为 **当前 Markdown 文件所在目录**�
 
 已通过临时 UI 探针验证图片点击、SVG 点击、图片链接预览和预览窗口创建。
 
+## 6.6 Load 与 --file 加载审计
+
+`Load` 和 `--file` 最终都调用 `MainWindow::openLocalFile()`。为排除路径差异，增加了 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 审计日志：
+
+```text
+[load-origin] command-line <path>
+[load-origin] toolbar <path>
+[load] path=... size=... mtime=... fileSha256=... textSha256=...
+```
+
+`Load` 已改用 Qt 自带文件对话框（`DontUseNativeDialog`），避免 KDE 原生文件选择器的 KIO/KDirModel 路径和模型差异。实际 Load 自动化探针与 `--file` 得到相同的：
+
+- 路径；
+- 文件大小；
+- mtime；
+- 文件 SHA-256；
+- 解码文本 SHA-256。
+
+加载后 Preview 会切回 Preview tab、回到顶部并强制刷新视口。Outline 跳转也会把目标标题 block 对齐到视口顶部，而不是只做最小可见滚动。
+
 ## 7. 缓存与“渲染是纯函数”
 
 实际使用的内容寻址缓存：

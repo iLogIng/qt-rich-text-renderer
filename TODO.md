@@ -286,6 +286,8 @@
 - [x] Source 改为只读 tab，使用 Qt `QSyntaxHighlighter` 做 Markdown 语法高亮
 - [x] `MarkdownOutline` 从 `QTextDocument` 提取标题，左侧 Outline dock 点击跳转
 - [x] Outline dock 固定左侧，通过 `Outline` 按钮/设置隐藏或显示，不允许浮动或取下
+- [x] Outline 跳转把目标 block 对齐到 Preview 顶部
+- [x] Load 使用 Qt 文件对话框，避免 KDE KIO/KDirModel 差异，并增加路径/SHA-256 审计
 - [x] 点击 Markdown 图片、本地图片链接和渲染 SVG，在独立窗口预览
 - [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
 - [x] `config/settings.ini` 完整配置模板，打包进 AppImage

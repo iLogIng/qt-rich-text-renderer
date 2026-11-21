@@ -355,7 +355,7 @@ cmake --build build -j"$(nproc)"
 - 中央 `Preview` / `Source` 标签页；
 - 标签栏最左侧 `Outline` 开关，用于显示或隐藏目录；
 - `Source` 为只读视图，支持 Markdown 语法高亮；
-- `Load`：打开本地 Markdown 或文本文件；
+- `Load`：使用 Qt 文件对话框打开本地 Markdown 或文本文件，不经过 KDE KIO/KDirModel；
 - `Render (Ctrl+Enter)`；
 - **`Dark mode` / `Light mode` 切换按钮**；
 - `Settings`：编辑字体、视图、预览和渲染器超时；
@@ -367,10 +367,30 @@ cmake --build build -j"$(nproc)"
 - 使用 `Load` 或 `--file` 后才打开文件；
 - `sample.md` 保留在项目 `samples/` 目录中，但应用代码不硬编码该路径，不会自动加载，也不打包进 AppImage。
 
+加载审计：
+
+- `Load` 和 `--file` 最终都调用同一个 `openLocalFile()`；
+- `Load` 使用 Qt 自带文件对话框，不经过 KDE KIO/KDirModel；
+- 设置 `RICH_TEXT_RENDER_DEBUG_LOAD=1` 后会输出：
+  - 加载来源（command-line / toolbar）；
+  - 请求路径；
+  - 规范化路径；
+  - 文件大小和 mtime；
+  - 原始文件 SHA-256；
+  - 解码后文本 SHA-256。
+
+示例：
+
+```bash
+RICH_TEXT_RENDER_DEBUG_LOAD=1 ./build/rich-text-render --file <path>
+```
+
+加载新文档后 Preview 会回到顶部并强制刷新视口，避免文件对话框关闭后留下旧绘制区域。
+
 目录行为：
 
 - 从 Qt 生成的 `QTextDocument` 标题层级提取；
-- 点击条目切换到 Preview 并滚动到对应 block；
+- 点击条目切换到 Preview，把目标 block 对齐到视口顶部；
 - 标题中的数学/Mermaid token 使用可读替代文字；
 - 固定在主窗口左侧，只能隐藏，不能拖动、浮动或取下；
 - 标签栏左侧 `Outline` 按钮和 Settings 都可以切换显示状态。
