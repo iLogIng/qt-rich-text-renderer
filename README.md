@@ -153,7 +153,7 @@ Linux 上通常为：
 
 主题 JSON 只接受颜色、尺寸和 QSS 开关，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
 
-示例主题见 `samples/themes/warm-dark/theme.json`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。
+示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。
 
 当前主题能力只覆盖颜色、字体、间距、控件外观和内置布局选项。第三方整体窗口布局替换暂不提供；QML 不进入当前实施范围。
 
