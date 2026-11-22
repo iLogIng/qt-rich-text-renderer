@@ -298,6 +298,7 @@ dist/                   生成的 AppImage（gitignored）
 ## 文档
 
 - [FOR_LOCVAS.md](FOR_LOCVAS.md)：渲染契约、资源约束与验收条件
+- [FOR_LOCVAS_IF_QML.md](FOR_LOCVAS_IF_QML.md)：Widgets/QML 选型、主题接口与 QML spike 边界
 - [docs/FLOW.md](docs/FLOW.md)：启动、渲染、缓存、链接和预览流程
 - [docs/RESULTS.md](docs/RESULTS.md)：渲染结果、性能数据和已知限制
 - [docs/ADR-0001-rendering-pipeline.md](docs/ADR-0001-rendering-pipeline.md)：渲染路线说明
