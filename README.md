@@ -278,7 +278,7 @@ APPIMAGE_RUNTIME=/path/to/runtime-x86_64 \
 scripts/package-appimage.sh
 ```
 
-脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.3MB / 32.7MiB。
+脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.4MB / 32.8MiB。
 
 验证：
 
@@ -341,7 +341,7 @@ dist/                   生成的 AppImage（gitignored）
 - 缓存是文件缓存，没有容量上限或自动清理。
 - `SvgSanitizer` 是 QtSvg 兼容层，不是完整安全清洗器。
 - 本地文件链接没有 workspace allowlist。
-- AppImage 当前只在 Fedora Linux x86_64 环境验证。
+- AppImage 当前只在 Fedora Linux x86_64 环境验证；自包含性尚未确认：产物可能依赖宿主 Qt 平台/图像格式插件，且未包含 `qt.conf` 与完整许可证材料。
 
 ## 第三方与许可证
 

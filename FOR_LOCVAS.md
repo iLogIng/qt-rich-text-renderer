@@ -151,8 +151,9 @@
   - `mermaid-full-worker.mjs`；
   - `config/settings.ini` 默认模板。
 - AppImage 不得包含测试用 one-shot bundle 或 WebEngine。
-- 当前 AppImage 约 34.3MB / 32.7MiB。
+- 当前 AppImage 文件约 34.4MB / 32.8MiB；体积数字不等于自包含性。
 - 打包脚本使用 `linuxdeploy --plugin qt` 和 `appimagetool`；`--appimage-extract-and-run` 路径不要求宿主安装 FUSE。
+- 当前 AppImage 的自包含性尚未确认：产物可能依赖宿主 Qt 平台/图像格式插件，且未包含 `qt.conf` 与完整许可证材料；干净机器启动验证仍待完成。
 - CI 必须固定 linuxdeploy、appimagetool、AppImage runtime 和打包基础镜像版本。
 - 当前只在 Fedora Linux x86_64 环境验证；干净虚拟机和其他发行版验证仍待完成。
 
