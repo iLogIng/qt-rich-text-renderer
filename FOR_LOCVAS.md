@@ -112,12 +112,16 @@
 - `config/settings.ini` 是只读默认模板；用户覆盖写入 `QStandardPaths::AppConfigLocation/settings.ini`。
 - 用户覆盖不得重写模板，避免丢失模板注释。
 - 设置项至少覆盖：
-  - `appearance.theme`、应用/预览字号、Source 字号、Source 高亮；
+  - `appearance.themeId`、应用/预览字号、Source 字号、Source 高亮；
   - `view.outlineVisible`、`view.sourceVisible`；
   - `preview.maxSvgWidth`；
   - MathJax/Mermaid 请求超时和 worker 空闲超时；
   - 最近目录和窗口几何。
-- Settings 对话框必须提供 Appearance、View、Preview、Advanced 四组设置和 Restore Defaults。
+- 主题必须使用 Widgets + QPalette + QSS；内置 `light` / `dark` 保持当前视觉。
+- 用户主题只接受 JSON token 和 QSS 开关，不接受任意 QSS、QML 或可执行代码。
+- 用户主题目录为 `QStandardPaths::AppDataLocation/themes/<id>/theme.json`；加载失败必须回退默认主题。
+- 当前不支持第三方整体布局替换；`.ui` 布局只作为 QSS 稳定后的可选后续能力。
+- Settings 对话框必须提供 Appearance、View、Preview、Advanced 四组设置、主题选择和 Restore Defaults。
 - `--dark` 只影响当前进程，不得自动写回用户配置。
 - SVG 缓存必须是内容寻址的文件缓存，key 至少包含：
   - 渲染器版本；
@@ -186,7 +190,7 @@ scripts/test-process-bound.sh
 scripts/test-idle.sh
 ```
 
-`scripts/test.sh` 运行 13 个 CTest 目标，并执行渲染器 smoke test。
+`scripts/test.sh` 运行 14 个 CTest 目标，并执行渲染器 smoke test。
 
 ### 10.2 契约映射
 
@@ -197,7 +201,7 @@ scripts/test-idle.sh
 | 缓存 | `SvgCache` | `svg-cache-test` |
 | 链接与本地文件 | `LinkResolver`、`MarkdownLinkHandler`、`LocalFileLoader` | `link-resolver-test`、`link-handler-test`、`local-file-loader-test` |
 | 导航历史 | `NavigationHistory` | `navigation-history-test` |
-| 设置 | `AppSettings`、`SettingsDialog` | `app-settings-test`、`settings-dialog-test` |
+| 设置与主题 | `AppSettings`、`SettingsDialog`、`ThemeManager` | `app-settings-test`、`settings-dialog-test`、`theme-test` |
 | 目录与启动 | `MarkdownOutline`、`MainWindow` | `markdown-outline-test`、`main-window-startup-test` |
 | 加载与布局收尾 | `MainWindow::loadFile()`、`openLocalFile()`、`finishPreviewLoad()` | `main-window-startup-test` |
 | 媒体预览 | `MediaPreviewWindow` | `media-preview-test` |
