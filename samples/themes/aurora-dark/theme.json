@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "aurora-dark",
+  "name": "Aurora Dark",
+  "dark": true,
+  "qss": true,
+  "colors": {
+    "window": "#11161a",
+    "windowText": "#e6edf3",
+    "base": "#0d1117",
+    "alternateBase": "#161b22",
+    "text": "#e6edf3",
+    "mutedText": "#8b949e",
+    "button": "#1c232b",
+    "buttonText": "#e6edf3",
+    "brightText": "#ffffff",
+    "highlight": "#2dd4bf",
+    "highlightedText": "#062a26",
+    "link": "#67e8f9",
+    "linkVisited": "#c4b5fd",
+    "placeholder": "#6e7681",
+    "tooltipBase": "#1f2933",
+    "tooltipText": "#e6edf3",
+    "border": "#30363d"
+  },
+  "metrics": {
+    "radius": 10,
+    "spacing": 7
+  }
+}

@@ -4,12 +4,7 @@
 #include <QString>
 
 struct AppSettingsData {
-    enum class Theme {
-        Light,
-        Dark,
-    };
-
-    Theme theme = Theme::Light;
+    QString themeId = QStringLiteral("light");
     int uiFontPointSize = 10;
     int sourceFontPointSize = 10;
     bool sourceHighlighting = true;

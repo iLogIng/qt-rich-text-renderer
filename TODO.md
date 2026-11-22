@@ -4,30 +4,49 @@
 >
 > 记录日期：2026-11-18
 >
-> 原则：不引入 QtWebEngine，不引入 MarkQml/QML 渲染链路，不引入 Node 运行时；渲染链路保持 QuickJS + SVG。
+> 最近更新：2026-11-22
+>
+> 原则：不引入 QtWebEngine，不引入 QML/MarkQml UI 或渲染链路，不引入 Node 运行时；UI 采用 Widgets + QPalette/QSS，渲染链路保持 QuickJS + SVG。
 
-## Polish 顺序
+## Polish
 
-> 以下是“从验证版本到可日常使用”的建议顺序，汇总自下面的 P0/P1/P2；不替代详细清单。
+### QSS UI Polish
+
+> 当前项目仍是 `rich-text-renderer`，作为 locvas 的技术选型与 spike 验证。QSS/UI 工作不改变 `QTextDocument` + QuickJS 渲染管线，不引入 QML。
+
+- [x] 在引入 QSS 前整理 `src/` 下平铺的源文件：按现有 `core`、`document`、`ui` 边界移动到子目录，只更新 CMake 源列表和 include 路径，保持行为与测试不变
+- [x] 设计主题 JSON schema、`ThemeSpec` 和 `ThemeManager`；内置 `light` / `dark` 主题必须保持当前视觉
+- [x] 用 `QPalette` + QSS 模板生成主题样式，禁止把用户 JSON 直接当作任意 QSS 注入
+- [x] 将 `AppSettingsData::Theme` 迁移为 `themeId`，保留 `appearance/theme=light|dark` 的旧配置映射
+- [x] Settings 的 Appearance 页提供主题选择、字号/密度、主题目录入口和加载失败回退
+- [x] 决定代码高亮、Source 高亮、MathJax 和 Mermaid 如何消费主题语义；首版使用主题的 `dark` 标志，代码配色单独配置留待后续
+- [ ] 增加主题加载、校验、回退、设置迁移、QSS token 替换和视觉回归测试（主题/回退/QSS 测试已完成，golden 视觉回归待补）
+- [ ] 从当前 UI 骨架开始保留稳定的 `objectName` 和具名插槽，保证以后可以接入静态 `.ui` 布局
+- [ ] QSS 稳定后，再评估 `Qt6::UiTools` / `QUiLoader` 的可选 `.ui` 布局加载：白名单控件、必需插槽、资源限制、错误回退和版本化 manifest；不得先于 QSS 实现
+- [x] 更新 README、FOR_LOCVAS 和 FOR_LOCVAS_IF_QML，记录 QSS 主题入口、用户主题目录、.ui 边界和当前非目标
+
+### Defer Polish
+
+> 原有 Polish 顺序暂后置；以下是“从验证版本到可日常使用”的建议顺序，汇总自下面的 P0/P1/P2；不替代详细清单。
 > 每完成一项，都回到真实 AI 输出语料做一次冷/热缓存与视觉回归。
 
-| 顺序 | 打磨项 | 对应现有条目 |
-|---:|---|---|
-| 1 | renderer service / pool：替代 one-shot qjs，解决进程峰值 | P0-3 |
-| 2 | 块级 Markdown tokenizer：尊重 code span、围栏、引用、列表、表格 | P1-9（语料回归见 P0-5） |
-| 3 | XML 白名单 SVG sanitizer：脚本/事件/外链/foreignObject | P0-4 |
-| 4 | SQLite/Blob 缓存：single-flight、原子写、LRU、版本失效 | P1-7 |
-| 5 | 每条消息/代码块复制（代码高亮已完成） | P0-2 |
-| 6 | 流式增量 + 取消 + 选区冻结 | P1-8 |
-| 7 | 高 DPI / 字体 / 主题 / 响应式宽度 / 无障碍 | P1-11、P1-12、P2-14 |
-| 8 | 干净 VM AppImage + CI + 许可证材料 | P0-6 |
-| 9 | 真实 AI 输出语料 + golden tests | P0-5 |
-| 10 | Mermaid 版本策略与图类型扩展 | P1-10 |
-| 11 | 跨消息任意拖选（P2，后置） | P2-13 |
+| 顺序 | 打磨项 | 状态 | 对应现有条目 |
+|---:|---|---|---|
+| 1 | renderer service / pool：替代 one-shot qjs，解决进程峰值 | 已完成 | P0-3 |
+| 2 | 块级 Markdown tokenizer：尊重 code span、围栏、引用、列表、表格 | 待完成 | P1-9（语料回归见 P0-5） |
+| 3 | XML 白名单 SVG sanitizer：脚本/事件/外链/foreignObject | 待完成 | P0-4 |
+| 4 | SQLite/Blob 缓存：single-flight、原子写、LRU、版本失效 | 待完成 | P1-7 |
+| 5 | 每条消息/代码块复制（代码高亮已完成） | 部分完成 | P0-1、P0-2 |
+| 6 | 流式增量 + 取消 + 选区冻结 | 待完成 | P1-8 |
+| 7 | 高 DPI / 字体 / 主题 / 响应式宽度 / 无障碍 | 部分完成 | P1-11、P1-12、P2-14 |
+| 8 | 干净 VM AppImage + CI + 许可证材料 | 部分完成：CI 与 Release AppImage 已有；干净 VM 待验证 | P0-6 |
+| 9 | 真实 AI 输出语料 + golden tests | 待完成 | P0-5 |
+| 10 | Mermaid 版本策略与图类型扩展 | 部分完成：版本固定与 24/24 smoke 已有；升级回归待补 | P1-10 |
+| 11 | 跨消息任意拖选（P2，后置） | 待完成 | P2-13 |
 
-### 为什么是这个顺序
+#### 为什么是这个顺序
 
-- **先 renderer service**：当时 30 blocks 会起 30 个 qjs，先解决进程峰值，后面所有性能测试才有意义。
+- **先 renderer service**：优化前 30 blocks 会起 30 个 qjs，先解决进程峰值，后面所有性能测试才有意义。
 - **再 tokenizer**：公式/图块如果被 Markdown 结构误判，后面所有渲染都不可信。
 - **再 sanitizer**：Mermaid/MathJax 输出是不可信内容，安全层必须早于产品化。
 - **再缓存**：缓存是“渲染是纯函数”的落点；没有版本失效的缓存比没有缓存更危险。
@@ -36,7 +55,7 @@
 
 ## 渲染进程优化（已实施）
 
-优化前 one-shot `qjs` 模型没有并发上限。当时 30 blocks 场景：
+优化前 one-shot `qjs` 模型没有并发上限。30 blocks 场景：
 
 - 峰值 qjs 进程数：**34–35**（包含启动时 sample 渲染未取消的 4–5 个进程）；
 - qjs 进程组 PSS 峰值：**280.8MB**；
@@ -288,7 +307,7 @@
 - [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
 - [x] `config/settings.ini` 完整配置模板，打包进 AppImage
 - [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
-- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`、`media-preview-test`
+- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`、`media-preview-test`、`theme-test`
 - [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
 - [x] `Load` 与 `--file` 统一经过 `loadFile()`、`openLocalFile()` 和加载后收尾
 - [x] 加载后强制完成整篇文档布局，修复长文档后续 block 零高度问题

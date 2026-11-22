@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "warm-dark",
+  "name": "Warm Dark",
+  "dark": true,
+  "qss": true,
+  "colors": {
+    "window": "#1f1b18",
+    "windowText": "#f2e9e1",
+    "base": "#171412",
+    "alternateBase": "#211c18",
+    "text": "#f2e9e1",
+    "mutedText": "#a99f96",
+    "button": "#2a2420",
+    "buttonText": "#f2e9e1",
+    "brightText": "#ffffff",
+    "highlight": "#e07a5f",
+    "highlightedText": "#1f1b18",
+    "link": "#8ab4f8",
+    "linkVisited": "#c58af9",
+    "placeholder": "#9b9188",
+    "tooltipBase": "#2a2420",
+    "tooltipText": "#f2e9e1",
+    "border": "#3b332e"
+  },
+  "metrics": {
+    "radius": 10,
+    "spacing": 8
+  }
+}

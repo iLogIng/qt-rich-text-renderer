@@ -2,6 +2,7 @@
 
 #include "AppSettings.h"
 #include "NavigationHistory.h"
+#include "Theme.h"
 
 #include <QElapsedTimer>
 #include <QMainWindow>
@@ -63,6 +64,7 @@ private:
     };
 
     void configureRenderer();
+    void setThemeId(const QString &id);
     void updateThemeButton();
     void updateHistoryUi();
     bool openLocalFile(const QString &path,
@@ -113,7 +115,7 @@ private:
     QString m_pendingAnchor;
     bool m_loadAnchorRequested = false;
     QUrl m_baseUrl;
-    bool m_dark = false;
+    ThemeSpec m_theme;
     QElapsedTimer m_renderTimer;
     int m_generation = 0;
     int m_loadGeneration = 0;

@@ -1,12 +1,17 @@
 #include "SettingsDialog.h"
 
+#include "Theme.h"
+
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDesktopServices>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QUrl>
 #include <QVBoxLayout>
 
 SettingsDialog::SettingsDialog(const AppSettingsData &current,
@@ -24,9 +29,19 @@ SettingsDialog::SettingsDialog(const AppSettingsData &current,
 
     m_theme = new QComboBox(appearanceGroup);
     m_theme->setObjectName(QStringLiteral("themeCombo"));
-    m_theme->addItem(tr("Light"), static_cast<int>(AppSettingsData::Theme::Light));
-    m_theme->addItem(tr("Dark"), static_cast<int>(AppSettingsData::Theme::Dark));
+    for (const ThemeInfo &theme : ThemeManager::availableThemes()) {
+        m_theme->addItem(theme.name, theme.id);
+    }
     appearanceForm->addRow(tr("Theme"), m_theme);
+
+    auto *openThemes = new QPushButton(tr("Open themes folder"), appearanceGroup);
+    openThemes->setObjectName(QStringLiteral("openThemesButton"));
+    connect(openThemes, &QPushButton::clicked, this, []() {
+        const QString directory = ThemeManager::themeDirectory();
+        QDir().mkpath(directory);
+        QDesktopServices::openUrl(QUrl::fromLocalFile(directory));
+    });
+    appearanceForm->addRow(openThemes);
 
     m_uiFontPointSize = new QSpinBox(appearanceGroup);
     m_uiFontPointSize->setObjectName(QStringLiteral("uiFontPointSizeSpin"));
@@ -103,7 +118,8 @@ SettingsDialog::SettingsDialog(const AppSettingsData &current,
 
 void SettingsDialog::loadValues(const AppSettingsData &data)
 {
-    m_theme->setCurrentIndex(data.theme == AppSettingsData::Theme::Dark ? 1 : 0);
+    const int themeIndex = m_theme->findData(data.themeId);
+    m_theme->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
     m_uiFontPointSize->setValue(data.uiFontPointSize);
     m_sourceFontPointSize->setValue(data.sourceFontPointSize);
     m_sourceHighlighting->setChecked(data.sourceHighlighting);
@@ -118,7 +134,7 @@ void SettingsDialog::loadValues(const AppSettingsData &data)
 AppSettingsData SettingsDialog::values() const
 {
     AppSettingsData data = m_current;
-    data.theme = static_cast<AppSettingsData::Theme>(m_theme->currentData().toInt());
+    data.themeId = m_theme->currentData().toString();
     data.uiFontPointSize = m_uiFontPointSize->value();
     data.sourceFontPointSize = m_sourceFontPointSize->value();
     data.sourceHighlighting = m_sourceHighlighting->isChecked();

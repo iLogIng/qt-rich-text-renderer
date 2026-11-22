@@ -135,6 +135,28 @@ Settings 对话框提供 Appearance、View、Preview、Advanced 四组设置，�
 - MathJax / Mermaid 请求超时与 worker 空闲超时；
 - 最近目录和窗口几何。
 
+### 主题配置
+
+内置主题为 `light` 和 `dark`，保持当前 QPalette 视觉，不额外应用 QSS。
+
+用户主题位于：
+
+```text
+QStandardPaths::AppDataLocation/themes/<theme-id>/theme.json
+```
+
+Linux 上通常为：
+
+```text
+~/.local/share/rich-text-renderer/rich-text-renderer/themes/<theme-id>/theme.json
+```
+
+主题 JSON 只接受颜色、尺寸和 QSS 开关，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
+
+示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。
+
+当前主题能力只覆盖颜色、字体、间距、控件外观和内置布局选项。第三方整体窗口布局替换暂不提供；QML 不进入当前实施范围。
+
 ## 支持的 Markdown
 
 | 能力 | 说明 |
@@ -210,11 +232,12 @@ scripts/test-process-bound.sh
 scripts/test-idle.sh
 ```
 
-`scripts/test.sh` 运行渲染器 smoke test 和 13 个 CTest 目标，覆盖：
+`scripts/test.sh` 运行渲染器 smoke test 和 14 个 CTest 目标，覆盖：
 
 - 链接解析、链接交互和本地文件加载；
 - 导航历史；
-- 设置模板、用户覆盖和设置对话框；
+- 设置模板、用户覆盖、设置对话框和旧主题配置迁移；
+- 主题 JSON 加载、QSS token、用户主题、错误回退和内置主题；
 - Markdown 预处理、目录提取和文档渲染；
 - SVG 缓存、SVG 归一化和对象嵌入；
 - 启动、Outline、设置应用和加载后的完整文档布局；
@@ -255,7 +278,7 @@ APPIMAGE_RUNTIME=/path/to/runtime-x86_64 \
 scripts/package-appimage.sh
 ```
 
-脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.3MB / 32.7MiB。
+脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.4MB / 32.8MiB。
 
 验证：
 
@@ -282,7 +305,11 @@ GitHub Actions 工作流位于 `.github/workflows/ci.yml`。
 
 ```text
 .github/workflows/      GitHub Actions CI/CD 流水线
-src/                    Qt Widgets 应用与渲染、缓存、交互逻辑
+src/app/                应用入口
+src/core/               设置、链接、文件、缓存、渲染服务与 worker
+src/document/           Markdown 文档构建、高亮、目录和 SVG 对象
+src/ui/                 主窗口、设置、媒体预览、主题与交互
+resources/              内置主题 JSON 和 QSS 模板
 renderer/               MathJax / Mermaid 的 QuickJS bundle 与构建脚本
 third_party/quickjs-ng  QuickJS-ng 子模块
 config/                 settings.ini 默认模板
@@ -298,6 +325,7 @@ dist/                   生成的 AppImage（gitignored）
 ## 文档
 
 - [FOR_LOCVAS.md](FOR_LOCVAS.md)：渲染契约、资源约束与验收条件
+- [FOR_LOCVAS_IF_QML.md](FOR_LOCVAS_IF_QML.md)：Widgets/QSS 当前决策、QML 对比与 UI 自由度边界
 - [docs/FLOW.md](docs/FLOW.md)：启动、渲染、缓存、链接和预览流程
 - [docs/RESULTS.md](docs/RESULTS.md)：渲染结果、性能数据和已知限制
 - [docs/ADR-0001-rendering-pipeline.md](docs/ADR-0001-rendering-pipeline.md)：渲染路线说明
@@ -313,7 +341,7 @@ dist/                   生成的 AppImage（gitignored）
 - 缓存是文件缓存，没有容量上限或自动清理。
 - `SvgSanitizer` 是 QtSvg 兼容层，不是完整安全清洗器。
 - 本地文件链接没有 workspace allowlist。
-- AppImage 当前只在 Fedora Linux x86_64 环境验证。
+- AppImage 当前只在 Fedora Linux x86_64 环境验证；自包含性尚未确认：产物可能依赖宿主 Qt 平台/图像格式插件，且未包含 `qt.conf` 与完整许可证材料。
 
 ## 第三方与许可证
 
