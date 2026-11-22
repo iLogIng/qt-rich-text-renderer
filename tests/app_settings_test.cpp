@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     const QString userPath = directory.filePath(QStringLiteral("user/settings.ini"));
     const QByteArray templateData(
         "[appearance]\n"
-        "theme=dark\n"
+        "themeId=dark\n"
         "uiFontPointSize=12\n"
         "sourceFontPointSize=14\n"
         "sourceHighlighting=true\n"
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 
     AppSettings settings(userPath, templatePath);
     AppSettingsData data = settings.defaults();
-    expect(data.theme == AppSettingsData::Theme::Dark, QStringLiteral("template theme is default"));
+    expect(data.themeId == QStringLiteral("dark"), QStringLiteral("template theme is default"));
     expect(data.uiFontPointSize == 12, QStringLiteral("template UI font size is default"));
     expect(data.sourceFontPointSize == 14, QStringLiteral("template source font size is default"));
     expect(data.sourceVisible == false, QStringLiteral("template source visibility is default"));
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 
     {
         QSettings user(userPath, QSettings::IniFormat);
-        user.setValue(QStringLiteral("appearance/theme"), QStringLiteral("light"));
+        user.setValue(QStringLiteral("appearance/themeId"), QStringLiteral("light"));
         user.setValue(QStringLiteral("appearance/sourceFontPointSize"), 30);
         user.setValue(QStringLiteral("appearance/uiFontPointSize"), 9);
         user.setValue(QStringLiteral("view/outlineVisible"), false);
@@ -79,11 +79,20 @@ int main(int argc, char **argv)
     }
 
     data = settings.load();
-    expect(data.theme == AppSettingsData::Theme::Light, QStringLiteral("user theme overrides template"));
+    expect(data.themeId == QStringLiteral("light"), QStringLiteral("user theme overrides template"));
     expect(data.uiFontPointSize == 9, QStringLiteral("user UI font size overrides template"));
     expect(data.sourceFontPointSize == 24, QStringLiteral("source font size is clamped"));
     expect(!data.outlineVisible, QStringLiteral("user outline visibility overrides template"));
     expect(data.mathRequestTimeoutMs == 2000, QStringLiteral("missing user value falls back to template"));
+
+    {
+        QSettings legacy(userPath, QSettings::IniFormat);
+        legacy.remove(QStringLiteral("appearance/themeId"));
+        legacy.setValue(QStringLiteral("appearance/theme"), QStringLiteral("dark"));
+        legacy.sync();
+    }
+    expect(settings.load().themeId == QStringLiteral("dark"),
+           QStringLiteral("legacy theme key is migrated"));
 
     data.lastDirectory = directory.path();
     data.windowGeometry = QByteArray("geometry");

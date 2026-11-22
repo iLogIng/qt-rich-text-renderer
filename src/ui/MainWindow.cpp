@@ -92,15 +92,18 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     , m_settings(std::make_unique<AppSettings>(
           settingsPath.isEmpty() ? AppSettings::defaultUserPath() : settingsPath,
           runtimeRoot() + QStringLiteral("/config/settings.ini")))
-    , m_dark(dark)
 {
     m_settingsData = m_settings->load();
-    if (!dark && m_settingsData.theme == AppSettingsData::Theme::Dark) {
-        m_dark = true;
+    QString themeError;
+    m_theme = ThemeManager::loadTheme(dark ? QStringLiteral("dark")
+                                           : m_settingsData.themeId,
+                                      &themeError);
+    if (!themeError.isEmpty()) {
+        qWarning("Theme load failed: %s", qPrintable(themeError));
     }
 
     applyApplicationFont(m_settingsData.uiFontPointSize);
-    applyTheme(m_dark);
+    ThemeManager::apply(m_theme);
 
     setWindowTitle(QStringLiteral("rich-text-renderer"));
     resize(1280, 860);
@@ -167,7 +170,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     fixedFont.setPointSize(m_settingsData.sourceFontPointSize);
     m_source->setFont(fixedFont);
-    m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_dark, this);
+    m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_theme.dark, this);
     m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
 
     m_preview = new PreviewBrowser(m_tabs);
@@ -177,7 +180,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     m_preview->document()->setDocumentMargin(12);
     m_svgHandler = new SvgObjectHandler(this);
     m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
-    m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_dark, this);
+    m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_theme.dark, this);
     m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
     connect(m_preview, &PreviewBrowser::imagePreviewRequested,
             this, &MainWindow::previewImageUrl);
@@ -318,8 +321,7 @@ void MainWindow::showSettings()
     syncViewSettingsFromUi();
 
     AppSettingsData dialogData = m_settingsData;
-    dialogData.theme = m_dark ? AppSettingsData::Theme::Dark
-                              : AppSettingsData::Theme::Light;
+    dialogData.themeId = m_theme.id;
 
     SettingsDialog dialog(dialogData, m_settings->defaults(), this);
     if (dialog.exec() != QDialog::Accepted) {
@@ -334,8 +336,7 @@ void MainWindow::showSettings()
 
 void MainWindow::applySettings(const AppSettingsData &previous)
 {
-    const bool themeChanged =
-        (m_settingsData.theme == AppSettingsData::Theme::Dark) != m_dark;
+    const bool themeChanged = previous.themeId != m_settingsData.themeId;
     const bool uiFontChanged =
         previous.uiFontPointSize != m_settingsData.uiFontPointSize;
     const bool sourceFontChanged =
@@ -373,7 +374,7 @@ void MainWindow::applySettings(const AppSettingsData &previous)
     }
 
     if (themeChanged) {
-        setDarkMode(m_settingsData.theme == AppSettingsData::Theme::Dark);
+        setThemeId(m_settingsData.themeId);
     } else if ((uiFontChanged || widthChanged) && !m_source->toPlainText().isEmpty()) {
         renderNow();
     }
@@ -659,46 +660,58 @@ void MainWindow::previewSvg(const QString &svg)
     MediaPreviewWindow::showSvg(svg, tr("SVG preview"), this);
 }
 
+void MainWindow::setThemeId(const QString &id)
+{
+    QString error;
+    const ThemeSpec theme = ThemeManager::loadTheme(id, &error);
+    if (!error.isEmpty()) {
+        qWarning("Theme load failed: %s", qPrintable(error));
+    }
+
+    m_theme = theme;
+    ThemeManager::apply(m_theme);
+    updateThemeButton();
+
+    if (m_codeHighlighter) {
+        m_codeHighlighter->setDark(m_theme.dark);
+    }
+    if (m_sourceHighlighter) {
+        m_sourceHighlighter->setDark(m_theme.dark);
+    }
+    if (m_source && !m_source->toPlainText().isEmpty()) {
+        renderNow();
+    }
+}
+
 void MainWindow::updateThemeButton()
 {
     if (m_themeButton) {
-        m_themeButton->setText(m_dark ? QStringLiteral("Light mode") : QStringLiteral("Dark mode"));
+        m_themeButton->setText(m_theme.dark ? QStringLiteral("Light mode")
+                                           : QStringLiteral("Dark mode"));
     }
 }
 
 void MainWindow::toggleTheme()
 {
-    const bool dark = !m_dark;
-    setDarkMode(dark);
-    m_settingsData.theme = dark ? AppSettingsData::Theme::Dark
-                                : AppSettingsData::Theme::Light;
+    setDarkMode(!m_theme.dark);
+    m_settingsData.themeId = m_theme.id;
     syncViewSettingsFromUi();
     m_settings->save(m_settingsData);
 }
 
 bool MainWindow::isDarkMode() const
 {
-    return m_dark;
+    return m_theme.dark;
 }
 
 void MainWindow::setDarkMode(bool dark)
 {
-    if (m_dark == dark) {
+    const QString id = dark ? QStringLiteral("dark") : QStringLiteral("light");
+    if (m_theme.id == id) {
         updateThemeButton();
         return;
     }
-    m_dark = dark;
-    applyTheme(dark);
-    updateThemeButton();
-    if (m_codeHighlighter) {
-        m_codeHighlighter->setDark(dark);
-    }
-    if (m_sourceHighlighter) {
-        m_sourceHighlighter->setDark(dark);
-    }
-    if (!m_source->toPlainText().isEmpty()) {
-        renderNow();
-    }
+    setThemeId(id);
 }
 
 void MainWindow::renderNow()
@@ -758,7 +771,7 @@ void MainWindow::renderNow()
                 result.svg,
                 result.error,
                 block.kind == RenderBlock::Kind::Mermaid,
-                m_dark,
+                m_theme.dark,
                 m_preview->palette().color(QPalette::Text),
                 m_settingsData.maxSvgWidth,
                 &error);
@@ -799,7 +812,7 @@ void MainWindow::renderNow()
         if (block.kind == RenderBlock::Kind::Math) {
             m_renderer->renderMath(block.source, block.display, callback);
         } else {
-            m_renderer->renderMermaid(block.source, m_dark, callback);
+            m_renderer->renderMermaid(block.source, m_theme.dark, callback);
         }
     }
 }

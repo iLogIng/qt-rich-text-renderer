@@ -19,19 +19,6 @@ constexpr int kMaxIdleTimeoutMs = 60 * 60 * 1000;
 constexpr int kMinRequestTimeoutMs = 1000;
 constexpr int kMaxRequestTimeoutMs = 5 * 60 * 1000;
 
-AppSettingsData::Theme parseTheme(const QString &value)
-{
-    return value.compare(QStringLiteral("dark"), Qt::CaseInsensitive) == 0
-               ? AppSettingsData::Theme::Dark
-               : AppSettingsData::Theme::Light;
-}
-
-QString themeName(AppSettingsData::Theme theme)
-{
-    return theme == AppSettingsData::Theme::Dark ? QStringLiteral("dark")
-                                                  : QStringLiteral("light");
-}
-
 struct SettingsSource {
     const QSettings *user = nullptr;
     const QSettings &defaults;
@@ -60,9 +47,18 @@ AppSettingsData readSettings(const QSettings *user, const QSettings &defaults)
     const AppSettingsData fallback;
     AppSettingsData data;
 
-    data.theme = parseTheme(source.value(QStringLiteral("appearance/theme"),
-                                         themeName(fallback.theme))
-                                .toString());
+    const QString legacyTheme =
+        source.value(QStringLiteral("appearance/theme"), QStringLiteral("light"))
+            .toString()
+            .trimmed();
+    data.themeId = source
+                       .value(QStringLiteral("appearance/themeId"),
+                              legacyTheme.isEmpty() ? fallback.themeId : legacyTheme)
+                       .toString()
+                       .trimmed();
+    if (data.themeId.isEmpty()) {
+        data.themeId = fallback.themeId;
+    }
     data.uiFontPointSize = clampedInt(source,
                                       QStringLiteral("appearance/uiFontPointSize"),
                                       fallback.uiFontPointSize,
@@ -144,7 +140,7 @@ void AppSettings::save(const AppSettingsData &data)
     QDir().mkpath(QFileInfo(m_userPath).absolutePath());
     QSettings user(m_userPath, QSettings::IniFormat);
     user.setValue(QStringLiteral("meta/version"), 1);
-    user.setValue(QStringLiteral("appearance/theme"), themeName(data.theme));
+    user.setValue(QStringLiteral("appearance/themeId"), data.themeId);
     user.setValue(QStringLiteral("appearance/uiFontPointSize"), data.uiFontPointSize);
     user.setValue(QStringLiteral("appearance/sourceFontPointSize"), data.sourceFontPointSize);
     user.setValue(QStringLiteral("appearance/sourceHighlighting"), data.sourceHighlighting);

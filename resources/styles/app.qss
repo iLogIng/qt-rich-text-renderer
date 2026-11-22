@@ -1,0 +1,150 @@
+QMainWindow,
+QDialog {
+    background: @window;
+    color: @windowText;
+}
+
+QWidget {
+    selection-background-color: @accent;
+    selection-color: @accentText;
+}
+
+QPushButton,
+QToolButton {
+    background: @button;
+    color: @buttonText;
+    border: 1px solid @border;
+    border-radius: @radius;
+    padding: 4px 9px;
+}
+
+QPushButton:hover,
+QToolButton:hover {
+    border-color: @accent;
+}
+
+QPushButton:pressed,
+QToolButton:pressed {
+    background: @alternateBase;
+}
+
+QPushButton:disabled,
+QToolButton:disabled {
+    color: @mutedText;
+}
+
+QComboBox,
+QSpinBox,
+QLineEdit {
+    background: @base;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: @radius;
+    padding: 2px 5px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 18px;
+}
+
+QGroupBox {
+    border: 1px solid @border;
+    border-radius: @radius;
+    margin-top: 9px;
+    padding-top: 6px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 9px;
+    padding: 0 4px;
+    color: @text;
+}
+
+QTabWidget::pane {
+    border: 1px solid @border;
+}
+
+QTabBar::tab {
+    background: @button;
+    color: @buttonText;
+    border: 1px solid @border;
+    border-bottom: none;
+    border-top-left-radius: @radius;
+    border-top-right-radius: @radius;
+    padding: 4px 10px;
+}
+
+QTabBar::tab:selected {
+    background: @base;
+    color: @text;
+}
+
+QDockWidget {
+    color: @windowText;
+}
+
+QDockWidget::title {
+    background: @button;
+    color: @buttonText;
+    padding: 3px 6px;
+}
+
+QTreeView,
+QListView,
+QPlainTextEdit,
+QTextBrowser {
+    background: @base;
+    color: @text;
+    border: 1px solid @border;
+}
+
+QHeaderView::section {
+    background: @button;
+    color: @buttonText;
+    border: 0;
+    border-right: 1px solid @border;
+    padding: 3px 5px;
+}
+
+QScrollBar:vertical {
+    background: @base;
+    width: 12px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: @border;
+    min-height: 24px;
+    border-radius: 6px;
+}
+
+QScrollBar:horizontal {
+    background: @base;
+    height: 12px;
+    margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background: @border;
+    min-width: 24px;
+    border-radius: 6px;
+}
+
+QScrollBar::add-line,
+QScrollBar::sub-line {
+    width: 0;
+    height: 0;
+}
+
+QStatusBar {
+    background: @window;
+    color: @mutedText;
+}
+
+QToolTip {
+    background: @tooltipBase;
+    color: @tooltipText;
+    border: 1px solid @border;
+}

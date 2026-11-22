@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "dark",
+  "name": "Dark",
+  "dark": true,
+  "qss": false,
+  "colors": {
+    "window": "#1e1e1e",
+    "windowText": "#e6e6e6",
+    "base": "#1e1e1e",
+    "alternateBase": "#252526",
+    "text": "#e6e6e6",
+    "mutedText": "#a0a0a0",
+    "button": "#2d2d30",
+    "buttonText": "#e6e6e6",
+    "brightText": "#ffffff",
+    "highlight": "#264f78",
+    "highlightedText": "#ffffff",
+    "link": "#8ab4f8",
+    "linkVisited": "#c58af9",
+    "placeholder": "#8c8c8c",
+    "tooltipBase": "#252526",
+    "tooltipText": "#e6e6e6",
+    "border": "#3c3c3c"
+  },
+  "metrics": {
+    "radius": 6,
+    "spacing": 6
+  }
+}

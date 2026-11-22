@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     QApplication app(argc, argv);
 
     AppSettingsData current;
-    current.theme = AppSettingsData::Theme::Light;
+    current.themeId = QStringLiteral("light");
     current.uiFontPointSize = 11;
     current.sourceFontPointSize = 12;
     current.sourceHighlighting = true;
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     current.windowGeometry = QByteArray("geometry");
 
     AppSettingsData defaults;
-    defaults.theme = AppSettingsData::Theme::Dark;
+    defaults.themeId = QStringLiteral("dark");
     defaults.uiFontPointSize = 14;
     defaults.sourceFontPointSize = 16;
     defaults.sourceHighlighting = false;
@@ -55,6 +55,7 @@ int main(int argc, char **argv)
     SettingsDialog dialog(current, defaults);
 
     auto *theme = dialog.findChild<QComboBox *>(QStringLiteral("themeCombo"));
+    auto *openThemes = dialog.findChild<QPushButton *>(QStringLiteral("openThemesButton"));
     auto *uiFont = dialog.findChild<QSpinBox *>(QStringLiteral("uiFontPointSizeSpin"));
     auto *sourceFont =
         dialog.findChild<QSpinBox *>(QStringLiteral("sourceFontPointSizeSpin"));
@@ -62,11 +63,16 @@ int main(int argc, char **argv)
     auto *maxWidth = dialog.findChild<QSpinBox *>(QStringLiteral("maxSvgWidthSpin"));
     auto *buttons = dialog.findChild<QDialogButtonBox *>();
 
-    expect(theme && uiFont && sourceFont && outline && maxWidth && buttons,
+    expect(theme && openThemes && uiFont && sourceFont && outline && maxWidth && buttons,
            QStringLiteral("settings controls found"));
-    if (!theme || !uiFont || !sourceFont || !outline || !maxWidth || !buttons) {
+    if (!theme || !openThemes || !uiFont || !sourceFont || !outline || !maxWidth || !buttons) {
         return 1;
     }
+
+    expect(theme->findData(QStringLiteral("light")) >= 0,
+           QStringLiteral("built-in light theme is listed"));
+    expect(theme->findData(QStringLiteral("dark")) >= 0,
+           QStringLiteral("built-in dark theme is listed"));
 
     expect(uiFont->value() == 11, QStringLiteral("UI font size is loaded"));
     expect(sourceFont->value() == 12, QStringLiteral("source font size is loaded"));
@@ -76,14 +82,14 @@ int main(int argc, char **argv)
 
     uiFont->setValue(13);
     sourceFont->setValue(18);
-    theme->setCurrentIndex(1);
+    theme->setCurrentIndex(theme->findData(QStringLiteral("dark")));
     outline->setChecked(false);
     maxWidth->setValue(1200);
 
     AppSettingsData edited = dialog.values();
     expect(edited.uiFontPointSize == 13, QStringLiteral("UI font size is read back"));
     expect(edited.sourceFontPointSize == 18, QStringLiteral("source font size is read back"));
-    expect(edited.theme == AppSettingsData::Theme::Dark, QStringLiteral("theme is read back"));
+    expect(edited.themeId == QStringLiteral("dark"), QStringLiteral("theme is read back"));
     expect(!edited.outlineVisible, QStringLiteral("outline visibility is read back"));
     expect(edited.maxSvgWidth == 1200, QStringLiteral("preview width is read back"));
     expect(edited.lastDirectory == QStringLiteral("/tmp"),
@@ -93,7 +99,7 @@ int main(int argc, char **argv)
 
     buttons->button(QDialogButtonBox::RestoreDefaults)->click();
     const AppSettingsData restored = dialog.values();
-    expect(restored.theme == defaults.theme, QStringLiteral("restore resets theme"));
+    expect(restored.themeId == defaults.themeId, QStringLiteral("restore resets theme"));
     expect(restored.uiFontPointSize == defaults.uiFontPointSize,
            QStringLiteral("restore resets UI font size"));
     expect(restored.sourceFontPointSize == defaults.sourceFontPointSize,
