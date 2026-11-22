@@ -19,7 +19,7 @@
 
 实现流程见 [docs/FLOW.md](docs/FLOW.md)，测量数据见 [docs/RESULTS.md](docs/RESULTS.md)，渲染路线取舍见 [docs/ADR-0001-rendering-pipeline.md](docs/ADR-0001-rendering-pipeline.md)。
 
-QML 作为 UI 外壳的备选路线、Widgets/QSS 对比和主题接口设计见 [FOR_LOCVAS_IF_QML.md](FOR_LOCVAS_IF_QML.md)。本文契约中的 Markdown 渲染管线约束仍适用于 QML 方案。
+当前 UI 不采用 QML，配置方案采用 Widgets + QPalette + QSS + 主题 token。Widgets/QSS 与 QML 的对比、UI 自由度边界和未来重新评估条件见 [FOR_LOCVAS_IF_QML.md](FOR_LOCVAS_IF_QML.md)。本文契约中的 Markdown 渲染管线约束保持有效。
 
 ## 2. Markdown 与文档契约
 

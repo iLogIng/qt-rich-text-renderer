@@ -1,4 +1,17 @@
-# locvas UI 选型：Widgets 与 QML
+# locvas UI 选型：Widgets 与 QML（当前不采用 QML）
+
+## 当前决定
+
+当前阶段不采用 QML 作为 locvas / `rich-text-renderer` 的 UI 实现，也不启动 QML 重构。
+
+决定依据：
+
+- 本地富文本渲染方案已经验证，当前重点是稳定渲染行为和文件处理；
+- Preview 依赖 `QTextDocument`、`QTextObjectInterface` 和 `SvgObjectHandler`，QML 无法直接复用；
+- QML 需要额外实现 `DocumentSurface`、QML 主题 API、Qt Quick 部署和第三方代码信任模型；
+- 这些成本不解决当前核心问题，反而可能给已经稳定的渲染链路引入回归。
+
+UI 配置采用 **Widgets + QPalette + QSS + 主题 token**。本文保留 QML 对比和 future spike 条件，作为未来重新评估的依据，不代表当前实施计划。
 
 ## 1. 文档定位
 
@@ -9,7 +22,7 @@
 
 重点不是语法差异，而是两种 UI 模型如何承载主题、第三方布局和现有文档渲染管线。
 
-本文是条件性选型分析。当前 `rich-text-renderer` 的实现和 [FOR_LOCVAS.md](FOR_LOCVAS.md) 中的契约仍以 Widgets 为准；QML 路线如果启动，需要单独建立 spike 目标，并明确修订契约中的 UI 边界。
+当前 `rich-text-renderer` 的实现和 [FOR_LOCVAS.md](FOR_LOCVAS.md) 中的契约以 Widgets 为准；QML 路线不启动。
 
 ## 2. 当前技术基线
 
@@ -317,7 +330,9 @@ QML spike 不应直接替换生产渲染器。
 
 适合快速提升视觉一致性，且不改变渲染架构。
 
-### 7.2 QML 路线
+### 7.2 QML 路线（当前不实施）
+
+以下是未来重新评估时的候选路线，不属于当前计划：
 
 1. 新建独立 `qml-spike` 目标或项目；
 2. 复用 core/document 渲染库；
@@ -346,7 +361,54 @@ QML spike 不应直接替换生产渲染器。
 
 ## 9. 结论
 
-- **只做主题和视觉统一**：优先 Widgets + QSS。
-- **要做第三方整体布局和现代 UI**：QML 是更合适的方向，但必须接受 `DocumentSurface`、QML API 和主题信任模型的成本。
-- **locvas 如果从零开始**：可以采用 QML 作为 UI 基础，但渲染核心应保持 C++ + `QTextDocument` + QuickJS 子进程，不能用 QML `Text` 替代 Markdown 渲染管线。
-- **当前 `rich-text-renderer`**：继续作为 Widgets 渲染参考实现；QML 以独立 spike 验证，不直接改写生产 UI。
+当前采用 **Widgets + QPalette + QSS + 主题 token**：
+
+- 保留已经验证的 `QTextDocument` + QuickJS 渲染管线；
+- 不引入 Qt Quick/QML 运行时和 `DocumentSurface`；
+- 不引入第三方 QML 代码的信任和兼容性问题；
+- 主题只覆盖颜色、字体、间距、控件外观和内置布局选项；
+- 不支持第三方替换整体窗口布局。
+
+QML 路线仅在以下条件同时成立时重新评估：
+
+- locvas 的产品目标明确需要第三方整体布局/皮肤生态；
+- 当前渲染管线和本地文件交互已经稳定；
+- 有可投入的 QML API、`DocumentSurface`、测试和部署预算；
+- 第三方主题的信任模型已经确定。
+
+在条件满足前，QML 只作为技术备选，不进入实施范围。
+
+## 10. 不采用 QML 后的 UI 自由度
+
+不采用 QML 并不意味着界面只能使用 Qt 默认外观，但需要明确边界。
+
+仍然可以提供：
+
+- 内置浅色、深色、高对比和护眼主题；
+- 强调色、链接色、选中色、字体、字号、行距和密度；
+- 按钮、工具栏、标签页、Dock、滚动条、输入框、状态栏的 QSS 样式；
+- 内置布局选项，例如 Outline 显示/隐藏、Source 页签显示/隐藏；
+- 主题 token 驱动的背景和图标资源。
+
+不能提供：
+
+- 第三方替换整个窗口布局；
+- WebView/WebEngine 级别的 HTML/CSS/JS 自由定制；
+- 任意动画、复杂变换和毛玻璃效果；
+- 用户直接编写 QML 或 QSS 来改变控件结构；
+- 与当前渲染管线无关的第三方 UI 插件。
+
+WebView 式的自由度来自完整的 HTML/CSS/JS 运行时，代价是 WebEngine 依赖、体积、启动、安全边界和渲染一致性。
+
+QML 可以避免 WebEngine，但仍会引入 Qt Quick 运行时、文档适配器和 QML API 兼容成本。
+
+因此当前选择是：
+
+```text
+视觉配置足够开放
+布局结构保持受控
+不引入新的 UI 运行时
+不为主题能力牺牲渲染稳定性
+```
+
+如果未来产品目标确实需要“第三方整体界面替换”，再以独立 spike 评估 QML；当前不作为生产路线。
