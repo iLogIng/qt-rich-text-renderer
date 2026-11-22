@@ -47,15 +47,15 @@ AppSettingsData readSettings(const QSettings *user, const QSettings &defaults)
     const AppSettingsData fallback;
     AppSettingsData data;
 
-    const QString legacyTheme =
-        source.value(QStringLiteral("appearance/theme"), QStringLiteral("light"))
-            .toString()
-            .trimmed();
-    data.themeId = source
-                       .value(QStringLiteral("appearance/themeId"),
-                              legacyTheme.isEmpty() ? fallback.themeId : legacyTheme)
-                       .toString()
-                       .trimmed();
+    if (user && user->contains(QStringLiteral("appearance/themeId"))) {
+        data.themeId = user->value(QStringLiteral("appearance/themeId")).toString().trimmed();
+    } else if (user && user->contains(QStringLiteral("appearance/theme"))) {
+        data.themeId = user->value(QStringLiteral("appearance/theme")).toString().trimmed();
+    } else if (defaults.contains(QStringLiteral("appearance/themeId"))) {
+        data.themeId = defaults.value(QStringLiteral("appearance/themeId")).toString().trimmed();
+    } else if (defaults.contains(QStringLiteral("appearance/theme"))) {
+        data.themeId = defaults.value(QStringLiteral("appearance/theme")).toString().trimmed();
+    }
     if (data.themeId.isEmpty()) {
         data.themeId = fallback.themeId;
     }
