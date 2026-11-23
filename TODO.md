@@ -21,9 +21,63 @@
 - [x] Settings 的 Appearance 页提供主题选择、字号/密度、主题目录入口和加载失败回退
 - [x] 决定代码高亮、Source 高亮、MathJax 和 Mermaid 如何消费主题语义；首版使用主题的 `dark` 标志，代码配色单独配置留待后续
 - [ ] 增加主题加载、校验、回退、设置迁移、QSS token 替换和视觉回归测试（主题/回退/QSS 测试已完成，golden 视觉回归待补）
-- [ ] 从当前 UI 骨架开始保留稳定的 `objectName` 和具名插槽，保证以后可以接入静态 `.ui` 布局
-- [ ] QSS 稳定后，再评估 `Qt6::UiTools` / `QUiLoader` 的可选 `.ui` 布局加载：白名单控件、必需插槽、资源限制、错误回退和版本化 manifest；不得先于 QSS 实现
 - [x] 更新 README、FOR_LOCVAS 和 FOR_LOCVAS_IF_QML，记录 QSS 主题入口、用户主题目录、.ui 边界和当前非目标
+
+#### XML Static UI Polish
+
+> 触发条件：QSS 主题、主题回退和视觉检查稳定后启动。本阶段仍不引入 QML。
+>
+> `.ui` 只替换 `QMainWindow::centralWidget()` 的子树，不替换 `QMainWindow` 本身，也不改变菜单、状态栏和 Outline 的 `QDockWidget` 停靠行为。
+>
+> 主题包指 `QStandardPaths::AppDataLocation/themes/<id>/` 下的目录。内置主题可以不带 `.ui`，此时继续使用当前 C++ 中央布局。
+>
+> 本阶段允许用户主题目录中的静态 `.ui`，但只从主题包目录内加载；禁止外部 URL、未知控件和任意样式表注入。解析或校验失败时，回退到 C++ 默认中央布局，而不是保留上一次主题的布局。
+
+##### A. 具名插槽与中央骨架
+
+- [ ] 在 C++ 中央内容骨架中定义稳定的插槽名和 `objectName`，至少覆盖：
+  - `central.toolbar.leading`
+  - `central.toolbar.trailing`
+  - `central.preview`
+  - `central.source`
+  - `central.top`
+  - `central.bottom`
+  - `central.empty`
+- [ ] 插槽宿主使用普通 `QWidget` + 布局容器；空插槽默认隐藏，`sizePolicy` 不占位，避免留下视觉空洞
+- [ ] C++ 通过稳定插槽名注入现有工具栏按钮、`PreviewBrowser`、`QPlainTextEdit` 和媒体/状态组件，不改变控制器、信号槽和历史逻辑
+- [ ] 内置主题未提供 `.ui` 时，保持当前 C++ 中央布局和视觉不变
+- [ ] 增加测试：默认布局、插槽存在性、空插槽零占位、注入后控件类型和信号连接不变
+
+##### B. 主题包 `.ui` 加载
+
+- [ ] 增加 `Qt6::UiTools` 依赖和 `QUiLoader` 子类；只在 UI 层引入，不进入 core/document 库
+- [ ] 主题 manifest 增加布局字段和版本字段，例如 `layoutFile`、`layoutApiVersion`；布局文件必须位于主题包目录内
+- [ ] 使用 `QUiLoader` 只加载 `QMainWindow::centralWidget()` 的中央内容骨架，不加载或替换 `QMainWindow`
+- [ ] 通过具名插槽把现有控件注入加载后的骨架；缺少必需插槽时视为无效主题
+- [ ] 用户主题目录允许携带 `layout.ui`；内置主题可以没有 `.ui`，没有时使用 C++ 默认布局
+- [ ] 增加测试：加载测试 `.ui`、缺少必需插槽、非法 XML、布局文件路径越界、内置主题无 `.ui`
+
+##### C. 校验、安全与回退
+
+- [ ] 使用 `QUiLoader::createWidget()` 白名单，只允许标准 Qt 控件和当前阶段明确提供的插槽宿主
+- [ ] 禁止加载未知控件类、主题目录外的资源、`http/https` 外部 URL 和任意 `styleSheet` 属性注入
+- [ ] 限制 `.ui` 文件大小、控件数量、嵌套深度和资源路径；所有资源解析必须限制在主题包目录内
+- [ ] 校验必需插槽、对象名和布局版本；任何解析、校验或注入失败都回退到 C++ 默认中央布局
+- [ ] 回退时清理已创建的临时控件树，不能影响当前文档、历史、设置或渲染 worker
+- [ ] 增加测试：未知控件、外部 URL、样式表注入、超大 XML、缺失插槽、错误版本和回退路径
+
+##### 自定义控件接入形式
+
+- [ ] A. **标准 Qt 控件 + 插槽宿主**：当前采用。`.ui` 只能使用标准控件和应用提供的具名插槽容器；现有 Preview、Source、工具栏由 C++ 注入，不执行主题代码。
+- [ ] B. **应用预注册的自定义控件**：未来可选。控件由应用编译并通过 `createWidget()` 注册，主题只能按稳定类名使用；需要独立的控件 API 和兼容性测试。
+- [ ] C. **主题携带的第三方编译控件**：当前不采用。主题包含 `.so` / `.dll` 并由应用动态加载，会引入二进制兼容、代码执行和安全风险，不在 `.ui` 静态主题体系内。
+
+##### 验收
+
+- [ ] C++ 默认中央布局、内置主题和现有功能测试不回归
+- [ ] 用户主题 `.ui` 可替换中央排列和插槽内容，但不改变主窗口、菜单、状态栏、Outline dock 和渲染控制器
+- [ ] 无效 `.ui` 自动回退默认布局，并记录可诊断错误
+- [ ] 更新 README、FOR_LOCVAS 和主题示例，明确主题包目录、插槽名、支持的控件和 `.ui` 边界
 
 ### Defer Polish
 
