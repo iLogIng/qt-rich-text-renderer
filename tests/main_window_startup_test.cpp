@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QLayout>
 #include <QPlainTextEdit>
+#include <QPalette>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QSettings>
@@ -131,10 +132,21 @@ int main(int argc, char **argv)
     expect(outlineToggle->palette().color(QPalette::Button)
                == QColor(QStringLiteral("#1e1e1e")),
            QStringLiteral("dark outline toggle uses the dark tab background"));
+    auto *outlineTree = window.findChild<QTreeWidget *>(QStringLiteral("outlineTree"));
+    expect(outlineTree
+               && outlineTree->palette().color(QPalette::Base)
+                      == QColor(QStringLiteral("#1e1e1e"))
+               && outlineTree->viewport()->palette().color(QPalette::Base)
+                      == QColor(QStringLiteral("#1e1e1e")),
+           QStringLiteral("dark outline tree uses the dark base palette"));
     window.setDarkMode(false);
     expect(outlineToggle->palette().color(QPalette::Button)
                == QApplication::palette().color(QPalette::Button),
            QStringLiteral("light outline toggle follows the application palette"));
+    expect(outlineTree
+               && outlineTree->palette().color(QPalette::Base)
+                      == QApplication::palette().color(QPalette::Base),
+           QStringLiteral("light outline tree follows the application palette"));
     outlineToggle->click();
     expect(outlineDock->isHidden() && !outlineToggle->isChecked(),
            QStringLiteral("outline toggle hides the fixed outline"));

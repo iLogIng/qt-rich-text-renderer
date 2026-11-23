@@ -97,6 +97,7 @@ private:
     void applyPreviewFont(int pointSize);
     void applySourceFont(int pointSize);
     void applyOutlineTogglePalette();
+    void applyOutlineChromePalette();
     void updateToolbarHeights();
     void syncViewSettingsFromUi();
     void previewImageUrl(const QUrl &url);
