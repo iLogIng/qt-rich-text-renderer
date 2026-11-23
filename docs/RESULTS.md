@@ -279,7 +279,7 @@ documentLayout()->documentSize();
 ## 6.7 主题与静态 `.ui`
 
 - 内置 `light` / `dark` 使用 QPalette，不启用 QSS，不提供 `.ui`，默认中央布局保持原视觉；
-- 深色主题补齐 Active/Inactive/Disabled 组以及 `Light`、`Midlight`、`Dark`、`Mid`、`Shadow` 等 bevel 角色，避免 Outline 切换按钮和边框残留浅色调色板；
+- 深色主题补齐 Active/Inactive/Disabled 组以及 `Light`、`Midlight`、`Dark`、`Mid`、`Shadow` 等 bevel 角色，避免 Outline 切换按钮和边框残留浅色调色板；Outline dock、面板和树的 palette 在主题切换时显式同步，避免继承链中断导致局部浅色；
 - 用户主题支持 JSON 颜色、字体族、布局间距、Preview 文档边距与阅读列、语法高亮色板、Mermaid 主题、PNG/JPEG 资源、固定插槽样式、QSS 模板 token 和可选 `layout.ui`；
 - 字号仍由 Settings 唯一控制；主题和 `.ui` 不能覆盖字号，`.ui` 的 `font/pointsize` 会被拒绝；
 - Preview 支持 `maxTextWidth` 居中阅读列、代码块背景和代码块边距；`maxTextWidth=0` 保持 viewport 宽度；

@@ -46,6 +46,7 @@
 #include <QTextDocument>
 #include <QTimer>
 #include <QToolButton>
+#include <QTreeWidget>
 #include <QDebug>
 #include <cstdio>
 
@@ -138,6 +139,7 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
         m_settings->save(m_settingsData);
     });
     m_outlineDock->setVisible(m_settingsData.outlineVisible);
+    applyOutlineChromePalette();
 
     statusBar()->showMessage(QStringLiteral("rich-text-renderer: QuickJS + MathJax + Mermaid -> SVG -> QtSvg"));
 
@@ -636,6 +638,23 @@ void MainWindow::applyPreviewFont(int pointSize)
     m_preview->document()->setDefaultFont(font);
 }
 
+void MainWindow::applyOutlineChromePalette()
+{
+    if (!m_outlineDock || !m_outlinePanel) {
+        return;
+    }
+
+    const QPalette palette = QApplication::palette();
+    m_outlineDock->setPalette(palette);
+    m_outlinePanel->setPalette(palette);
+    if (auto *tree = m_outlinePanel->findChild<QTreeWidget *>(QStringLiteral("outlineTree"))) {
+        tree->setPalette(palette);
+        if (tree->viewport()) {
+            tree->viewport()->setPalette(palette);
+        }
+    }
+}
+
 void MainWindow::applyOutlineTogglePalette()
 {
     if (!m_outlineToggleButton) {
@@ -980,6 +999,7 @@ void MainWindow::setThemeId(const QString &id)
         applySourceFont(m_settingsData.sourceFontPointSize);
     }
     applyOutlineTogglePalette();
+    applyOutlineChromePalette();
     if (m_preview) {
         m_preview->document()->setDocumentMargin(m_theme.documentMargin);
         forcePreviewLayout();
