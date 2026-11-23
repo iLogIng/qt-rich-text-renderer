@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg SvgWidgets)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg SvgWidgets UiTools)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -54,6 +54,8 @@ target_include_directories(rich-text-renderer-document PUBLIC ${CMAKE_CURRENT_SO
 target_link_libraries(rich-text-renderer-document PUBLIC Qt6::Gui Qt6::Svg)
 
 add_library(rich-text-renderer-ui STATIC
+    src/ui/CentralUiLayout.cpp
+    src/ui/CentralUiLayout.h
     src/ui/MainWindow.cpp
     src/ui/MainWindow.h
     src/ui/MarkdownLinkHandler.cpp
@@ -77,6 +79,7 @@ target_link_libraries(rich-text-renderer-ui PUBLIC
     Qt6::SvgWidgets
     Qt6::Widgets
 )
+target_link_libraries(rich-text-renderer-ui PRIVATE Qt6::UiTools)
 target_compile_definitions(rich-text-renderer-ui PRIVATE
     RENDERER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
 )
@@ -170,6 +173,11 @@ add_executable(theme-test
 )
 target_link_libraries(theme-test PRIVATE rich-text-renderer-ui)
 
+add_executable(ui-layout-test
+    tests/ui_layout_test.cpp
+)
+target_link_libraries(ui-layout-test PRIVATE rich-text-renderer-ui)
+
 if(BUILD_TESTING)
     add_test(NAME link-resolver-test COMMAND link-resolver-test)
     add_test(NAME link-handler-test COMMAND link-handler-test)
@@ -211,6 +219,11 @@ if(BUILD_TESTING)
 
     add_test(NAME theme-test COMMAND theme-test)
     set_tests_properties(theme-test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    add_test(NAME ui-layout-test COMMAND ui-layout-test)
+    set_tests_properties(ui-layout-test PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()

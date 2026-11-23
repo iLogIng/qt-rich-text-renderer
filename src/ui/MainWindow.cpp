@@ -45,7 +45,6 @@
 #include <QTextDocument>
 #include <QTimer>
 #include <QToolButton>
-#include <QVBoxLayout>
 #include <QDebug>
 #include <cstdio>
 
@@ -111,99 +110,10 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
         restoreGeometry(m_settingsData.windowGeometry);
     }
 
-    auto *central = new QWidget(this);
-    auto *layout = new QVBoxLayout(central);
-    layout->setContentsMargins(8, 8, 8, 8);
-    layout->setSpacing(6);
-
-    auto *toolbar = new QHBoxLayout;
-    m_loadButton = new QPushButton(QStringLiteral("Load"), central);
-    m_loadButton->setToolTip(QStringLiteral("Open a local Markdown or text file"));
-    m_renderButton = new QPushButton(QStringLiteral("Render (Ctrl+Enter)"), central);
-    m_themeButton = new QPushButton(central);
-    updateThemeButton();
-    m_settingsButton = new QPushButton(QStringLiteral("Settings"), central);
-    m_status = new QLabel(QStringLiteral("No document open"), central);
-    m_status->setObjectName(QStringLiteral("statusLabel"));
-    m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    m_backButton = new QToolButton(central);
-    m_backButton->setObjectName(QStringLiteral("historyBackButton"));
-    m_backButton->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
-    m_backButton->setToolTip(QStringLiteral("Back"));
-    m_backButton->setAutoRaise(true);
-    m_forwardButton = new QToolButton(central);
-    m_forwardButton->setObjectName(QStringLiteral("historyForwardButton"));
-    m_forwardButton->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
-    m_forwardButton->setToolTip(QStringLiteral("Forward"));
-    m_forwardButton->setAutoRaise(true);
-    m_historyCombo = new QComboBox(central);
-    m_historyCombo->setObjectName(QStringLiteral("historyCombo"));
-    m_historyCombo->setPlaceholderText(QStringLiteral("History"));
-    m_historyCombo->setMinimumContentsLength(18);
-    m_historyCombo->setMaximumWidth(280);
-    m_historyCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    m_historyCombo->setMaxVisibleItems(16);
-    m_historyCombo->setToolTip(QStringLiteral("Local file history (newest first, max 64)"));
-    const int toolbarHeight = m_renderButton->sizeHint().height();
-    m_backButton->setFixedHeight(toolbarHeight);
-    m_forwardButton->setFixedHeight(toolbarHeight);
-    m_historyCombo->setFixedHeight(toolbarHeight);
-
-    toolbar->addWidget(m_loadButton);
-    toolbar->addWidget(m_renderButton);
-    toolbar->addWidget(m_themeButton);
-    toolbar->addWidget(m_settingsButton);
-    toolbar->addSpacing(12);
-    toolbar->addWidget(m_status, 1);
-    toolbar->addWidget(m_backButton);
-    toolbar->addWidget(m_forwardButton);
-    toolbar->addWidget(m_historyCombo);
-    layout->addLayout(toolbar);
-
-    m_tabs = new QTabWidget(central);
-    m_tabs->setObjectName(QStringLiteral("documentTabs"));
-
-    m_source = new QPlainTextEdit(m_tabs);
-    m_source->setObjectName(QStringLiteral("sourceView"));
-    m_source->setReadOnly(true);
-    m_source->setPlaceholderText(QStringLiteral("Markdown source"));
-    QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    fixedFont.setPointSize(m_settingsData.sourceFontPointSize);
-    m_source->setFont(fixedFont);
-    m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_theme.dark, this);
-    m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
-
-    m_preview = new PreviewBrowser(m_tabs);
-    m_preview->setObjectName(QStringLiteral("previewView"));
-    m_preview->setOpenExternalLinks(false);
-    m_preview->setReadOnly(true);
-    m_preview->document()->setDocumentMargin(12);
-    m_svgHandler = new SvgObjectHandler(this);
-    m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
-    m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_theme.dark, this);
-    m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
-    connect(m_preview, &PreviewBrowser::imagePreviewRequested,
-            this, &MainWindow::previewImageUrl);
-    connect(m_preview, &PreviewBrowser::svgPreviewRequested,
-            this, &MainWindow::previewSvg);
-
-    m_tabs->addTab(m_preview, tr("Preview"));
-    m_tabs->addTab(m_source, tr("Source"));
-    m_tabs->setCurrentWidget(m_preview);
-    m_tabs->setTabVisible(m_tabs->indexOf(m_source), m_settingsData.sourceVisible);
-
-    m_outlineToggleButton = new QToolButton(m_tabs);
-    m_outlineToggleButton->setObjectName(QStringLiteral("outlineToggleButton"));
-    m_outlineToggleButton->setText(tr("Outline"));
-    m_outlineToggleButton->setToolTip(tr("Show or hide the document outline"));
-    m_outlineToggleButton->setCheckable(true);
-    m_outlineToggleButton->setAutoRaise(true);
-    m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
-    m_tabs->setCornerWidget(m_outlineToggleButton, Qt::TopLeftCorner);
-
-    layout->addWidget(m_tabs, 1);
-
-    setCentralWidget(central);
+    buildCentralShell();
+    createCentralUiWidgets();
+    populateCentralShell();
+    setCentralWidget(m_centralSlots.root);
 
     m_outlinePanel = new OutlinePanel(this);
     m_outlineDock = new QDockWidget(tr("Outline"), this);
@@ -254,6 +164,161 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     addAction(renderShortcut);
 
     updateHistoryUi();
+}
+
+void MainWindow::buildCentralShell()
+{
+    QString layoutError;
+    CentralUiLayout shell;
+
+    if (!m_theme.layoutError.isEmpty()) {
+        qWarning("Theme layout rejected: %s", qPrintable(m_theme.layoutError));
+    }
+
+    if (!m_theme.layoutFile.isEmpty()) {
+        shell = CentralUiBuilder::loadTheme(m_theme, this, &layoutError);
+        if (!shell.isValid()) {
+            qWarning("Theme layout load failed: %s", qPrintable(layoutError));
+        }
+    }
+
+    if (!shell.isValid()) {
+        shell = CentralUiBuilder::createDefault(this);
+        m_activeLayoutFile.clear();
+    } else {
+        m_activeLayoutFile = m_theme.layoutFile;
+    }
+    m_centralSlots = shell;
+}
+
+void MainWindow::createCentralUiWidgets()
+{
+    QWidget *shell = m_centralSlots.root ? m_centralSlots.root : this;
+
+    m_loadButton = new QPushButton(QStringLiteral("Load"), shell);
+    m_loadButton->setObjectName(QStringLiteral("loadButton"));
+    m_loadButton->setToolTip(QStringLiteral("Open a local Markdown or text file"));
+    m_renderButton = new QPushButton(QStringLiteral("Render (Ctrl+Enter)"), shell);
+    m_renderButton->setObjectName(QStringLiteral("renderButton"));
+    m_themeButton = new QPushButton(shell);
+    m_themeButton->setObjectName(QStringLiteral("themeButton"));
+    updateThemeButton();
+    m_settingsButton = new QPushButton(QStringLiteral("Settings"), shell);
+    m_settingsButton->setObjectName(QStringLiteral("settingsButton"));
+    m_status = new QLabel(QStringLiteral("No document open"), shell);
+    m_status->setObjectName(QStringLiteral("statusLabel"));
+    m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_backButton = new QToolButton(shell);
+    m_backButton->setObjectName(QStringLiteral("historyBackButton"));
+    m_backButton->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    m_backButton->setToolTip(QStringLiteral("Back"));
+    m_backButton->setAutoRaise(true);
+    m_forwardButton = new QToolButton(shell);
+    m_forwardButton->setObjectName(QStringLiteral("historyForwardButton"));
+    m_forwardButton->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    m_forwardButton->setToolTip(QStringLiteral("Forward"));
+    m_forwardButton->setAutoRaise(true);
+    m_historyCombo = new QComboBox(shell);
+    m_historyCombo->setObjectName(QStringLiteral("historyCombo"));
+    m_historyCombo->setPlaceholderText(QStringLiteral("History"));
+    m_historyCombo->setMinimumContentsLength(18);
+    m_historyCombo->setMaximumWidth(280);
+    m_historyCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    m_historyCombo->setMaxVisibleItems(16);
+    m_historyCombo->setToolTip(QStringLiteral("Local file history (newest first, max 64)"));
+
+    m_tabs = new QTabWidget(shell);
+    m_tabs->setObjectName(QStringLiteral("documentTabs"));
+
+    m_previewPage =
+        CentralUiBuilder::createSlot(m_tabs, QString::fromLatin1(CentralUiSlotNames::Preview));
+    m_preview = new PreviewBrowser(m_previewPage);
+    m_preview->setObjectName(QStringLiteral("previewView"));
+    m_preview->setOpenExternalLinks(false);
+    m_preview->setReadOnly(true);
+    m_preview->document()->setDocumentMargin(12);
+    m_svgHandler = new SvgObjectHandler(this);
+    m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
+    m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_theme.dark, this);
+    m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
+    connect(m_preview, &PreviewBrowser::imagePreviewRequested,
+            this, &MainWindow::previewImageUrl);
+    connect(m_preview, &PreviewBrowser::svgPreviewRequested,
+            this, &MainWindow::previewSvg);
+    CentralUiBuilder::addToSlot(m_previewPage, m_preview);
+
+    m_sourcePage =
+        CentralUiBuilder::createSlot(m_tabs, QString::fromLatin1(CentralUiSlotNames::Source));
+    m_source = new QPlainTextEdit(m_sourcePage);
+    m_source->setObjectName(QStringLiteral("sourceView"));
+    m_source->setReadOnly(true);
+    m_source->setPlaceholderText(QStringLiteral("Markdown source"));
+    QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    fixedFont.setPointSize(m_settingsData.sourceFontPointSize);
+    m_source->setFont(fixedFont);
+    m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_theme.dark, this);
+    m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
+    CentralUiBuilder::addToSlot(m_sourcePage, m_source);
+
+    m_tabs->addTab(m_previewPage, tr("Preview"));
+    m_tabs->addTab(m_sourcePage, tr("Source"));
+    m_tabs->setCurrentWidget(m_previewPage);
+    m_tabs->setTabVisible(m_tabs->indexOf(m_sourcePage), m_settingsData.sourceVisible);
+
+    m_outlineToggleButton = new QToolButton(m_tabs);
+    m_outlineToggleButton->setObjectName(QStringLiteral("outlineToggleButton"));
+    m_outlineToggleButton->setText(tr("Outline"));
+    m_outlineToggleButton->setToolTip(tr("Show or hide the document outline"));
+    m_outlineToggleButton->setCheckable(true);
+    m_outlineToggleButton->setAutoRaise(true);
+    m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
+    m_tabs->setCornerWidget(m_outlineToggleButton, Qt::TopLeftCorner);
+
+    updateToolbarHeights();
+}
+
+void MainWindow::populateCentralShell()
+{
+    if (!m_centralSlots.isValid() || !m_tabs) {
+        return;
+    }
+
+    auto *leading = qobject_cast<QHBoxLayout *>(m_centralSlots.toolbarLeading->layout());
+    auto *trailing = qobject_cast<QHBoxLayout *>(m_centralSlots.toolbarTrailing->layout());
+    if (!leading || !trailing) {
+        qWarning("Central layout toolbar slots are not horizontal layouts");
+        return;
+    }
+
+    leading->addWidget(m_loadButton);
+    leading->addWidget(m_renderButton);
+    leading->addWidget(m_themeButton);
+    leading->addWidget(m_settingsButton);
+    leading->addSpacing(12);
+
+    trailing->addSpacing(6);
+    trailing->addWidget(m_status, 1);
+    trailing->addWidget(m_backButton);
+    trailing->addWidget(m_forwardButton);
+    trailing->addWidget(m_historyCombo);
+
+    CentralUiBuilder::setSlotEmpty(m_centralSlots.toolbarLeading, false);
+    CentralUiBuilder::setSlotEmpty(m_centralSlots.toolbarTrailing, false);
+    m_centralSlots.toolbarLeading->setSizePolicy(QSizePolicy::Maximum,
+                                                 QSizePolicy::Fixed);
+    m_centralSlots.toolbarTrailing->setSizePolicy(QSizePolicy::Expanding,
+                                                  QSizePolicy::Fixed);
+    CentralUiBuilder::addToSlot(m_centralSlots.content, m_tabs);
+    m_centralSlots.content->setSizePolicy(QSizePolicy::Expanding,
+                                          QSizePolicy::Expanding);
+}
+
+void MainWindow::rebuildCentralLayout()
+{
+    buildCentralShell();
+    populateCentralShell();
+    setCentralWidget(m_centralSlots.root);
+    updateToolbarHeights();
 }
 
 MainWindow::~MainWindow()
@@ -364,9 +429,9 @@ void MainWindow::applySettings(const AppSettingsData &previous)
         m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
     }
     m_outlineDock->setVisible(m_settingsData.outlineVisible);
-    m_tabs->setTabVisible(m_tabs->indexOf(m_source), m_settingsData.sourceVisible);
-    if (!m_settingsData.sourceVisible && m_tabs->currentWidget() == m_source) {
-        m_tabs->setCurrentWidget(m_preview);
+    m_tabs->setTabVisible(m_tabs->indexOf(m_sourcePage), m_settingsData.sourceVisible);
+    if (!m_settingsData.sourceVisible && m_tabs->currentWidget() == m_sourcePage) {
+        m_tabs->setCurrentWidget(m_previewPage);
     }
 
     if (rendererChanged) {
@@ -427,7 +492,7 @@ void MainWindow::syncViewSettingsFromUi()
     }
     if (m_tabs && m_source) {
         m_settingsData.sourceVisible =
-            m_tabs->isTabVisible(m_tabs->indexOf(m_source));
+            m_tabs->isTabVisible(m_tabs->indexOf(m_sourcePage));
     }
 }
 
@@ -471,7 +536,7 @@ bool MainWindow::openLocalFile(const QString &path,
     }
 
     renderNow();
-    m_tabs->setCurrentWidget(m_preview);
+    m_tabs->setCurrentWidget(m_previewPage);
     schedulePreviewRefresh();
     updateHistoryUi();
     return true;
@@ -632,7 +697,7 @@ void MainWindow::scrollPreviewToBlock(int blockNumber)
         return;
     }
 
-    m_tabs->setCurrentWidget(m_preview);
+    m_tabs->setCurrentWidget(m_previewPage);
     QTextCursor cursor(block);
     m_preview->setTextCursor(cursor);
 
@@ -668,8 +733,12 @@ void MainWindow::setThemeId(const QString &id)
         qWarning("Theme load failed: %s", qPrintable(error));
     }
 
+    const QString previousLayout = m_activeLayoutFile;
     m_theme = theme;
     ThemeManager::apply(m_theme);
+    if (previousLayout != m_theme.layoutFile) {
+        rebuildCentralLayout();
+    }
     updateThemeButton();
 
     if (m_codeHighlighter) {

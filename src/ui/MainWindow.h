@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AppSettings.h"
+#include "CentralUiLayout.h"
 #include "NavigationHistory.h"
 #include "Theme.h"
 
@@ -64,6 +65,10 @@ private:
     };
 
     void configureRenderer();
+    void buildCentralShell();
+    void createCentralUiWidgets();
+    void populateCentralShell();
+    void rebuildCentralLayout();
     void setThemeId(const QString &id);
     void updateThemeButton();
     void updateHistoryUi();
@@ -94,7 +99,11 @@ private:
     AppSettingsData m_settingsData;
     QPlainTextEdit *m_source = nullptr;
     PreviewBrowser *m_preview = nullptr;
+    QWidget *m_previewPage = nullptr;
+    QWidget *m_sourcePage = nullptr;
     QTabWidget *m_tabs = nullptr;
+    CentralUiLayout m_centralSlots;
+    QString m_activeLayoutFile;
     QDockWidget *m_outlineDock = nullptr;
     OutlinePanel *m_outlinePanel = nullptr;
     QToolButton *m_outlineToggleButton = nullptr;
