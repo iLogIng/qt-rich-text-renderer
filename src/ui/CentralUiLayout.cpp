@@ -7,18 +7,26 @@
 #include <QBuffer>
 #include <QDebug>
 #include <QDir>
+#include <QEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QIcon>
+#include <QImage>
+#include <QImageReader>
+#include <QLabel>
 #include <QLayout>
 #include <QMetaProperty>
+#include <QPixmap>
+#include <QPushButton>
 #include <QMetaType>
 #include <QSet>
 #include <QSizePolicy>
 #include <QStyle>
 #include <QStringList>
 #include <QTextDocument>
+#include <QToolButton>
 #include <QUrl>
 #include <QVariant>
 #include <QXmlStreamReader>
@@ -27,6 +35,7 @@
 #include <QWidget>
 
 #include <memory>
+#include <utility>
 
 namespace {
 
@@ -34,6 +43,87 @@ constexpr qint64 kMaxLayoutBytes = 512 * 1024;
 constexpr int kMaxXmlElements = 4000;
 constexpr int kMaxXmlDepth = 64;
 constexpr int kMaxWidgetCount = 300;
+
+bool fail(QString *error, const QString &message);
+
+class ThemeAssetLabelController : public QObject {
+public:
+    ThemeAssetLabelController(QLabel *label, QImage image)
+        : QObject(label)
+        , m_label(label)
+        , m_image(std::move(image))
+    {
+        m_label->setAlignment(Qt::AlignCenter);
+        m_label->setScaledContents(false);
+        updatePixmap();
+        m_label->installEventFilter(this);
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (watched == m_label && event->type() == QEvent::Resize) {
+            updatePixmap();
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    void updatePixmap()
+    {
+        QPixmap pixmap = QPixmap::fromImage(m_image);
+        const QSize available = m_label->contentsRect().size();
+        if (!available.isEmpty()
+            && (pixmap.width() > available.width()
+                || pixmap.height() > available.height())) {
+            pixmap = pixmap.scaled(available,
+                                   Qt::KeepAspectRatio,
+                                   Qt::SmoothTransformation);
+        }
+        m_label->setPixmap(pixmap);
+    }
+
+    QLabel *m_label = nullptr;
+    QImage m_image;
+};
+
+bool applyThemeAssets(QWidget *root, const ThemeSpec &theme, QString *error)
+{
+    QList<QWidget *> widgets = root->findChildren<QWidget *>();
+    widgets.prepend(root);
+    for (QWidget *widget : widgets) {
+        const QVariant value = widget->property(ThemeAssetProperty::Key);
+        if (!value.isValid()) {
+            continue;
+        }
+        const QString id = value.toString().trimmed();
+        if (id.isEmpty() || !theme.assets.contains(id)) {
+            return fail(error, QStringLiteral("unknown theme asset: %1").arg(id));
+        }
+
+        const ThemeAsset asset = theme.assets.value(id);
+        QImageReader reader(asset.filePath);
+        reader.setDecideFormatFromContent(true);
+        reader.setAutoTransform(true);
+        const QImage image = reader.read();
+        if (image.isNull()) {
+            return fail(error,
+                        QStringLiteral("cannot decode theme asset: %1").arg(id));
+        }
+
+        if (auto *label = qobject_cast<QLabel *>(widget)) {
+            new ThemeAssetLabelController(label, image);
+        } else if (auto *toolButton = qobject_cast<QToolButton *>(widget)) {
+            toolButton->setIcon(QIcon(QPixmap::fromImage(image)));
+        } else if (auto *pushButton = qobject_cast<QPushButton *>(widget)) {
+            pushButton->setIcon(QIcon(QPixmap::fromImage(image)));
+        } else {
+            return fail(error,
+                        QStringLiteral("theme asset host is not supported: %1").arg(id));
+        }
+    }
+    return true;
+}
 
 bool fail(QString *error, const QString &message)
 {
@@ -654,7 +744,7 @@ CentralUiLayout CentralUiBuilder::createDefault(QWidget *parent, int spacing)
     return layout;
 }
 
-CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, QString *error)
+CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, bool slotsMode, QString *error)
 {
     static const QSet<QString> allowedNames = {
         QString::fromLatin1(CentralUiSlotNames::Root),
@@ -662,6 +752,9 @@ CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, QString *error)
         QString::fromLatin1(CentralUiSlotNames::ToolbarLeading),
         QString::fromLatin1(CentralUiSlotNames::ToolbarTrailing),
         QString::fromLatin1(CentralUiSlotNames::Content),
+        QString::fromLatin1(CentralUiSlotNames::Preview),
+        QString::fromLatin1(CentralUiSlotNames::Source),
+        QString::fromLatin1(CentralUiSlotNames::Outline),
         QString::fromLatin1(CentralUiSlotNames::Bottom),
         QString::fromLatin1(CentralUiSlotNames::Empty),
     };
@@ -680,6 +773,7 @@ CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, QString *error)
 
     CentralUiLayout layout;
     layout.root = root;
+    layout.slotsMode = slotsMode;
 
     layout.toolbarLeading =
         findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::ToolbarLeading), true, error);
@@ -699,10 +793,42 @@ CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, QString *error)
                                     error)) {
         return {};
     }
-    layout.content =
-        findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Content), true, error);
-    if (!layout.content) {
-        return {};
+
+    if (slotsMode) {
+        layout.preview =
+            findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Preview), true, error);
+        if (!layout.preview) {
+            return {};
+        }
+        layout.source =
+            findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Source), true, error);
+        if (!layout.source) {
+            return {};
+        }
+        if (findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Content), false, error)) {
+            fail(error, QStringLiteral("central.content is not allowed in slots mode"));
+            return {};
+        }
+        layout.outline =
+            findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Outline), false, error);
+        if (error && !error->isEmpty()) {
+            return {};
+        }
+    } else {
+        layout.content =
+            findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Content), true, error);
+        if (!layout.content) {
+            return {};
+        }
+        if (findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Preview), false, error)
+            || findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Source), false, error)
+            || findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Outline), false, error)) {
+            fail(error, QStringLiteral("preview/source/outline slots require slots mode"));
+            return {};
+        }
+        if (error && !error->isEmpty()) {
+            return {};
+        }
     }
 
     layout.top = findUniqueSlot(root, QString::fromLatin1(CentralUiSlotNames::Top), false, error);
@@ -731,15 +857,32 @@ CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, QString *error)
                          QString::fromLatin1(ThemeSlotStyle::ToolbarLeading));
     setSlotStyleProperty(layout.toolbarTrailing,
                          QString::fromLatin1(ThemeSlotStyle::ToolbarTrailing));
-    setSlotStyleProperty(layout.content, QString::fromLatin1(ThemeSlotStyle::Content));
+    if (layout.content) {
+        setSlotStyleProperty(layout.content, QString::fromLatin1(ThemeSlotStyle::Content));
+    }
+    if (layout.preview) {
+        setSlotStyleProperty(layout.preview, QString::fromLatin1(ThemeSlotStyle::Preview));
+    }
+    if (layout.source) {
+        setSlotStyleProperty(layout.source, QString::fromLatin1(ThemeSlotStyle::Source));
+    }
+    if (layout.outline) {
+        setSlotStyleProperty(layout.outline, QString::fromLatin1(ThemeSlotStyle::Outline));
+    }
 
     for (QWidget *slot : {layout.top, layout.bottom, layout.empty}) {
         if (slot) {
             setSlotEmpty(slot, !slotHasContent(slot));
         }
     }
-    for (QWidget *slot : {layout.toolbarLeading, layout.toolbarTrailing, layout.content}) {
-        setSlotEmpty(slot, !slotHasContent(slot));
+    for (QWidget *slot : {layout.toolbarLeading,
+                           layout.toolbarTrailing,
+                           layout.content,
+                           layout.preview,
+                           layout.source}) {
+        if (slot) {
+            setSlotEmpty(slot, !slotHasContent(slot));
+        }
     }
 
     return layout;
@@ -754,6 +897,10 @@ CentralUiLayout CentralUiBuilder::loadTheme(const ThemeSpec &theme,
     }
     if (!theme.layoutError.isEmpty()) {
         fail(error, theme.layoutError);
+        return {};
+    }
+    if (!theme.assetError.isEmpty()) {
+        fail(error, theme.assetError);
         return {};
     }
     if (!validateLayoutPath(theme, error)) {
@@ -806,8 +953,11 @@ CentralUiLayout CentralUiBuilder::loadTheme(const ThemeSpec &theme,
                  .arg(QString::fromLatin1(CentralUiSlotNames::Root)));
         return {};
     }
+    if (!applyThemeAssets(root, theme, error)) {
+        return {};
+    }
 
-    CentralUiLayout layout = resolveSlots(root, error);
+    CentralUiLayout layout = resolveSlots(root, theme.contentMode == QStringLiteral("slots"), error);
     if (!layout.isValid()) {
         return {};
     }

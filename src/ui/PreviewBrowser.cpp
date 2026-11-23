@@ -4,6 +4,7 @@
 
 #include <QFileInfo>
 #include <QMouseEvent>
+#include <QResizeEvent>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextImageFormat>
@@ -13,6 +14,16 @@ PreviewBrowser::PreviewBrowser(QWidget *parent)
 {
 }
 
+QMargins PreviewBrowser::contentMargins() const
+{
+    return viewportMargins();
+}
+
+void PreviewBrowser::setContentMargins(const QMargins &margins)
+{
+    setViewportMargins(margins);
+}
+
 void PreviewBrowser::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton && tryPreviewMedia(event->position().toPoint())) {
@@ -20,6 +31,12 @@ void PreviewBrowser::mousePressEvent(QMouseEvent *event)
         return;
     }
     QTextBrowser::mousePressEvent(event);
+}
+
+void PreviewBrowser::resizeEvent(QResizeEvent *event)
+{
+    QTextBrowser::resizeEvent(event);
+    emit viewportResized();
 }
 
 bool PreviewBrowser::tryPreviewMedia(const QPoint &position)

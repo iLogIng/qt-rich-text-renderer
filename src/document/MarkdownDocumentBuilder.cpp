@@ -33,7 +33,8 @@ bool MarkdownDocumentBuilder::embedSvg(QTextDocument *document,
                                        bool dark,
                                        const QColor &foreground,
                                        int maxWidth,
-                                       QString *errorOut)
+                                       QString *errorOut,
+                                       const QHash<QString, QString> &mermaidVariables)
 {
     if (!error.isEmpty() || svg.isEmpty()) {
         const QString message = error.isEmpty() ? QStringLiteral("empty SVG") : error;
@@ -44,7 +45,7 @@ bool MarkdownDocumentBuilder::embedSvg(QTextDocument *document,
         return false;
     }
 
-    const QString safeSvg = sanitizeSvgForQt(svg, mermaid, foreground, dark);
+    const QString safeSvg = sanitizeSvgForQt(svg, mermaid, foreground, dark, mermaidVariables);
     QSvgRenderer renderer(safeSvg.toUtf8());
     if (!renderer.isValid()) {
         const QString message = QStringLiteral("QSvgRenderer rejected SVG");

@@ -10,6 +10,7 @@
 #include "MediaPreviewWindow.h"
 #include "OutlinePanel.h"
 #include "PreviewBrowser.h"
+#include "PreviewStyle.h"
 #include "RendererService.h"
 #include "SettingsDialog.h"
 #include "SvgObjectHandler.h"
@@ -180,19 +181,46 @@ void MainWindow::buildCentralShell()
     if (!m_theme.layoutError.isEmpty()) {
         qWarning("Theme layout rejected: %s", qPrintable(m_theme.layoutError));
     }
+    if (!m_theme.assetError.isEmpty()) {
+        qWarning("Theme asset rejected: %s", qPrintable(m_theme.assetError));
+    }
 
-    if (!m_theme.layoutFile.isEmpty()) {
-        shell = CentralUiBuilder::loadTheme(m_theme, this, &layoutError);
-        if (!shell.isValid()) {
+    ThemeLayout selectedLayout =
+        chooseThemeLayout(m_theme, m_settingsData.layoutId);
+    const auto loadLayout = [this, &layoutError](const ThemeLayout &layout) {
+        if (layout.file.isEmpty()) {
+            return CentralUiLayout{};
+        }
+        ThemeSpec layoutTheme = m_theme;
+        layoutTheme.layoutFile = layout.file;
+        layoutTheme.contentMode = layout.contentMode;
+        CentralUiLayout result = CentralUiBuilder::loadTheme(layoutTheme, this, &layoutError);
+        if (!result.isValid()) {
             qWarning("Theme layout load failed: %s", qPrintable(layoutError));
+        }
+        return result;
+    };
+
+    if (m_theme.assetError.isEmpty()) {
+        shell = loadLayout(selectedLayout);
+        if (!shell.isValid() && !m_theme.layoutVariants.isEmpty()
+            && selectedLayout.id != m_theme.layoutVariants.first().id) {
+            const ThemeLayout fallback = m_theme.layoutVariants.first();
+            layoutError.clear();
+            shell = loadLayout(fallback);
+            if (shell.isValid()) {
+                selectedLayout = fallback;
+            }
         }
     }
 
     if (!shell.isValid()) {
         shell = CentralUiBuilder::createDefault(this, m_theme.spacing);
         m_activeLayoutFile.clear();
+        m_activeLayoutId.clear();
     } else {
-        m_activeLayoutFile = m_theme.layoutFile;
+        m_activeLayoutFile = selectedLayout.file;
+        m_activeLayoutId = selectedLayout.id;
     }
     m_centralSlots = shell;
 }
@@ -254,6 +282,11 @@ void MainWindow::createCentralUiWidgets()
             this, &MainWindow::previewImageUrl);
     connect(m_preview, &PreviewBrowser::svgPreviewRequested,
             this, &MainWindow::previewSvg);
+    connect(m_preview, &PreviewBrowser::viewportResized, this, [this]() {
+        if (m_theme.preview.maxTextWidth > 0) {
+            QTimer::singleShot(0, this, &MainWindow::forcePreviewLayout);
+        }
+    });
     CentralUiBuilder::addToSlot(m_previewPage, m_preview);
 
     m_sourcePage =
@@ -285,7 +318,6 @@ void MainWindow::createCentralUiWidgets()
     m_outlineToggleButton->setAutoRaise(true);
     m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
     applyOutlineTogglePalette();
-    m_tabs->setCornerWidget(m_outlineToggleButton, Qt::TopLeftCorner);
 
     updateToolbarHeights();
 }
@@ -321,9 +353,122 @@ void MainWindow::populateCentralShell()
                                                  QSizePolicy::Fixed);
     m_centralSlots.toolbarTrailing->setSizePolicy(QSizePolicy::Expanding,
                                                   QSizePolicy::Fixed);
-    CentralUiBuilder::addToSlot(m_centralSlots.content, m_tabs);
-    m_centralSlots.content->setSizePolicy(QSizePolicy::Expanding,
-                                          QSizePolicy::Expanding);
+
+    if (m_centralSlots.slotsMode) {
+        m_centralSlots.preview->setSizePolicy(QSizePolicy::Expanding,
+                                              QSizePolicy::Expanding);
+        m_centralSlots.source->setSizePolicy(QSizePolicy::Expanding,
+                                             QSizePolicy::Expanding);
+    } else {
+        CentralUiBuilder::addToSlot(m_centralSlots.content, m_tabs);
+        m_centralSlots.content->setSizePolicy(QSizePolicy::Expanding,
+                                              QSizePolicy::Expanding);
+    }
+
+    attachContentWidgets();
+    placeOutlineToggle();
+    setSourceVisibleInLayout(m_settingsData.sourceVisible);
+}
+
+void MainWindow::attachContentWidgets()
+{
+    if (!m_tabs || !m_previewPage || !m_sourcePage) {
+        return;
+    }
+
+    if (m_centralSlots.slotsMode) {
+        // The tab widget remains as a hidden owner for the page containers
+        // while Preview and Source live directly in the theme slots.
+        m_tabs->setParent(this);
+        m_tabs->hide();
+        CentralUiBuilder::addToSlot(m_centralSlots.preview, m_preview);
+        CentralUiBuilder::addToSlot(m_centralSlots.source, m_source);
+        return;
+    }
+
+    CentralUiBuilder::addToSlot(m_previewPage, m_preview);
+    CentralUiBuilder::addToSlot(m_sourcePage, m_source);
+    m_tabs->show();
+    m_tabs->setCurrentWidget(m_previewPage);
+}
+
+void MainWindow::placeOutlineToggle()
+{
+    if (!m_outlineToggleButton) {
+        return;
+    }
+
+    if (m_centralSlots.slotsMode) {
+        m_tabs->setCornerWidget(nullptr, Qt::TopLeftCorner);
+        if (m_centralSlots.outline) {
+            CentralUiBuilder::addToSlot(m_centralSlots.outline, m_outlineToggleButton);
+        } else if (auto *trailing =
+                       qobject_cast<QHBoxLayout *>(m_centralSlots.toolbarTrailing->layout())) {
+            trailing->addSpacing(6);
+            trailing->addWidget(m_outlineToggleButton);
+        }
+        m_outlineToggleButton->show();
+        return;
+    }
+
+    m_tabs->setCornerWidget(m_outlineToggleButton, Qt::TopLeftCorner);
+}
+
+void MainWindow::setSourceVisibleInLayout(bool visible)
+{
+    if (m_centralSlots.slotsMode) {
+        QWidget *source = m_centralSlots.source;
+        if (!source) {
+            return;
+        }
+        QWidget *ancestor = source->parentWidget();
+        while (ancestor) {
+            if (auto *tabs = qobject_cast<QTabWidget *>(ancestor)) {
+                const int index = tabs->indexOf(source);
+                if (index >= 0) {
+                    tabs->setTabVisible(index, visible);
+                    return;
+                }
+                break;
+            }
+            ancestor = ancestor->parentWidget();
+        }
+        source->setVisible(visible);
+        return;
+    }
+
+    if (m_tabs && m_sourcePage) {
+        m_tabs->setTabVisible(m_tabs->indexOf(m_sourcePage), visible);
+        if (!visible && m_tabs->currentWidget() == m_sourcePage) {
+            m_tabs->setCurrentWidget(m_previewPage);
+        }
+    }
+}
+
+void MainWindow::showPreviewContent()
+{
+    if (!m_centralSlots.slotsMode) {
+        if (m_tabs && m_previewPage) {
+            m_tabs->setCurrentWidget(m_previewPage);
+        }
+        return;
+    }
+
+    if (!m_centralSlots.preview) {
+        return;
+    }
+    QWidget *ancestor = m_centralSlots.preview->parentWidget();
+    while (ancestor) {
+        if (auto *tabs = qobject_cast<QTabWidget *>(ancestor)) {
+            const int index = tabs->indexOf(m_centralSlots.preview);
+            if (index >= 0) {
+                tabs->setCurrentIndex(index);
+                return;
+            }
+            break;
+        }
+        ancestor = ancestor->parentWidget();
+    }
 }
 
 void MainWindow::rebuildCentralLayout()
@@ -422,6 +567,7 @@ void MainWindow::applySettings(const AppSettingsData &previous)
     const bool sourceHighlightingChanged =
         previous.sourceHighlighting != m_settingsData.sourceHighlighting;
     const bool widthChanged = previous.maxSvgWidth != m_settingsData.maxSvgWidth;
+    const bool layoutChanged = previous.layoutId != m_settingsData.layoutId;
     const bool rendererChanged =
         previous.rendererIdleTimeoutMs != m_settingsData.rendererIdleTimeoutMs
         || previous.mathRequestTimeoutMs != m_settingsData.mathRequestTimeoutMs
@@ -442,10 +588,7 @@ void MainWindow::applySettings(const AppSettingsData &previous)
         m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
     }
     m_outlineDock->setVisible(m_settingsData.outlineVisible);
-    m_tabs->setTabVisible(m_tabs->indexOf(m_sourcePage), m_settingsData.sourceVisible);
-    if (!m_settingsData.sourceVisible && m_tabs->currentWidget() == m_sourcePage) {
-        m_tabs->setCurrentWidget(m_previewPage);
-    }
+    setSourceVisibleInLayout(m_settingsData.sourceVisible);
 
     if (rendererChanged) {
         configureRenderer();
@@ -453,6 +596,12 @@ void MainWindow::applySettings(const AppSettingsData &previous)
 
     if (themeChanged) {
         setThemeId(m_settingsData.themeId);
+    } else if (layoutChanged) {
+        rebuildCentralLayout();
+        if (!m_source->toPlainText().isEmpty()) {
+            renderNow();
+        }
+        forcePreviewLayout();
     } else if ((uiFontChanged || widthChanged) && !m_source->toPlainText().isEmpty()) {
         renderNow();
     }
@@ -544,7 +693,7 @@ void MainWindow::syncViewSettingsFromUi()
     if (m_outlineDock) {
         m_settingsData.outlineVisible = m_outlineDock->isVisible();
     }
-    if (m_tabs && m_source) {
+    if (!m_centralSlots.slotsMode && m_tabs && m_sourcePage) {
         m_settingsData.sourceVisible =
             m_tabs->isTabVisible(m_tabs->indexOf(m_sourcePage));
     }
@@ -590,7 +739,7 @@ bool MainWindow::openLocalFile(const QString &path,
     }
 
     renderNow();
-    m_tabs->setCurrentWidget(m_previewPage);
+    showPreviewContent();
     schedulePreviewRefresh();
     updateHistoryUi();
     return true;
@@ -718,11 +867,32 @@ void MainWindow::finishPreviewLoad()
 
 void MainWindow::forcePreviewLayout()
 {
+    if (!m_preview) {
+        return;
+    }
+
     // Reassigning the text width invalidates any partial lazy layout and
     // forces the complete document to be laid out before sizes are queried.
-    const int width = m_preview->viewport()->width();
-    if (width > 0) {
-        m_preview->document()->setTextWidth(width);
+    const QMargins currentMargins = m_preview->contentMargins();
+    const int availableWidth =
+        m_preview->viewport()->width() + currentMargins.left() + currentMargins.right();
+    int contentWidth = availableWidth;
+    int horizontalMargin = 0;
+    if (m_theme.preview.maxTextWidth > 0
+        && availableWidth > m_theme.preview.maxTextWidth) {
+        contentWidth = m_theme.preview.maxTextWidth;
+        horizontalMargin = (availableWidth - contentWidth) / 2;
+    }
+
+    const QMargins targetMargins(horizontalMargin,
+                                 0,
+                                 availableWidth - contentWidth - horizontalMargin,
+                                 0);
+    if (currentMargins != targetMargins) {
+        m_preview->setContentMargins(targetMargins);
+    }
+    if (contentWidth > 0) {
+        m_preview->document()->setTextWidth(contentWidth);
     }
     m_preview->document()->documentLayout()->documentSize();
 }
@@ -751,7 +921,7 @@ void MainWindow::scrollPreviewToBlock(int blockNumber)
         return;
     }
 
-    m_tabs->setCurrentWidget(m_previewPage);
+    showPreviewContent();
     QTextCursor cursor(block);
     m_preview->setTextCursor(cursor);
 
@@ -794,8 +964,12 @@ void MainWindow::setThemeId(const QString &id)
     const QString previousCodeFamily = m_theme.codeFontFamily;
     m_theme = theme;
     ThemeManager::apply(m_theme);
-    if (previousLayout != m_theme.layoutFile
-        || (m_theme.layoutFile.isEmpty() && previousSpacing != m_theme.spacing)) {
+    const ThemeLayout selectedLayout = chooseThemeLayout(m_theme, m_settingsData.layoutId);
+    if (previousLayout != selectedLayout.file
+        || m_activeLayoutId != selectedLayout.id
+        || m_centralSlots.slotsMode
+               != (selectedLayout.contentMode == QStringLiteral("slots"))
+        || (selectedLayout.file.isEmpty() && previousSpacing != m_theme.spacing)) {
         rebuildCentralLayout();
     }
     if (previousUiFamily != m_theme.uiFontFamily
@@ -808,6 +982,7 @@ void MainWindow::setThemeId(const QString &id)
     applyOutlineTogglePalette();
     if (m_preview) {
         m_preview->document()->setDocumentMargin(m_theme.documentMargin);
+        forcePreviewLayout();
     }
     updateThemeButton();
 
@@ -872,6 +1047,7 @@ void MainWindow::renderNow()
     if (m_codeHighlighter) {
         m_codeHighlighter->rehighlight();
     }
+    applyPreviewStyle(m_preview->document(), m_theme.preview, m_theme.codeFontFamily);
 
     QHash<QString, QString> tokenLabels;
     for (const RenderBlock &block : prepared.blocks) {
@@ -913,7 +1089,8 @@ void MainWindow::renderNow()
                 m_theme.dark,
                 m_preview->palette().color(QPalette::Text),
                 m_settingsData.maxSvgWidth,
-                &error);
+                &error,
+                m_theme.mermaid.variables);
             if (!ok) {
                 qWarning() << "render failed for" << block.token << error;
             }
@@ -951,7 +1128,7 @@ void MainWindow::renderNow()
         if (block.kind == RenderBlock::Kind::Math) {
             m_renderer->renderMath(block.source, block.display, callback);
         } else {
-            m_renderer->renderMermaid(block.source, m_theme.dark, callback);
+            m_renderer->renderMermaid(block.source, m_theme.mermaid, callback);
         }
     }
 }

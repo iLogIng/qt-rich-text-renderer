@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
 #include <QPalette>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -57,6 +58,8 @@ int main(int argc, char **argv)
            QStringLiteral("light theme keeps the code syntax defaults"));
     expect(light.sourceSyntax.heading == QColor(QStringLiteral("#0b57d0")),
            QStringLiteral("light theme keeps the source syntax defaults"));
+    expect(light.mermaid.name == QStringLiteral("default"),
+           QStringLiteral("light theme keeps the default Mermaid theme"));
     const QString lightStyle = ThemeManager::buildStyleSheet(light, &error);
     expect(error.isEmpty() && !lightStyle.contains(QStringLiteral("centralSlot")),
            QStringLiteral("theme without slot styles emits no slot QSS"));
@@ -69,6 +72,8 @@ int main(int argc, char **argv)
            QStringLiteral("dark theme preserves the text color"));
     expect(dark.codeSyntax.keyword == QColor(QStringLiteral("#cf8e6d")),
            QStringLiteral("dark theme keeps the code syntax defaults"));
+    expect(dark.mermaid.name == QStringLiteral("dark"),
+           QStringLiteral("dark theme keeps the dark Mermaid theme"));
 
     const QString userDirectory = ThemeManager::themeDirectory();
     const QString customDirectory = QDir(userDirectory).filePath(QStringLiteral("test-custom"));
@@ -100,6 +105,18 @@ int main(int argc, char **argv)
             },
             "source": {
                 "heading": "#445566"
+            }
+        },
+        "preview": {
+            "maxTextWidth": 720,
+            "codeBackground": "#202020",
+            "codeBlockMargin": 4
+        },
+        "mermaid": {
+            "theme": "forest",
+            "variables": {
+                "primaryColor": "#123456",
+                "textColor": "#abcdef"
             }
         },
         "slots": {
@@ -135,6 +152,17 @@ int main(int argc, char **argv)
            QStringLiteral("custom theme source syntax color loads"));
     expect(custom.slotStyles.contains(QStringLiteral("top")),
            QStringLiteral("custom theme slot style loads"));
+    expect(custom.preview.maxTextWidth == 720,
+           QStringLiteral("custom theme preview width loads"));
+    expect(custom.preview.codeBackground == QColor(QStringLiteral("#202020")),
+           QStringLiteral("custom theme code background loads"));
+    expect(custom.preview.codeBlockMargin == 4,
+           QStringLiteral("custom theme code block margin loads"));
+    expect(custom.mermaid.name == QStringLiteral("forest"),
+           QStringLiteral("custom Mermaid theme loads"));
+    expect(custom.mermaid.variables.value(QStringLiteral("primaryColor"))
+               == QStringLiteral("#123456"),
+           QStringLiteral("custom Mermaid color variable loads"));
 
     const QString style = ThemeManager::buildStyleSheet(custom, &error);
     expect(error.isEmpty(), QStringLiteral("custom QSS builds without error"));
@@ -174,6 +202,62 @@ int main(int argc, char **argv)
         themes.cend(),
         [](const ThemeInfo &info) { return info.id == QStringLiteral("test-custom"); });
     expect(hasCustom, QStringLiteral("available themes include custom theme"));
+
+    const QString assetThemeId = QStringLiteral("asset-test-theme");
+    const QString assetThemeDirectory = QDir(userDirectory).filePath(assetThemeId);
+    QDir(assetThemeDirectory).removeRecursively();
+    const QString assetImagePath =
+        QDir(assetThemeDirectory).filePath(QStringLiteral("assets/logo.png"));
+    QDir().mkpath(QFileInfo(assetImagePath).absolutePath());
+    QImage assetImage(8, 8, QImage::Format_ARGB32);
+    assetImage.fill(Qt::blue);
+    expect(assetImage.save(assetImagePath, "PNG"), QStringLiteral("write theme asset image"));
+    const QByteArray assetThemeJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "asset-test-theme",
+        "name": "Asset Test Theme",
+        "assets": {
+            "logo": "assets/logo.png"
+        }
+    })JSON";
+    expect(writeFile(QDir(assetThemeDirectory).filePath(QStringLiteral("theme.json")),
+                     assetThemeJson),
+           QStringLiteral("write asset theme"));
+    error.clear();
+    const ThemeSpec assetTheme = ThemeManager::loadTheme(assetThemeId, &error);
+    expect(error.isEmpty() && assetTheme.assetError.isEmpty(),
+           QStringLiteral("asset theme loads without error"));
+    expect(assetTheme.assets.contains(QStringLiteral("logo")),
+           QStringLiteral("asset manifest is parsed"));
+    if (assetTheme.assets.contains(QStringLiteral("logo"))) {
+        expect(assetTheme.assets.value(QStringLiteral("logo")).format
+                   == QStringLiteral("png"),
+               QStringLiteral("asset format is detected"));
+        expect(assetTheme.assets.value(QStringLiteral("logo")).size == QSize(8, 8),
+               QStringLiteral("asset dimensions are recorded"));
+    }
+
+    const QString invalidAssetThemeId = QStringLiteral("invalid-asset-theme");
+    const QString invalidAssetThemeDirectory =
+        QDir(userDirectory).filePath(invalidAssetThemeId);
+    QDir(invalidAssetThemeDirectory).removeRecursively();
+    const QByteArray invalidAssetJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "invalid-asset-theme",
+        "name": "Invalid Asset Theme",
+        "assets": {
+            "logo": "../escape.png"
+        }
+    })JSON";
+    expect(writeFile(QDir(invalidAssetThemeDirectory).filePath(QStringLiteral("theme.json")),
+                     invalidAssetJson),
+           QStringLiteral("write invalid asset theme"));
+    error.clear();
+    const ThemeSpec invalidAsset = ThemeManager::loadTheme(invalidAssetThemeId, &error);
+    expect(error.isEmpty() && !invalidAsset.assetError.isEmpty(),
+           QStringLiteral("asset path error keeps theme colors available"));
+    expect(invalidAsset.assets.isEmpty(),
+           QStringLiteral("invalid asset is not exposed"));
 
     const QString invalidSlotDirectory =
         QDir(userDirectory).filePath(QStringLiteral("invalid-slot-theme"));
@@ -230,6 +314,8 @@ int main(int argc, char **argv)
            QStringLiteral("invalid theme falls back to the default"));
 
     QDir(customDirectory).removeRecursively();
+    QDir(assetThemeDirectory).removeRecursively();
+    QDir(invalidAssetThemeDirectory).removeRecursively();
     QDir(invalidSlotDirectory).removeRecursively();
     QDir(invalidSyntaxDirectory).removeRecursively();
     QDir(invalidDirectory).removeRecursively();

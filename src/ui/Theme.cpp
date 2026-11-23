@@ -6,6 +6,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QImageReader>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -48,6 +50,7 @@ ThemeSpec lightFallback()
     theme.border = QColor(QStringLiteral("#d0d0d0"));
     theme.codeSyntax = defaultCodeSyntaxPalette(false);
     theme.sourceSyntax = defaultMarkdownSourcePalette(false);
+    theme.mermaid.name = QStringLiteral("default");
     theme.documentMargin = 12;
     return theme;
 }
@@ -80,6 +83,7 @@ ThemeSpec darkFallback()
     theme.border = QColor(QStringLiteral("#3c3c3c"));
     theme.codeSyntax = defaultCodeSyntaxPalette(true);
     theme.sourceSyntax = defaultMarkdownSourcePalette(true);
+    theme.mermaid.name = QStringLiteral("dark");
     theme.documentMargin = 12;
     return theme;
 }
@@ -326,6 +330,104 @@ bool readSyntax(const QJsonObject &root, ThemeSpec *theme, QString *error)
     return true;
 }
 
+bool readPreview(const QJsonObject &root, ThemeSpec *theme, QString *error)
+{
+    if (!root.contains(QStringLiteral("preview"))) {
+        return true;
+    }
+    if (!root.value(QStringLiteral("preview")).isObject()) {
+        if (error) {
+            *error = QStringLiteral("preview must be a JSON object");
+        }
+        return false;
+    }
+    const QJsonObject preview = root.value(QStringLiteral("preview")).toObject();
+    return readOptionalInt(preview,
+                           QStringLiteral("maxTextWidth"),
+                           QStringLiteral("preview"),
+                           0,
+                           10000,
+                           &theme->preview.maxTextWidth,
+                           error)
+        && readOptionalColor(preview,
+                             QStringLiteral("codeBackground"),
+                             QStringLiteral("preview"),
+                             &theme->preview.codeBackground,
+                             error)
+        && readOptionalInt(preview,
+                           QStringLiteral("codeBlockMargin"),
+                           QStringLiteral("preview"),
+                           0,
+                           64,
+                           &theme->preview.codeBlockMargin,
+                           error);
+}
+
+bool readMermaid(const QJsonObject &root, ThemeSpec *theme, QString *error)
+{
+    if (!root.contains(QStringLiteral("mermaid"))) {
+        return true;
+    }
+    if (!root.value(QStringLiteral("mermaid")).isObject()) {
+        if (error) {
+            *error = QStringLiteral("mermaid must be a JSON object");
+        }
+        return false;
+    }
+
+    const QJsonObject mermaid = root.value(QStringLiteral("mermaid")).toObject();
+    if (mermaid.contains(QStringLiteral("theme"))) {
+        if (!mermaid.value(QStringLiteral("theme")).isString()) {
+            if (error) {
+                *error = QStringLiteral("mermaid.theme must be a string");
+            }
+            return false;
+        }
+        const QString name = mermaid.value(QStringLiteral("theme")).toString().trimmed();
+        if (!isAllowedMermaidTheme(name)) {
+            if (error) {
+                *error = QStringLiteral("unsupported Mermaid theme: %1").arg(name);
+            }
+            return false;
+        }
+        theme->mermaid.name = name;
+    }
+
+    if (mermaid.contains(QStringLiteral("variables"))) {
+        if (!mermaid.value(QStringLiteral("variables")).isObject()) {
+            if (error) {
+                *error = QStringLiteral("mermaid.variables must be a JSON object");
+            }
+            return false;
+        }
+        const QJsonObject variables = mermaid.value(QStringLiteral("variables")).toObject();
+        for (auto it = variables.constBegin(); it != variables.constEnd(); ++it) {
+            if (!isAllowedMermaidVariable(it.key())) {
+                if (error) {
+                    *error = QStringLiteral("unsupported Mermaid variable: %1").arg(it.key());
+                }
+                return false;
+            }
+            if (!it.value().isString()) {
+                if (error) {
+                    *error = QStringLiteral("Mermaid variable must be a color string: %1")
+                                 .arg(it.key());
+                }
+                return false;
+            }
+            const QColor color(it.value().toString());
+            if (!color.isValid()) {
+                if (error) {
+                    *error = QStringLiteral("invalid Mermaid color: %1").arg(it.key());
+                }
+                return false;
+            }
+            theme->mermaid.variables.insert(it.key(), color.name(QColor::HexRgb));
+        }
+    }
+    return true;
+}
+
 bool readSlotStyles(const QJsonObject &root,
                     QHash<QString, SlotStyle> *styles,
                     QString *error)
@@ -347,6 +449,9 @@ bool readSlotStyles(const QJsonObject &root,
         QString::fromLatin1(ThemeSlotStyle::ToolbarLeading),
         QString::fromLatin1(ThemeSlotStyle::ToolbarTrailing),
         QString::fromLatin1(ThemeSlotStyle::Content),
+        QString::fromLatin1(ThemeSlotStyle::Preview),
+        QString::fromLatin1(ThemeSlotStyle::Source),
+        QString::fromLatin1(ThemeSlotStyle::Outline),
     };
     static const QSet<QString> allowedFields = {
         QStringLiteral("background"),
@@ -424,35 +529,16 @@ bool readSlotStyles(const QJsonObject &root,
     return true;
 }
 
-void readLayout(const QJsonObject &root,
-                bool builtIn,
-                const QString &packageDirectory,
-                ThemeSpec *theme)
+bool resolveLayoutFile(const QString &file,
+                       const QString &packageDirectory,
+                       QString *layoutPath,
+                       QString *error)
 {
-    if (!root.contains(QStringLiteral("layout"))) {
-        return;
-    }
-    if (builtIn) {
-        theme->layoutError = QStringLiteral("built-in themes cannot provide a .ui layout");
-        return;
-    }
-    if (!root.value(QStringLiteral("layout")).isObject()) {
-        theme->layoutError = QStringLiteral("layout must be a JSON object");
-        return;
-    }
-
-    const QJsonObject layout = root.value(QStringLiteral("layout")).toObject();
-    const int apiVersion = layout.value(QStringLiteral("apiVersion")).toInt(0);
-    if (apiVersion != 1) {
-        theme->layoutError =
-            QStringLiteral("unsupported layout API version: %1").arg(apiVersion);
-        return;
-    }
-
-    const QString file = layout.value(QStringLiteral("file")).toString().trimmed();
     if (file.isEmpty()) {
-        theme->layoutError = QStringLiteral("layout.file is required");
-        return;
+        if (error) {
+            *error = QStringLiteral("layout.file is required");
+        }
+        return false;
     }
     if (QDir::isAbsolutePath(file)
         || file.contains(QLatin1Char('\\'))
@@ -460,34 +546,265 @@ void readLayout(const QJsonObject &root,
         || file != QDir::cleanPath(file)
         || file == QStringLiteral("..")
         || file.startsWith(QStringLiteral("../"))) {
-        theme->layoutError = QStringLiteral("layout.file must stay inside the theme package");
-        return;
+        if (error) {
+            *error = QStringLiteral("layout.file must stay inside the theme package");
+        }
+        return false;
     }
     if (!file.endsWith(QStringLiteral(".ui"), Qt::CaseInsensitive)) {
-        theme->layoutError = QStringLiteral("layout.file must use the .ui suffix");
-        return;
+        if (error) {
+            *error = QStringLiteral("layout.file must use the .ui suffix");
+        }
+        return false;
     }
 
     const QFileInfo packageInfo(packageDirectory);
     const QString packagePath = packageInfo.canonicalFilePath();
     if (packagePath.isEmpty() || !packageInfo.isDir()) {
-        theme->layoutError = QStringLiteral("theme package directory is not accessible");
-        return;
+        if (error) {
+            *error = QStringLiteral("theme package directory is not accessible");
+        }
+        return false;
     }
 
     const QFileInfo layoutInfo(QDir(packageDirectory).filePath(file));
-    const QString layoutPath = layoutInfo.canonicalFilePath();
-    if (!layoutInfo.isFile() || layoutPath.isEmpty()) {
-        theme->layoutError = QStringLiteral("layout file is missing");
-        return;
+    const QString canonical = layoutInfo.canonicalFilePath();
+    if (!layoutInfo.isFile() || canonical.isEmpty()) {
+        if (error) {
+            *error = QStringLiteral("layout file is missing");
+        }
+        return false;
     }
-    if (!layoutPath.startsWith(packagePath + QDir::separator())) {
-        theme->layoutError = QStringLiteral("layout file is outside the theme package");
-        return;
+    if (!canonical.startsWith(packagePath + QDir::separator())) {
+        if (error) {
+            *error = QStringLiteral("layout file is outside the theme package");
+        }
+        return false;
+    }
+    *layoutPath = canonical;
+    return true;
+}
+
+bool readLayout(const QJsonObject &root,
+                bool builtIn,
+                const QString &packageDirectory,
+                ThemeSpec *theme)
+{
+    if (root.contains(QStringLiteral("layout"))
+        && root.contains(QStringLiteral("layouts"))) {
+        theme->layoutError =
+            QStringLiteral("layout and layouts are mutually exclusive");
+        return false;
     }
 
+    if (root.contains(QStringLiteral("layouts"))) {
+        if (builtIn) {
+            theme->layoutError =
+                QStringLiteral("built-in themes cannot provide a .ui layout");
+            return false;
+        }
+        if (!root.value(QStringLiteral("layouts")).isObject()) {
+            theme->layoutError = QStringLiteral("layouts must be a JSON object");
+            return false;
+        }
+        const QJsonObject layouts = root.value(QStringLiteral("layouts")).toObject();
+        const int apiVersion = layouts.value(QStringLiteral("apiVersion")).toInt(0);
+        if (apiVersion != 1) {
+            theme->layoutError =
+                QStringLiteral("unsupported layout API version: %1").arg(apiVersion);
+            return false;
+        }
+        if (!layouts.value(QStringLiteral("variants")).isArray()) {
+            theme->layoutError = QStringLiteral("layouts.variants must be an array");
+            return false;
+        }
+        const QJsonArray variants = layouts.value(QStringLiteral("variants")).toArray();
+        if (variants.isEmpty()) {
+            theme->layoutError = QStringLiteral("layouts.variants must not be empty");
+            return false;
+        }
+        QSet<QString> ids;
+        for (const QJsonValue &value : variants) {
+            if (!value.isObject()) {
+                theme->layoutError =
+                    QStringLiteral("each layout variant must be a JSON object");
+                return false;
+            }
+            const QJsonObject variant = value.toObject();
+            const QString id = variant.value(QStringLiteral("id")).toString().trimmed();
+            if (id.isEmpty() || ids.contains(id)) {
+                theme->layoutError =
+                    QStringLiteral("layout variant id must be unique and non-empty");
+                return false;
+            }
+            ids.insert(id);
+            const QString contentMode = variant.value(QStringLiteral("contentMode"))
+                                            .toString(QStringLiteral("tabs"))
+                                            .trimmed();
+            if (contentMode != QStringLiteral("tabs")
+                && contentMode != QStringLiteral("slots")) {
+                theme->layoutError =
+                    QStringLiteral("layout variant contentMode must be tabs or slots");
+                return false;
+            }
+            const QString file = variant.value(QStringLiteral("file")).toString().trimmed();
+            QString layoutFile;
+            if (!resolveLayoutFile(file, packageDirectory, &layoutFile, &theme->layoutError)) {
+                return false;
+            }
+            theme->layoutVariants.push_back({id, layoutFile, contentMode});
+        }
+        theme->layoutApiVersion = apiVersion;
+        return true;
+    }
+
+    if (!root.contains(QStringLiteral("layout"))) {
+        return false;
+    }
+    if (builtIn) {
+        theme->layoutError = QStringLiteral("built-in themes cannot provide a .ui layout");
+        return false;
+    }
+    if (!root.value(QStringLiteral("layout")).isObject()) {
+        theme->layoutError = QStringLiteral("layout must be a JSON object");
+        return false;
+    }
+
+    const QJsonObject layout = root.value(QStringLiteral("layout")).toObject();
+    const int apiVersion = layout.value(QStringLiteral("apiVersion")).toInt(0);
+    if (apiVersion != 1) {
+        theme->layoutError =
+            QStringLiteral("unsupported layout API version: %1").arg(apiVersion);
+        return false;
+    }
+
+    const QString contentMode = layout.value(QStringLiteral("contentMode"))
+                                    .toString(QStringLiteral("tabs"))
+                                    .trimmed();
+    if (contentMode != QStringLiteral("tabs") && contentMode != QStringLiteral("slots")) {
+        theme->layoutError = QStringLiteral("layout.contentMode must be tabs or slots");
+        return false;
+    }
+    theme->contentMode = contentMode;
+
+    const QString file = layout.value(QStringLiteral("file")).toString().trimmed();
+    QString layoutPath;
+    if (!resolveLayoutFile(file, packageDirectory, &layoutPath, &theme->layoutError)) {
+        return false;
+    }
     theme->layoutApiVersion = apiVersion;
     theme->layoutFile = layoutPath;
+    return true;
+}
+
+
+bool readAssets(const QJsonObject &root,
+                bool builtIn,
+                const QString &packageDirectory,
+                ThemeSpec *theme)
+{
+    if (!root.contains(QStringLiteral("assets"))) {
+        return true;
+    }
+    if (builtIn) {
+        theme->assetError = QStringLiteral("built-in themes cannot provide assets");
+        return true;
+    }
+    if (!root.value(QStringLiteral("assets")).isObject()) {
+        theme->assetError = QStringLiteral("assets must be a JSON object");
+        return true;
+    }
+    const QJsonObject assets = root.value(QStringLiteral("assets")).toObject();
+    if (assets.isEmpty()) {
+        return true;
+    }
+
+    const QFileInfo packageInfo(packageDirectory);
+    const QString packagePath = packageInfo.canonicalFilePath();
+    if (packagePath.isEmpty() || !packageInfo.isDir()) {
+        theme->assetError = QStringLiteral("theme package directory is not accessible");
+        return true;
+    }
+
+    static const QRegularExpression idPattern(
+        QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]*$"));
+    for (auto it = assets.constBegin(); it != assets.constEnd(); ++it) {
+        const QString id = it.key().trimmed();
+        if (!idPattern.match(id).hasMatch()) {
+            theme->assetError = QStringLiteral("invalid asset id: %1").arg(it.key());
+            return true;
+        }
+        if (!it.value().isString()) {
+            theme->assetError = QStringLiteral("asset path must be a string: %1").arg(id);
+            return true;
+        }
+        const QString file = it.value().toString().trimmed();
+        if (file.isEmpty() || QDir::isAbsolutePath(file)
+            || file.contains(QLatin1Char('\\'))
+            || file.contains(QStringLiteral("://"))
+            || file != QDir::cleanPath(file)
+            || file == QStringLiteral("..")
+            || file.startsWith(QStringLiteral("../"))) {
+            theme->assetError =
+                QStringLiteral("asset path must stay inside the theme package: %1").arg(id);
+            return true;
+        }
+        if (!file.endsWith(QStringLiteral(".png"), Qt::CaseInsensitive)
+            && !file.endsWith(QStringLiteral(".jpg"), Qt::CaseInsensitive)
+            && !file.endsWith(QStringLiteral(".jpeg"), Qt::CaseInsensitive)) {
+            theme->assetError =
+                QStringLiteral("asset must be PNG or JPEG: %1").arg(id);
+            return true;
+        }
+
+        const QFileInfo assetInfo(QDir(packageDirectory).filePath(file));
+        const QString assetPath = assetInfo.canonicalFilePath();
+        if (!assetInfo.isFile() || assetPath.isEmpty()) {
+            theme->assetError = QStringLiteral("asset file is missing: %1").arg(id);
+            return true;
+        }
+        if (!assetPath.startsWith(packagePath + QDir::separator())) {
+            theme->assetError =
+                QStringLiteral("asset file is outside the theme package: %1").arg(id);
+            return true;
+        }
+        if (assetInfo.size() > 2 * 1024 * 1024) {
+            theme->assetError = QStringLiteral("asset file is too large: %1").arg(id);
+            return true;
+        }
+
+        QImageReader reader(assetPath);
+        reader.setDecideFormatFromContent(true);
+        const QString format = QString::fromLatin1(reader.format()).toLower();
+        if (!reader.canRead()
+            || (format != QStringLiteral("png")
+                && format != QStringLiteral("jpeg")
+                && format != QStringLiteral("jpg"))) {
+            theme->assetError =
+                QStringLiteral("asset format is not supported: %1").arg(id);
+            return true;
+        }
+        const QSize size = reader.size();
+        if (!size.isValid() || size.width() <= 0 || size.height() <= 0
+            || size.width() > 4096 || size.height() > 4096) {
+            theme->assetError =
+                QStringLiteral("asset dimensions are not supported: %1").arg(id);
+            return true;
+        }
+        if (reader.imageCount() > 1) {
+            theme->assetError =
+                QStringLiteral("animated assets are not supported: %1").arg(id);
+            return true;
+        }
+
+        ThemeAsset asset;
+        asset.id = id;
+        asset.filePath = assetPath;
+        asset.format = format;
+        asset.size = size;
+        theme->assets.insert(id, asset);
+    }
+    return true;
 }
 
 bool readTheme(const QString &path,
@@ -562,6 +879,8 @@ bool readTheme(const QString &path,
 
     if (!readTypography(root, &parsed, error)
         || !readSyntax(root, &parsed, error)
+        || !readPreview(root, &parsed, error)
+        || !readMermaid(root, &parsed, error)
         || !readSlotStyles(root, &parsed.slotStyles, error)) {
         return false;
     }
@@ -573,6 +892,7 @@ bool readTheme(const QString &path,
         qBound(0, metrics.value(QStringLiteral("documentMargin")).toInt(parsed.documentMargin), 64);
 
     readLayout(root, builtIn, packageDirectory, &parsed);
+    readAssets(root, builtIn, packageDirectory, &parsed);
 
     *theme = parsed;
     return true;
@@ -616,6 +936,26 @@ QString buildSlotRules(const ThemeSpec &theme)
 }
 
 } // namespace
+
+ThemeLayout chooseThemeLayout(const ThemeSpec &theme, const QString &requestedId)
+{
+    if (!theme.layoutError.isEmpty()) {
+        return {};
+    }
+    if (!theme.layoutVariants.isEmpty()) {
+        for (const ThemeLayout &variant : theme.layoutVariants) {
+            if (!requestedId.isEmpty() && variant.id == requestedId) {
+                return variant;
+            }
+        }
+        return theme.layoutVariants.first();
+    }
+
+    ThemeLayout layout;
+    layout.file = theme.layoutFile;
+    layout.contentMode = theme.contentMode;
+    return layout;
+}
 
 void ensureThemeResources()
 {

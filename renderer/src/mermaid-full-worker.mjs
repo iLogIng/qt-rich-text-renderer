@@ -6,17 +6,44 @@ function send(payload) {
   std.out.flush();
 }
 
-function initialize(theme) {
+const allowedThemes = new Set(['default', 'dark', 'forest', 'neutral', 'base']);
+const allowedVariables = new Set([
+  'primaryColor',
+  'lineColor',
+  'textColor',
+  'mainBkg',
+  'nodeBorder',
+  'nodeTextColor',
+  'arrowheadColor',
+  'edgeLabelBackground',
+]);
+
+function themeConfig(request) {
+  const name = allowedThemes.has(request.theme) ? request.theme : 'default';
+  const variables = {};
+  if (request.themeVariables && typeof request.themeVariables === 'object') {
+    for (const key of allowedVariables) {
+      const value = request.themeVariables[key];
+      if (typeof value === 'string') {
+        variables[key] = value;
+      }
+    }
+  }
+  return { name, variables };
+}
+
+function initialize(config) {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
-    theme: theme === 'dark' ? 'dark' : 'default',
+    theme: config.name,
+    themeVariables: config.variables,
     deterministicIds: true,
     deterministicIDSeed: 'rich-text-renderer',
   });
 }
 
-initialize('default');
+initialize({ name: 'default', variables: {} });
 send({ type: 'ready', renderer: 'mermaid-full', version: '13.0.0-alpha.3' });
 
 let renderCounter = 0;
@@ -43,7 +70,7 @@ while (true) {
 
   const started = Date.now();
   try {
-    initialize(request.theme);
+    initialize(themeConfig(request));
     const { svg } = await mermaid.render(`rich-text-renderer-${++renderCounter}`, String(request.source ?? ''));
     send({ id: request.id ?? '', svg, ms: Date.now() - started });
   } catch (error) {

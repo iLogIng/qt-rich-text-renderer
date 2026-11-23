@@ -43,13 +43,25 @@ void RendererService::configure(const QString &qjsPath,
 
 void RendererService::renderMath(const QString &tex, bool display, Callback callback)
 {
-    render(QStringLiteral("math"), tex, display, QString(), std::move(callback));
+    render(QStringLiteral("math"),
+           tex,
+           display,
+           QString(),
+           QString(),
+           {},
+           std::move(callback));
 }
 
-void RendererService::renderMermaid(const QString &source, bool dark, Callback callback)
+void RendererService::renderMermaid(const QString &source,
+                                    const MermaidTheme &theme,
+                                    Callback callback)
 {
-    render(QStringLiteral("mermaid"), source, true,
-           dark ? QStringLiteral("dark") : QStringLiteral("default"),
+    render(QStringLiteral("mermaid"),
+           source,
+           true,
+           theme.cacheKey(),
+           theme.name,
+           theme.variables,
            std::move(callback));
 }
 
@@ -70,11 +82,13 @@ void RendererService::shutdown()
 void RendererService::render(const QString &kind,
                              const QString &source,
                              bool display,
-                             const QString &theme,
+                             const QString &cacheTheme,
+                             const QString &workerTheme,
+                             const QHash<QString, QString> &themeVariables,
                              Callback callback)
 {
     const quint64 generation = m_generation;
-    const QString key = m_cache.key(kind, source, display, theme);
+    const QString key = m_cache.key(kind, source, display, cacheTheme);
 
     QString cachedSvg;
     if (m_cache.read(key, &cachedSvg)) {
@@ -104,7 +118,8 @@ void RendererService::render(const QString &kind,
     job.id = key;
     job.source = source;
     job.display = display;
-    job.theme = theme;
+    job.theme = workerTheme;
+    job.themeVariables = themeVariables;
     job.generation = generation;
     job.callback = [this, key, generation](const RenderResult &result) {
         handleWorkerResult(key, generation, result);

@@ -29,6 +29,8 @@ add_library(rich-text-renderer-core STATIC
     src/core/RendererService.h
     src/core/RendererWorker.cpp
     src/core/RendererWorker.h
+    src/core/RenderTheme.cpp
+    src/core/RenderTheme.h
     src/core/RenderTypes.h
     src/core/SvgCache.cpp
     src/core/SvgCache.h
@@ -45,6 +47,8 @@ add_library(rich-text-renderer-document STATIC
     src/document/MarkdownOutline.h
     src/document/MarkdownSourceHighlighter.cpp
     src/document/MarkdownSourceHighlighter.h
+    src/document/PreviewStyle.cpp
+    src/document/PreviewStyle.h
     src/document/SvgObjectHandler.cpp
     src/document/SvgObjectHandler.h
     src/document/SvgSanitizer.cpp

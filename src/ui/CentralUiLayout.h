@@ -16,6 +16,7 @@ inline constexpr char ToolbarTrailing[] = "central.toolbar.trailing";
 inline constexpr char Content[] = "central.content";
 inline constexpr char Preview[] = "central.preview";
 inline constexpr char Source[] = "central.source";
+inline constexpr char Outline[] = "central.outline";
 inline constexpr char Bottom[] = "central.bottom";
 inline constexpr char Empty[] = "central.empty";
 
@@ -29,9 +30,13 @@ struct CentralUiLayout {
     QWidget *toolbarLeading = nullptr;
     QWidget *toolbarTrailing = nullptr;
     QWidget *content = nullptr;
+    QWidget *preview = nullptr;
+    QWidget *source = nullptr;
+    QWidget *outline = nullptr;
     QWidget *bottom = nullptr;
     QWidget *empty = nullptr;
     bool fromTheme = false;
+    bool slotsMode = false;
 
     bool isValid() const { return root != nullptr; }
 };
@@ -58,5 +63,5 @@ public:
     static bool isAllowedWidgetClass(const QString &className);
 
 private:
-    static CentralUiLayout resolveSlots(QWidget *root, QString *error);
+    static CentralUiLayout resolveSlots(QWidget *root, bool slotsMode, QString *error);
 };

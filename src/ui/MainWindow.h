@@ -69,6 +69,10 @@ private:
     void buildCentralShell();
     void createCentralUiWidgets();
     void populateCentralShell();
+    void attachContentWidgets();
+    void placeOutlineToggle();
+    void setSourceVisibleInLayout(bool visible);
+    void showPreviewContent();
     void rebuildCentralLayout();
     void setThemeId(const QString &id);
     void updateThemeButton();
@@ -107,6 +111,7 @@ private:
     QTabWidget *m_tabs = nullptr;
     CentralUiLayout m_centralSlots;
     QString m_activeLayoutFile;
+    QString m_activeLayoutId;
     QDockWidget *m_outlineDock = nullptr;
     OutlinePanel *m_outlinePanel = nullptr;
     QToolButton *m_outlineToggleButton = nullptr;

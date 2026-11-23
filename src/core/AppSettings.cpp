@@ -59,6 +59,10 @@ AppSettingsData readSettings(const QSettings *user, const QSettings &defaults)
     if (data.themeId.isEmpty()) {
         data.themeId = fallback.themeId;
     }
+    data.layoutId = source.value(QStringLiteral("appearance/layoutId"),
+                                 fallback.layoutId)
+                        .toString()
+                        .trimmed();
     data.uiFontPointSize = clampedInt(source,
                                       QStringLiteral("appearance/uiFontPointSize"),
                                       fallback.uiFontPointSize,
@@ -141,6 +145,7 @@ void AppSettings::save(const AppSettingsData &data)
     QSettings user(m_userPath, QSettings::IniFormat);
     user.setValue(QStringLiteral("meta/version"), 1);
     user.setValue(QStringLiteral("appearance/themeId"), data.themeId);
+    user.setValue(QStringLiteral("appearance/layoutId"), data.layoutId);
     user.setValue(QStringLiteral("appearance/uiFontPointSize"), data.uiFontPointSize);
     user.setValue(QStringLiteral("appearance/sourceFontPointSize"), data.sourceFontPointSize);
     user.setValue(QStringLiteral("appearance/sourceHighlighting"), data.sourceHighlighting);

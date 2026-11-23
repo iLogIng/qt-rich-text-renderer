@@ -5,6 +5,7 @@
 
 struct AppSettingsData {
     QString themeId = QStringLiteral("light");
+    QString layoutId;
     int uiFontPointSize = 10;
     int sourceFontPointSize = 10;
     bool sourceHighlighting = true;

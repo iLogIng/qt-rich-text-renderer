@@ -46,6 +46,7 @@ int main(int argc, char **argv)
     const QByteArray templateData(
         "[appearance]\n"
         "themeId=light\n"
+        "layoutId=compact\n"
         "uiFontPointSize=12\n"
         "sourceFontPointSize=14\n"
         "sourceHighlighting=true\n"
@@ -63,6 +64,8 @@ int main(int argc, char **argv)
     AppSettings settings(userPath, templatePath);
     AppSettingsData data = settings.defaults();
     expect(data.themeId == QStringLiteral("light"), QStringLiteral("template theme is default"));
+    expect(data.layoutId == QStringLiteral("compact"),
+           QStringLiteral("template layout id is default"));
     expect(data.uiFontPointSize == 12, QStringLiteral("template UI font size is default"));
     expect(data.sourceFontPointSize == 14, QStringLiteral("template source font size is default"));
     expect(data.sourceVisible == false, QStringLiteral("template source visibility is default"));
@@ -72,6 +75,7 @@ int main(int argc, char **argv)
     {
         QSettings user(userPath, QSettings::IniFormat);
         user.setValue(QStringLiteral("appearance/themeId"), QStringLiteral("dark"));
+        user.setValue(QStringLiteral("appearance/layoutId"), QStringLiteral("wide"));
         user.setValue(QStringLiteral("appearance/sourceFontPointSize"), 30);
         user.setValue(QStringLiteral("appearance/uiFontPointSize"), 9);
         user.setValue(QStringLiteral("view/outlineVisible"), false);
@@ -80,6 +84,7 @@ int main(int argc, char **argv)
 
     data = settings.load();
     expect(data.themeId == QStringLiteral("dark"), QStringLiteral("user theme overrides template"));
+    expect(data.layoutId == QStringLiteral("wide"), QStringLiteral("user layout id overrides template"));
     expect(data.uiFontPointSize == 9, QStringLiteral("user UI font size overrides template"));
     expect(data.sourceFontPointSize == 24, QStringLiteral("source font size is clamped"));
     expect(!data.outlineVisible, QStringLiteral("user outline visibility overrides template"));
@@ -100,6 +105,7 @@ int main(int argc, char **argv)
 
     const AppSettings reloaded(userPath, templatePath);
     const AppSettingsData saved = reloaded.load();
+    expect(saved.layoutId == QStringLiteral("wide"), QStringLiteral("layout id round-trips"));
     expect(saved.lastDirectory == directory.path(), QStringLiteral("last directory round-trips"));
     expect(saved.windowGeometry == QByteArray("geometry"), QStringLiteral("geometry round-trips"));
     expect(saved.rendererIdleTimeoutMs == 5000, QStringLiteral("saved data preserves renderer defaults"));

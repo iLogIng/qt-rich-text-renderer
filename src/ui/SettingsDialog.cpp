@@ -34,6 +34,15 @@ SettingsDialog::SettingsDialog(const AppSettingsData &current,
     }
     appearanceForm->addRow(tr("Theme"), m_theme);
 
+    m_layout = new QComboBox(appearanceGroup);
+    m_layout->setObjectName(QStringLiteral("layoutCombo"));
+    m_layout->setToolTip(tr("Named central layout provided by the selected theme"));
+    appearanceForm->addRow(tr("Layout"), m_layout);
+    connect(m_theme,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int) { populateLayouts(); });
+
     auto *openThemes = new QPushButton(tr("Open themes folder"), appearanceGroup);
     openThemes->setObjectName(QStringLiteral("openThemesButton"));
     connect(openThemes, &QPushButton::clicked, this, []() {
@@ -116,10 +125,35 @@ SettingsDialog::SettingsDialog(const AppSettingsData &current,
     loadValues(m_current);
 }
 
+void SettingsDialog::populateLayouts(const QString &preferredId)
+{
+    if (!m_layout) {
+        return;
+    }
+
+    const QString previous = preferredId.isEmpty()
+                                 ? m_layout->currentData().toString()
+                                 : preferredId;
+    m_layout->clear();
+    QString error;
+    const ThemeSpec theme = ThemeManager::loadTheme(m_theme->currentData().toString(), &error);
+    if (error.isEmpty() && theme.layoutError.isEmpty() && !theme.layoutVariants.isEmpty()) {
+        for (const ThemeLayout &variant : theme.layoutVariants) {
+            m_layout->addItem(variant.id, variant.id);
+        }
+    } else {
+        m_layout->addItem(tr("Default layout"), QString());
+    }
+    const int preferredIndex = m_layout->findData(previous);
+    m_layout->setCurrentIndex(preferredIndex >= 0 ? preferredIndex : 0);
+    m_layout->setEnabled(!theme.layoutVariants.isEmpty());
+}
+
 void SettingsDialog::loadValues(const AppSettingsData &data)
 {
     const int themeIndex = m_theme->findData(data.themeId);
     m_theme->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
+    populateLayouts(data.layoutId);
     m_uiFontPointSize->setValue(data.uiFontPointSize);
     m_sourceFontPointSize->setValue(data.sourceFontPointSize);
     m_sourceHighlighting->setChecked(data.sourceHighlighting);
@@ -135,6 +169,7 @@ AppSettingsData SettingsDialog::values() const
 {
     AppSettingsData data = m_current;
     data.themeId = m_theme->currentData().toString();
+    data.layoutId = m_layout->currentData().toString();
     data.uiFontPointSize = m_uiFontPointSize->value();
     data.sourceFontPointSize = m_sourceFontPointSize->value();
     data.sourceHighlighting = m_sourceHighlighting->isChecked();
