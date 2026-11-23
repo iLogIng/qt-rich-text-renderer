@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CentralWidget</class>
+ <widget class="QWidget" name="central.root">
+  <layout class="QVBoxLayout" name="centralLayout">
+   <property name="leftMargin"><number>8</number></property>
+   <property name="topMargin"><number>8</number></property>
+   <property name="rightMargin"><number>8</number></property>
+   <property name="bottomMargin"><number>8</number></property>
+   <property name="spacing"><number>6</number></property>
+   <item>
+    <widget class="QWidget" name="central.top">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <layout class="QHBoxLayout" name="topLayout">
+      <property name="spacing"><number>8</number></property>
+      <item>
+       <widget class="QLabel" name="nixieMark">
+        <property name="themeAsset" stdset="0"><string>nixie</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="crtTitle">
+        <property name="text"><string>NIXIE // CRT-77</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="crtSubtitle">
+        <property name="text"><string>MONOCHROME PHOSPHOR DISPLAY</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="topSpacer">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="crtVoltage">
+        <property name="text"><string>HV 180V</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="toolbarRow">
+     <property name="spacing"><number>0</number></property>
+     <item>
+      <widget class="QWidget" name="central.toolbar.leading">
+       <layout class="QHBoxLayout" name="leadingLayout">
+        <property name="spacing"><number>6</number></property>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QWidget" name="central.toolbar.trailing">
+       <layout class="QHBoxLayout" name="trailingLayout">
+        <property name="spacing"><number>6</number></property>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QWidget" name="central.content">
+     <layout class="QVBoxLayout" name="contentLayout">
+      <property name="spacing"><number>0</number></property>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="central.bottom">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <layout class="QHBoxLayout" name="bottomLayout">
+      <property name="spacing"><number>8</number></property>
+      <item>
+       <widget class="QLabel" name="crtReady">
+        <property name="text"><string>READY</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="bottomSpacer">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="crtPhosphor">
+        <property name="text"><string>P3 AMBER / 60 Hz</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</ui>

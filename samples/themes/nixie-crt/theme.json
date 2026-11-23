@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "id": "nixie-crt",
+  "name": "Nixie CRT",
+  "dark": true,
+  "qss": true,
+  "typography": {
+    "uiFontFamily": "Noto Sans Mono",
+    "previewFontFamily": "Noto Sans Mono",
+    "codeFontFamily": "Noto Sans Mono"
+  },
+  "colors": {
+    "window": "#080604",
+    "windowText": "#ffc078",
+    "base": "#0f0a06",
+    "alternateBase": "#1a0f08",
+    "text": "#ffb45e",
+    "mutedText": "#a86532",
+    "button": "#1d1109",
+    "buttonText": "#ffd39b",
+    "brightText": "#fff0d0",
+    "highlight": "#ff8a2b",
+    "highlightedText": "#1a0b02",
+    "link": "#ffc05a",
+    "linkVisited": "#d98a32",
+    "placeholder": "#8e5728",
+    "tooltipBase": "#1a0f08",
+    "tooltipText": "#ffd8a8",
+    "border": "#5a3218"
+  },
+  "syntax": {
+    "code": {
+      "keyword": "#ffc078",
+      "string": "#ffd7a0",
+      "number": "#ff9f43",
+      "comment": "#925a2c",
+      "preprocessor": "#ffcf6a",
+      "type": "#ffbe7a",
+      "function": "#ffe0a8"
+    },
+    "source": {
+      "heading": "#ffd27a",
+      "bold": "#ffe6b8",
+      "emphasis": "#ffc078",
+      "inlineCode": "#ff9f43",
+      "link": "#ffcf6a",
+      "quote": "#a86532",
+      "marker": "#ff8a2b",
+      "fence": "#c47a32",
+      "math": "#ffb347"
+    }
+  },
+  "preview": {
+    "maxTextWidth": 840,
+    "codeBackground": "#160d07",
+    "codeBlockMargin": 6
+  },
+  "mermaid": {
+    "theme": "base",
+    "variables": {
+      "primaryColor": "#2a160b",
+      "lineColor": "#ff9f43",
+      "textColor": "#ffd5a3",
+      "mainBkg": "#0f0a06",
+      "nodeBorder": "#ff8a2b",
+      "nodeTextColor": "#ffe0b0",
+      "arrowheadColor": "#ffb45e",
+      "edgeLabelBackground": "#120b06"
+    }
+  },
+  "assets": {
+    "nixie": "assets/nixie-mark.png"
+  },
+  "slots": {
+    "top": {
+      "background": "#120b06",
+      "borderColor": "#6b3a1c",
+      "borderWidth": 1,
+      "radius": 3,
+      "padding": 6
+    },
+    "bottom": {
+      "background": "#120b06",
+      "borderColor": "#6b3a1c",
+      "borderWidth": 1,
+      "radius": 3,
+      "padding": 6
+    },
+    "toolbarLeading": {
+      "background": "#0b0805"
+    },
+    "toolbarTrailing": {
+      "background": "#0b0805"
+    },
+    "content": {
+      "background": "#0b0805",
+      "borderColor": "#5a3218",
+      "borderWidth": 1,
+      "radius": 2
+    },
+    "preview": {
+      "background": "#0b0805",
+      "radius": 2,
+      "padding": 2
+    },
+    "source": {
+      "background": "#0b0805",
+      "radius": 2,
+      "padding": 2
+    },
+    "outline": {
+      "background": "#0b0805",
+      "padding": 2
+    },
+    "empty": {
+      "background": "#0b0805"
+    }
+  },
+  "layouts": {
+    "apiVersion": 1,
+    "variants": [
+      {
+        "id": "console",
+        "file": "console.ui",
+        "contentMode": "tabs"
+      },
+      {
+        "id": "dual",
+        "file": "dual.ui",
+        "contentMode": "slots"
+      }
+    ]
+  },
+  "metrics": {
+    "radius": 3,
+    "spacing": 5,
+    "documentMargin": 20
+  }
+}

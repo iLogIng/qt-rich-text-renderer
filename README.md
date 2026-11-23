@@ -155,7 +155,11 @@ Linux 上通常为：
 
 所有字号仍由 Settings 控制。主题不提供字号字段，`.ui` 中的 `font/pointsize` 会被拒绝；主题只能提供字体族。
 
-示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。`aurora-dark` 同时包含可选 `.ui` 中央布局、插槽样式和自定义文档边距。
+示例主题见 `samples/themes/` 目录，目前包含 `warm-dark`、`aurora-dark` 和 `nixie-crt`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。`aurora-dark` 同时包含可选 `.ui` 中央布局、插槽样式和自定义文档边距。
+
+`nixie-crt` 是完整的暖橙色单色 CRT / 辉光管示例包，包含 PNG 标志、Preview 居中阅读列、Mermaid 颜色变量、具名插槽样式，以及 `console`（tabs）和 `dual`（slots）两种手动布局。安装方法、配色和使用的配置能力见 `samples/themes/nixie-crt/README.md`。
+
+![Nixie CRT 主题](docs/assets/nixie-console.png)
 
 #### 主题排版
 
