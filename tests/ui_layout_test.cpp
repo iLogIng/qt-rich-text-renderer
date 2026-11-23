@@ -680,7 +680,10 @@ int main(int argc, char **argv)
         auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
         auto *outlineToggle =
             window.findChild<QToolButton *>(QStringLiteral("outlineToggleButton"));
-        expect(previewSlot && sourceSlot && outlineSlot && preview && source && tabs,
+        auto *outlineDock =
+            window.findChild<QDockWidget *>(QStringLiteral("outlineDock"));
+        expect(previewSlot && sourceSlot && outlineSlot && preview && source && tabs
+                   && outlineDock,
                QStringLiteral("slots mode widgets found"));
         expect(previewSlot && previewSlot->isAncestorOf(preview),
                QStringLiteral("preview is injected into central.preview"));
@@ -692,12 +695,24 @@ int main(int argc, char **argv)
                QStringLiteral("outline toggle uses the outline slot"));
         expect(sourceSlot && !sourceSlot->isHidden(),
                QStringLiteral("source slot is visible by default"));
+        expect(outlineDock && outlineDock->width() >= outlineDock->minimumWidth()
+                   && outlineDock->minimumWidth() >= 200,
+               QStringLiteral("slots layout keeps a usable outline width"));
+
+        window.resize(1024, 700);
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        expect(outlineDock && outlineDock->width() >= outlineDock->minimumWidth(),
+               QStringLiteral("narrow slots layout keeps the outline usable"));
 
         window.setDarkMode(true);
+        QCoreApplication::processEvents();
         QCoreApplication::processEvents();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         expect(tabs && !tabs->isHidden(),
                QStringLiteral("theme switch restores the tabbed content"));
+        expect(outlineDock && outlineDock->width() >= outlineDock->minimumWidth(),
+               QStringLiteral("theme switch restores the outline width"));
         expect(preview && preview->parentWidget()
                    && preview->parentWidget()->objectName() == QStringLiteral("central.preview"),
                QStringLiteral("theme switch restores the preview page"));

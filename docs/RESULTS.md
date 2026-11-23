@@ -287,11 +287,13 @@ documentLayout()->documentSize();
 - 主题图片只支持 PNG/JPEG（≤2MiB、≤4096×4096），通过 `themeAsset` 逻辑 ID 注入，居中且不拉伸；
 - `.ui` 支持 `contentMode: tabs|slots`；`slots` 模式使用 `central.preview` / `central.source`，可选 `central.outline`；
 - `layouts` 支持手动布局变体，Settings 保存 `appearance/layoutId`；自动按宽度切换不实施；
+- Outline dock 保持至少 200px 可用宽度；工具栏状态文本允许收缩，避免把中央布局最小宽度推到窗口边缘；中央布局重建后恢复可用的 Outline 宽度，tabs/slots 或主题切换不会把 Outline 永久压窄；
+- 主题的 `preview.maxTextWidth=0` 时 Preview 文档宽度随面板或 splitter 伸缩；Nixie 示例使用该行为，避免 dual 模式下固定阅读列；
 - `.ui` 只替换 `QMainWindow::centralWidget()` 子树，Outline dock、标签页、工具栏、历史、设置和渲染 controller 保持 C++ 管理；
 - 具名插槽通过 `centralSlot` 动态属性生成固定 QSS 规则，支持背景、边框、圆角和 padding；
 - `samples/themes/aurora-dark` 同时验证 QSS、插槽样式和静态 `.ui` 布局；
-- `samples/themes/nixie-crt` 是完整的暖橙色单色 CRT / 辉光管示例，覆盖全部颜色角色、字体族、代码和 Source 色板、Preview 阅读列与代码样式、8 个 Mermaid 颜色变量、PNG 标志、全部 9 个具名插槽样式以及 `console`/`dual` 两种手动布局；截图见 [nixie-console.png](assets/nixie-console.png) 和 [nixie-dual.png](assets/nixie-dual.png)；
-- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本、字号属性、tabs/slots 切换、Source 显隐、布局变体和失败回退；
+- `samples/themes/nixie-crt` 是完整的暖橙色单色 CRT / 辉光管示例，覆盖全部颜色角色、字体族、代码和 Source 色板、Preview 自适应宽度与代码样式、8 个 Mermaid 颜色变量、PNG 标志、全部 9 个具名插槽样式以及 `console`/`dual` 两种手动布局；截图见 [nixie-console.png](assets/nixie-console.png) 和 [nixie-dual.png](assets/nixie-dual.png)；
+- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本、字号属性、tabs/slots 切换、Source 显隐、布局变体、Outline 宽度恢复和失败回退；
 - `theme-test` 覆盖 Preview、Mermaid、图片资源和布局变体 schema，并实际加载 `nixie-crt` 示例包及其两个 `.ui` 布局；`svg-sanitizer-test` 和 `svg-cache-test` 覆盖 Mermaid 变量映射与缓存签名；
 - 主题切换到内置主题时会重建默认中央布局，文档、历史、设置和 Outline 不受影响；
 - 内置 light/dark 与阶段改动前截图对比，仅状态栏计时文本和极少量抗锯齿像素不同；

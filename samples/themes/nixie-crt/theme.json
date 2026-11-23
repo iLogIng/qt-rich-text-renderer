@@ -51,7 +51,7 @@
     }
   },
   "preview": {
-    "maxTextWidth": 840,
+    "maxTextWidth": 0,
     "codeBackground": "#160d07",
     "codeBlockMargin": 6
   },
