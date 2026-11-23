@@ -1,6 +1,6 @@
 # 程序流程图
 
-> 对应代码：`src/app/main.cpp`、`src/ui/MainWindow.cpp`、`src/core/AppSettings.cpp`、`src/core/RendererService.cpp`、`src/core/RendererWorker.cpp`、`src/core/MarkdownPreprocessor.cpp`、`src/document/MarkdownDocumentBuilder.cpp`、`src/document/MarkdownOutline.cpp`、`src/ui/OutlinePanel.cpp`、`src/ui/SettingsDialog.cpp`、`src/ui/Theme.cpp`、`src/document/SvgObjectHandler.cpp`
+> 对应代码：`src/app/main.cpp`、`src/ui/MainWindow.cpp`、`src/core/AppSettings.cpp`、`src/core/RendererService.cpp`、`src/core/RendererWorker.cpp`、`src/core/MarkdownPreprocessor.cpp`、`src/document/MarkdownDocumentBuilder.cpp`、`src/document/MarkdownOutline.cpp`、`src/ui/OutlinePanel.cpp`、`src/ui/SettingsDialog.cpp`、`src/ui/Theme.cpp`、`src/ui/CentralUiLayout.cpp`、`src/document/SvgObjectHandler.cpp`
 >
 > 本文件只放流程图；架构与模块说明见 [README.md](../README.md)、[ADR-0001](ADR-0001-rendering-pipeline.md)。
 
@@ -378,11 +378,24 @@ flowchart TD
     G --> K["QApplication"]
     I --> K
     J --> K
+    F --> L{"layoutFile?"}
+    L -- 否 --> M["C++ 默认中央骨架"]
+    L -- 是 --> N["CentralUiBuilder::loadTheme()"]
+    N --> O{"校验通过?"}
+    O -- 否 --> M
+    O -- 是 --> P["central.root + 具名插槽"]
+    M --> Q["MainWindow::setCentralWidget()"]
+    P --> Q
 ```
 
-- 用户主题只提供 JSON token，不直接提供任意 QSS 或代码；
-- 内置主题保持原有 QPalette 视觉，不启用 QSS；
+- 用户主题只提供 JSON token、QSS 开关和可选静态 `.ui`，不直接提供任意 QSS 或代码；
+- 内置主题保持原有 QPalette 视觉，不启用 QSS，也不带 `.ui`；
 - 用户主题默认启用 QSS，由固定模板生成；
 - 主题缺失或校验失败时回退到 `light`；
+- `.ui` 只替换 `QMainWindow::centralWidget()` 子树；主窗口、状态栏、Outline dock 和渲染 controller 仍由 C++ 持有；
+- 必需插槽为 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；可选插槽为 `central.top`、`central.bottom`、`central.empty`；
+- `central.preview` 和 `central.source` 是 `central.content` 内部标签页的稳定内容插槽；
+- `.ui` 只允许标准 Qt 控件和布局；未知控件、`<customwidgets>`、`<resources>`、`<connections>`、外部 URL 和 `styleSheet` 注入会被拒绝；
+- `.ui` 缺失、解析失败、插槽缺失或校验失败时回退 C++ 默认中央布局；布局路径无效只拒绝布局，不回退主题颜色；
 - 代码高亮、Source 高亮和 Mermaid 仍使用主题的 `dark` 标志；
-- 当前不加载 `.ui` 布局，也不引入 QML。
+- 当前不引入 QML。
