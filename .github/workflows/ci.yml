@@ -36,7 +36,7 @@ jobs:
         run: |
           dnf install -y \
             gcc-c++ cmake make \
-            qt6-qtbase-devel qt6-qtsvg-devel \
+            qt6-qtbase-devel qt6-qtsvg-devel qt6-qttools-devel \
             nodejs22 nodejs22-npm nodejs22-npm-bin \
             python3 findutils
 
@@ -86,7 +86,7 @@ jobs:
       - name: Install test dependencies
         run: |
           dnf install -y \
-            cmake qt6-qtbase-gui qt6-qtsvg \
+            cmake qt6-qtbase-gui qt6-qtsvg qt6-qttools-libs-designer \
             python3 findutils
 
       - name: Download build artifact
@@ -134,7 +134,7 @@ jobs:
       - name: Install packaging dependencies
         run: |
           dnf install -y \
-            qt6-qtbase-devel qt6-qtsvg-devel \
+            qt6-qtbase-devel qt6-qtsvg-devel qt6-qttools-devel \
             patchelf binutils file desktop-file-utils \
             gtk-update-icon-cache fuse-libs curl
 
@@ -206,7 +206,7 @@ jobs:
           rm -rf "$staging"
 
           tar -tzf "dist/${name}-source.tar.gz" | grep -F 'README.md' >/dev/null
-          tar -tzf "dist/${name}-source.tar.gz" | grep -F 'src/main.cpp' >/dev/null
+          tar -tzf "dist/${name}-source.tar.gz" | grep -F 'src/app/main.cpp' >/dev/null
           tar -tzf "dist/${name}-source.tar.gz" | grep -F 'third_party/quickjs-ng/CMakeLists.txt' >/dev/null
 
       - name: Create checksums
