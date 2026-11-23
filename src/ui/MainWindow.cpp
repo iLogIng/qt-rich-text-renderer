@@ -92,6 +92,8 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
           settingsPath.isEmpty() ? AppSettings::defaultUserPath() : settingsPath,
           runtimeRoot() + QStringLiteral("/config/settings.ini")))
 {
+    static const QFont baseApplicationFont = QApplication::font();
+    m_baseApplicationFont = baseApplicationFont;
     m_settingsData = m_settings->load();
     QString themeError;
     m_theme = ThemeManager::loadTheme(dark ? QStringLiteral("dark")
@@ -101,8 +103,8 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
         qWarning("Theme load failed: %s", qPrintable(themeError));
     }
 
-    applyApplicationFont(m_settingsData.uiFontPointSize);
     ThemeManager::apply(m_theme);
+    applyApplicationFont(m_settingsData.uiFontPointSize);
 
     setWindowTitle(QStringLiteral("rich-text-renderer"));
     resize(1280, 860);
@@ -114,6 +116,10 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     createCentralUiWidgets();
     populateCentralShell();
     setCentralWidget(m_centralSlots.root);
+    if (!m_theme.previewFontFamily.isEmpty()) {
+        applyPreviewFont(m_settingsData.uiFontPointSize);
+    }
+    applySourceFont(m_settingsData.sourceFontPointSize);
 
     m_outlinePanel = new OutlinePanel(this);
     m_outlineDock = new QDockWidget(tr("Outline"), this);
@@ -183,7 +189,7 @@ void MainWindow::buildCentralShell()
     }
 
     if (!shell.isValid()) {
-        shell = CentralUiBuilder::createDefault(this);
+        shell = CentralUiBuilder::createDefault(this, m_theme.spacing);
         m_activeLayoutFile.clear();
     } else {
         m_activeLayoutFile = m_theme.layoutFile;
@@ -232,14 +238,17 @@ void MainWindow::createCentralUiWidgets()
 
     m_previewPage =
         CentralUiBuilder::createSlot(m_tabs, QString::fromLatin1(CentralUiSlotNames::Preview));
+    m_previewPage->setProperty(
+        ThemeSlotStyle::Property, QString::fromLatin1(ThemeSlotStyle::Preview));
     m_preview = new PreviewBrowser(m_previewPage);
     m_preview->setObjectName(QStringLiteral("previewView"));
     m_preview->setOpenExternalLinks(false);
     m_preview->setReadOnly(true);
-    m_preview->document()->setDocumentMargin(12);
+    m_preview->document()->setDocumentMargin(m_theme.documentMargin);
     m_svgHandler = new SvgObjectHandler(this);
     m_preview->document()->documentLayout()->registerHandler(SvgObjectHandler::Type, m_svgHandler);
     m_codeHighlighter = new CodeHighlighter(m_preview->document(), m_theme.dark, this);
+    m_codeHighlighter->setSyntaxPalette(m_theme.codeSyntax);
     m_linkHandler = new MarkdownLinkHandler(m_preview, this, this);
     connect(m_preview, &PreviewBrowser::imagePreviewRequested,
             this, &MainWindow::previewImageUrl);
@@ -249,6 +258,8 @@ void MainWindow::createCentralUiWidgets()
 
     m_sourcePage =
         CentralUiBuilder::createSlot(m_tabs, QString::fromLatin1(CentralUiSlotNames::Source));
+    m_sourcePage->setProperty(
+        ThemeSlotStyle::Property, QString::fromLatin1(ThemeSlotStyle::Source));
     m_source = new QPlainTextEdit(m_sourcePage);
     m_source->setObjectName(QStringLiteral("sourceView"));
     m_source->setReadOnly(true);
@@ -257,6 +268,7 @@ void MainWindow::createCentralUiWidgets()
     fixedFont.setPointSize(m_settingsData.sourceFontPointSize);
     m_source->setFont(fixedFont);
     m_sourceHighlighter = new MarkdownSourceHighlighter(m_source->document(), m_theme.dark, this);
+    m_sourceHighlighter->setSyntaxPalette(m_theme.sourceSyntax);
     m_sourceHighlighter->setEnabled(m_settingsData.sourceHighlighting);
     CentralUiBuilder::addToSlot(m_sourcePage, m_source);
 
@@ -447,15 +459,31 @@ void MainWindow::applySettings(const AppSettingsData &previous)
 
 void MainWindow::applyApplicationFont(int pointSize)
 {
-    QFont font = QApplication::font();
+    QFont font = m_baseApplicationFont;
+    if (!m_theme.uiFontFamily.isEmpty()) {
+        font.setFamily(m_theme.uiFontFamily);
+    }
     font.setPointSize(pointSize);
     QApplication::setFont(font);
-
-    if (m_preview) {
-        m_preview->setFont(font);
-        m_preview->document()->setDefaultFont(font);
-    }
+    applyPreviewFont(pointSize);
     updateToolbarHeights();
+}
+
+void MainWindow::applyPreviewFont(int pointSize)
+{
+    if (!m_preview) {
+        return;
+    }
+    QFont font = m_baseApplicationFont;
+    if (!m_theme.uiFontFamily.isEmpty()) {
+        font.setFamily(m_theme.uiFontFamily);
+    }
+    if (!m_theme.previewFontFamily.isEmpty()) {
+        font.setFamily(m_theme.previewFontFamily);
+    }
+    font.setPointSize(pointSize);
+    m_preview->setFont(font);
+    m_preview->document()->setDefaultFont(font);
 }
 
 void MainWindow::applySourceFont(int pointSize)
@@ -464,6 +492,9 @@ void MainWindow::applySourceFont(int pointSize)
         return;
     }
     QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    if (!m_theme.codeFontFamily.isEmpty()) {
+        font.setFamily(m_theme.codeFontFamily);
+    }
     font.setPointSize(pointSize);
     m_source->setFont(font);
 }
@@ -734,18 +765,33 @@ void MainWindow::setThemeId(const QString &id)
     }
 
     const QString previousLayout = m_activeLayoutFile;
+    const int previousSpacing = m_theme.spacing;
+    const QString previousUiFamily = m_theme.uiFontFamily;
+    const QString previousPreviewFamily = m_theme.previewFontFamily;
+    const QString previousCodeFamily = m_theme.codeFontFamily;
     m_theme = theme;
     ThemeManager::apply(m_theme);
-    if (previousLayout != m_theme.layoutFile) {
+    if (previousLayout != m_theme.layoutFile
+        || (m_theme.layoutFile.isEmpty() && previousSpacing != m_theme.spacing)) {
         rebuildCentralLayout();
+    }
+    if (previousUiFamily != m_theme.uiFontFamily
+        || previousPreviewFamily != m_theme.previewFontFamily) {
+        applyApplicationFont(m_settingsData.uiFontPointSize);
+    }
+    if (previousCodeFamily != m_theme.codeFontFamily) {
+        applySourceFont(m_settingsData.sourceFontPointSize);
+    }
+    if (m_preview) {
+        m_preview->document()->setDocumentMargin(m_theme.documentMargin);
     }
     updateThemeButton();
 
     if (m_codeHighlighter) {
-        m_codeHighlighter->setDark(m_theme.dark);
+        m_codeHighlighter->setSyntaxPalette(m_theme.codeSyntax);
     }
     if (m_sourceHighlighter) {
-        m_sourceHighlighter->setDark(m_theme.dark);
+        m_sourceHighlighter->setSyntaxPalette(m_theme.sourceSyntax);
     }
     if (m_source && !m_source->toPlainText().isEmpty()) {
         renderNow();

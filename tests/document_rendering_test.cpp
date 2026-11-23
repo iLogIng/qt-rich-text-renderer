@@ -1,6 +1,7 @@
 #include "CodeHighlighter.h"
 #include "MarkdownDocumentBuilder.h"
 #include "MarkdownSourceHighlighter.h"
+#include "SyntaxPalette.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QFont>
@@ -51,9 +52,32 @@ int main(int argc, char **argv)
     highlightedDocument.documentLayout()->documentSize();
     expect(codeBlock.layout() != nullptr, QStringLiteral("code block layout survives theme switch"));
 
+    QTextDocument paletteDocument;
+    QTextCursor paletteCursor(&paletteDocument);
+    QTextBlockFormat paletteFormat;
+    paletteFormat.setProperty(QTextFormat::BlockCodeLanguage, QStringLiteral("cpp"));
+    paletteCursor.setBlockFormat(paletteFormat);
+    paletteCursor.insertText(QStringLiteral("return"));
+    CodeSyntaxPalette codePalette = defaultCodeSyntaxPalette(false);
+    codePalette.keyword = QColor(QStringLiteral("#123456"));
+    CodeHighlighter paletteHighlighter(&paletteDocument, false);
+    paletteHighlighter.setSyntaxPalette(codePalette);
+    paletteHighlighter.rehighlight();
+    paletteDocument.documentLayout()->documentSize();
+    const QTextBlock paletteBlock = paletteDocument.firstBlock();
+    expect(paletteBlock.layout() != nullptr, QStringLiteral("palette code block layout exists"));
+    if (paletteBlock.layout() && !paletteBlock.layout()->formats().isEmpty()) {
+        expect(paletteBlock.layout()->formats().first().format.foreground().color()
+                   == codePalette.keyword,
+               QStringLiteral("custom code syntax palette is applied"));
+    }
+
     QTextDocument sourceDocument;
     sourceDocument.setPlainText(QStringLiteral("# Heading\n\n**bold** text\n"));
     MarkdownSourceHighlighter sourceHighlighter(&sourceDocument, false);
+    MarkdownSourcePalette sourcePalette = defaultMarkdownSourcePalette(false);
+    sourcePalette.heading = QColor(QStringLiteral("#654321"));
+    sourceHighlighter.setSyntaxPalette(sourcePalette);
     sourceHighlighter.rehighlight();
     sourceDocument.documentLayout()->documentSize();
     const QTextBlock headingBlock = sourceDocument.firstBlock();
@@ -61,6 +85,11 @@ int main(int argc, char **argv)
     if (headingBlock.layout()) {
         expect(!headingBlock.layout()->formats().isEmpty(),
                QStringLiteral("Markdown source heading receives formats"));
+        if (!headingBlock.layout()->formats().isEmpty()) {
+            expect(headingBlock.layout()->formats().first().format.foreground().color()
+                       == sourcePalette.heading,
+                   QStringLiteral("custom source syntax palette is applied"));
+        }
     }
     sourceHighlighter.setEnabled(false);
     sourceDocument.documentLayout()->documentSize();

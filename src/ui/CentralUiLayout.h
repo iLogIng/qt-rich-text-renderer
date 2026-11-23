@@ -39,7 +39,7 @@ struct CentralUiLayout {
 class CentralUiBuilder {
 public:
     // The default builder preserves the existing C++ central layout.
-    static CentralUiLayout createDefault(QWidget *parent);
+    static CentralUiLayout createDefault(QWidget *parent, int spacing = 6);
 
     // Loads a validated QUiLoader tree from a theme package. On failure the
     // returned layout is invalid and the caller must fall back to createDefault().
@@ -48,7 +48,9 @@ public:
                                      QString *error = nullptr);
 
     static QWidget *createSlot(QWidget *parent, const QString &name);
-    static QWidget *createToolbarSlot(QWidget *parent, const QString &name);
+    static QWidget *createToolbarSlot(QWidget *parent,
+                                      const QString &name,
+                                      int spacing = 6);
     static void addToSlot(QWidget *slot, QWidget *content);
     static void setSlotEmpty(QWidget *slot, bool empty);
     static bool slotHasContent(QWidget *slot);

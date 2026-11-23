@@ -9,10 +9,13 @@
 #include <QEvent>
 #include <QFile>
 #include <QFileInfo>
+#include <QLayout>
+#include <QPlainTextEdit>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QTextBrowser>
 #include <QTextStream>
 #include <QWidget>
 
@@ -158,6 +161,12 @@ int main(int argc, char **argv)
            QStringLiteral("theme layout required slots resolve"));
     expect(valid.top && valid.top->isHidden(),
            QStringLiteral("empty optional theme slot is hidden"));
+    expect(valid.top && valid.top->property("centralSlot").toString() == QStringLiteral("top")
+               && valid.content->property("centralSlot").toString()
+                      == QStringLiteral("content")
+               && valid.toolbarLeading->property("centralSlot").toString()
+                      == QStringLiteral("toolbarLeading"),
+           QStringLiteral("theme layout slots expose their QSS style property"));
     delete valid.root;
 
     {
@@ -215,6 +224,19 @@ int main(int argc, char **argv)
         expect(writeFile(path, ui.toUtf8()), QStringLiteral("write toolbar-layout layout"));
         rejected(themeForLayout(directory.path(), QStringLiteral("toolbar-layout.ui")),
                  QStringLiteral("toolbar layout slot must use QHBoxLayout"));
+    }
+
+    {
+        const QString path = directory.filePath(QStringLiteral("font-point-size.ui"));
+        QString ui = validLayoutUi();
+        ui.replace(QStringLiteral("<widget class=\"QLabel\" name=\"customMarker\">"),
+                   QStringLiteral("<widget class=\"QLabel\" name=\"customMarker\">"
+                                  "<property name=\"font\"><font><pointsize>14</pointsize>"
+                                  "</font></property>"));
+        expect(writeFile(path, ui.toUtf8()),
+               QStringLiteral("write font-point-size layout"));
+        rejected(themeForLayout(directory.path(), QStringLiteral("font-point-size.ui")),
+                 QStringLiteral("layout element is not allowed: pointsize"));
     }
 
     {
@@ -285,6 +307,61 @@ int main(int argc, char **argv)
            QStringLiteral("built-in themes use the default central layout"));
 
     const QString themeRoot = ThemeManager::themeDirectory();
+    const QString typographyId = QStringLiteral("typography-test-theme");
+    const QString typographyDirectory = QDir(themeRoot).filePath(typographyId);
+    QDir(typographyDirectory).removeRecursively();
+    const QByteArray typographyJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "typography-test-theme",
+        "name": "Typography Test Theme",
+        "dark": false,
+        "typography": {
+            "uiFontFamily": "Test UI Sans",
+            "previewFontFamily": "Test Preview Serif",
+            "codeFontFamily": "Test Code Mono"
+        },
+        "metrics": {
+            "spacing": 9,
+            "documentMargin": 18
+        }
+    })JSON";
+    expect(writeFile(QDir(typographyDirectory).filePath(QStringLiteral("theme.json")),
+                     typographyJson),
+           QStringLiteral("write typography theme"));
+    const QString typographySettingsPath =
+        directory.filePath(QStringLiteral("typography-settings.ini"));
+    {
+        QSettings settings(typographySettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), typographyId);
+        settings.sync();
+    }
+    {
+        MainWindow window(false, typographySettingsPath);
+        auto *preview = window.findChild<QTextBrowser *>(QStringLiteral("previewView"));
+        auto *source = window.findChild<QPlainTextEdit *>(QStringLiteral("sourceView"));
+        QWidget *central = window.centralWidget();
+        expect(QApplication::font().family() == QStringLiteral("Test UI Sans"),
+               QStringLiteral("theme UI font family is applied"));
+        expect(preview && preview->font().family() == QStringLiteral("Test Preview Serif"),
+               QStringLiteral("theme preview font family is applied"));
+        expect(source && source->font().family() == QStringLiteral("Test Code Mono"),
+               QStringLiteral("theme source font family is applied"));
+        expect(preview && preview->document()->documentMargin() == 18,
+               QStringLiteral("theme document margin is applied"));
+        expect(central && central->layout() && central->layout()->spacing() == 9,
+               QStringLiteral("theme default layout spacing is applied"));
+
+        window.setDarkMode(true);
+        QCoreApplication::processEvents();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        expect(QApplication::font().family() != QStringLiteral("Test UI Sans"),
+               QStringLiteral("theme switch resets the UI font family"));
+        expect(!source || source->font().family() != QStringLiteral("Test Code Mono"),
+               QStringLiteral("theme switch resets the code font family"));
+        expect(!preview || preview->font().family() != QStringLiteral("Test Preview Serif"),
+               QStringLiteral("theme switch resets the preview font family"));
+    }
+
     const QString layoutThemeId = QStringLiteral("layout-test-theme");
     const QString layoutThemeDirectory = QDir(themeRoot).filePath(layoutThemeId);
     QDir(layoutThemeDirectory).removeRecursively();
@@ -296,6 +373,7 @@ int main(int argc, char **argv)
         "id": "layout-test-theme",
         "name": "Layout Test Theme",
         "dark": false,
+        "metrics": { "spacing": 9 },
         "layout": { "apiVersion": 1, "file": "layout.ui" }
     })JSON";
     expect(writeFile(QDir(layoutThemeDirectory).filePath(QStringLiteral("theme.json")),
@@ -367,6 +445,9 @@ int main(int argc, char **argv)
                QStringLiteral("theme layout does not replace the outline dock"));
         expect(window.findChild<QTabWidget *>(QStringLiteral("documentTabs")) != nullptr,
                QStringLiteral("theme layout does not replace the document tabs"));
+        expect(window.centralWidget() && window.centralWidget()->layout()
+                   && window.centralWidget()->layout()->spacing() == 6,
+               QStringLiteral("theme layout keeps its explicit spacing"));
 
         window.setDarkMode(true);
         QCoreApplication::processEvents();
@@ -413,6 +494,7 @@ int main(int argc, char **argv)
                QStringLiteral("fallback keeps the outline dock"));
     }
 
+    QDir(typographyDirectory).removeRecursively();
     QDir(layoutThemeDirectory).removeRecursively();
     QDir(traversalDirectory).removeRecursively();
     QDir(missingDirectory).removeRecursively();

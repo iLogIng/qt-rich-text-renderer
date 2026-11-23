@@ -19,7 +19,7 @@
 - [x] 用 `QPalette` + QSS 模板生成主题样式，禁止把用户 JSON 直接当作任意 QSS 注入
 - [x] 将 `AppSettingsData::Theme` 迁移为 `themeId`，保留 `appearance/theme=light|dark` 的旧配置映射
 - [x] Settings 的 Appearance 页提供主题选择、字号/密度、主题目录入口和加载失败回退
-- [x] 决定代码高亮、Source 高亮、MathJax 和 Mermaid 如何消费主题语义；首版使用主题的 `dark` 标志，代码配色单独配置留待后续
+- [x] 决定代码高亮、Source 高亮、MathJax 和 Mermaid 如何消费主题语义；首版使用主题的 `dark` 标志，代码和 Source 独立色板已在后续 `T2` 完成
 - [ ] 增加主题加载、校验、回退、设置迁移、QSS token 替换和视觉回归测试（主题/回退/QSS 测试已完成，golden 视觉回归待补）
 - [x] 更新 README、FOR_LOCVAS 和 FOR_LOCVAS_IF_QML，记录 QSS 主题入口、用户主题目录、.ui 边界和当前非目标
 
@@ -83,7 +83,7 @@
 
 ### Theme & Layout Evolution
 
-> 状态：设计已记录，全部条目待实施。
+> 状态：`T1`、`T2`、`T7` 已完成；`T3`、`T4A`、`T4B`、`T5`、`T6`、`T8A` 待实施；`T8B` 为后续候选。
 >
 > 本文描述 `rich-text-renderer` 在现有 QSS 主题和静态 `.ui` 中央布局之上的后续 UI 配置能力。编号 `T1`、`T2`、`T7` 等是稳定功能标识，不表示实施顺序；章节按实施顺序排列。
 >
@@ -139,9 +139,9 @@
 
 #### 实施清单
 
-- [ ] `T1` 主题排版参数
-- [ ] `T2` 语法高亮色板
-- [ ] `T7` 具名插槽 QSS
+- [x] `T1` 主题排版参数
+- [x] `T2` 语法高亮色板
+- [x] `T7` 具名插槽 QSS
 - [ ] `T3` Preview 外观
 - [ ] `T4A` Mermaid 内置主题枚举
 - [ ] `T4B` Mermaid 主题颜色变量（`T4A` 稳定后）
@@ -157,6 +157,8 @@
 **目标**
 
 让主题控制字体族、默认中央布局间距和 Preview 文档边距，同时保持所有字号由 Settings 控制。
+
+**实施状态**：已完成。`ThemeSpec`、`ThemeManager`、`MainWindow`、`CentralUiLayout` 和测试已接入。
 
 **建议 schema**
 
@@ -201,7 +203,7 @@
 
 - 内置 light/dark 截图与当前版本一致；
 - Settings 修改字号仍立即生效，主题字体族不会改变字号；
-- 非法字体族/尺寸值有明确错误并回退；
+- 非法 schema 字段有明确错误并回退；不存在的字体族回退到应用默认字体；尺寸值按范围限制；
 - `.ui` 布局的显式间距不被 `metrics.spacing` 覆盖。
 
 ---
@@ -211,6 +213,8 @@
 **目标**
 
 让每个主题拥有独立的代码高亮和 Markdown Source 高亮颜色，不再只依赖 `dark` 布尔值。
+
+**实施状态**：已完成。新增 `SyntaxPalette`，代码/Source 高亮器接受 palette，主题切换重新应用并 rehighlight。
 
 **当前基线**
 
@@ -251,7 +255,7 @@
 
 - 在 document 层定义 `SyntaxPalette` 和 `MarkdownSourcePalette`，不引入 UI 依赖。
 - `CodeHighlighter` / `MarkdownSourceHighlighter` 改为接受 palette；`dark` 只作为缺失字段时的默认选择。
-- 主题切换时重新应用 palette 并 `rehighlight()`；不需要重新运行 MathJax/Mermaid。
+- 主题切换时重新应用 palette 并 `rehighlight()`；语法色板不改变 MathJax/Mermaid 的缓存 key。
 - 缺失字段回退到当前浅色/深色硬编码值；非法颜色按主题 schema 错误处理。
 - 不改变粗体、斜体、字号和代码块背景；背景属于 `T3`。
 
@@ -275,6 +279,8 @@
 **目标**
 
 让主题分别控制 `central.top`、`central.bottom`、`central.empty`、`central.toolbar.leading`、`central.toolbar.trailing` 和 `central.content` 的背景、边框、圆角和 padding；后续 `T6` 再扩展到 `central.preview` / `central.source`。
+
+**实施状态**：已完成。新增 `SlotStyle`、固定 QSS 生成、插槽 `centralSlot` 动态属性和运行期 polish，测试覆盖生成规则与默认布局属性。
 
 **当前基线**
 
@@ -342,6 +348,7 @@ QWidget[centralSlot="top"] {
 - 不接受任意选择器、伪状态、渐变字符串或未校验的值；
 - 插槽属性必须在 QSS 应用前设置，或在设置后执行 `style()->unpolish/polish`；
 - 没有 `slots` 字段时完全不生成额外规则，内置主题视觉不变；
+- `slots` 规则只在 `useQss` 为真时生效；`qss: false` 的主题保留 QPalette-only 行为；
 - `central.preview` / `central.source` 的选择器在 `T6` 完成后加入同一体系。
 
 **验收**

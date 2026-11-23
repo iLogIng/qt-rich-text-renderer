@@ -6,6 +6,7 @@
 #include "Theme.h"
 
 #include <QElapsedTimer>
+#include <QFont>
 #include <QMainWindow>
 #include <QUrl>
 
@@ -89,6 +90,7 @@ private:
     void scrollPreviewToBlock(int blockNumber);
     void applySettings(const AppSettingsData &previous);
     void applyApplicationFont(int pointSize);
+    void applyPreviewFont(int pointSize);
     void applySourceFont(int pointSize);
     void updateToolbarHeights();
     void syncViewSettingsFromUi();
@@ -121,6 +123,7 @@ private:
     MarkdownSourceHighlighter *m_sourceHighlighter = nullptr;
     MarkdownLinkHandler *m_linkHandler = nullptr;
     NavigationHistory m_history;
+    QFont m_baseApplicationFont;
     QString m_pendingAnchor;
     bool m_loadAnchorRequested = false;
     QUrl m_baseUrl;

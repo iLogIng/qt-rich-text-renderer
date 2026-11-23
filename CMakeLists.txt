@@ -49,6 +49,8 @@ add_library(rich-text-renderer-document STATIC
     src/document/SvgObjectHandler.h
     src/document/SvgSanitizer.cpp
     src/document/SvgSanitizer.h
+    src/document/SyntaxPalette.cpp
+    src/document/SyntaxPalette.h
 )
 target_include_directories(rich-text-renderer-document PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/document)
 target_link_libraries(rich-text-renderer-document PUBLIC Qt6::Gui Qt6::Svg)

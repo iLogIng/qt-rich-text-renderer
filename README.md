@@ -151,9 +151,103 @@ Linux 上通常为：
 ~/.local/share/rich-text-renderer/rich-text-renderer/themes/<theme-id>/theme.json
 ```
 
-主题 JSON 只接受颜色、尺寸、QSS 开关和可选的静态 `.ui` 布局声明，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
+主题 JSON 支持颜色、字体族、尺寸、语法高亮色板、插槽样式、QSS 开关和可选的静态 `.ui` 布局声明，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
 
-示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。`aurora-dark` 同时包含可选 `.ui` 中央布局。
+所有字号仍由 Settings 控制。主题不提供字号字段，`.ui` 中的 `font/pointsize` 会被拒绝；主题只能提供字体族。
+
+示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。`aurora-dark` 同时包含可选 `.ui` 中央布局、插槽样式和自定义文档边距。
+
+#### 主题排版
+
+```json
+{
+  "typography": {
+    "uiFontFamily": "Noto Sans",
+    "previewFontFamily": "Noto Serif",
+    "codeFontFamily": "JetBrains Mono"
+  },
+  "metrics": {
+    "spacing": 8,
+    "documentMargin": 16
+  }
+}
+```
+
+- `typography.uiFontFamily` 设置应用字体族；
+- `typography.previewFontFamily` 只影响 Preview 文档；
+- `typography.codeFontFamily` 影响 Source 视图，Preview 代码块字体族会在后续的 Preview 文档处理阶段接入；
+- `metrics.spacing` 是 C++ 默认中央布局的间距默认值，`.ui` 显式设置的间距优先；
+- `metrics.documentMargin` 设置 Preview 文档边距，默认 12。
+
+字体不存在时回退到应用默认字体。主题包不能携带字体文件，也不能覆盖字号。
+
+#### 语法高亮色板
+
+```json
+{
+  "syntax": {
+    "code": {
+      "keyword": "#cf8e6d",
+      "string": "#6aab73",
+      "number": "#2aacb8",
+      "comment": "#7a7a7a",
+      "preprocessor": "#b5a642",
+      "type": "#56a8f5",
+      "function": "#56a8f5"
+    },
+    "source": {
+      "heading": "#8ab4f8",
+      "bold": "#e6e6e6",
+      "emphasis": "#e6e6e6",
+      "inlineCode": "#d7ba7d",
+      "link": "#8ab4f8",
+      "quote": "#9a9a9a",
+      "marker": "#c586c0",
+      "fence": "#6aab73",
+      "math": "#b5a642"
+    }
+  }
+}
+```
+
+缺失的键使用当前浅色/深色默认色板；非法颜色会导致主题加载失败并回退。主题切换时语法色板只重新应用高亮格式，不改变 MathJax/Mermaid 的缓存 key。
+
+#### 具名插槽样式
+
+```json
+{
+  "slots": {
+    "top": {
+      "background": "#202124",
+      "borderColor": "#3c4043",
+      "borderWidth": 1,
+      "radius": 8,
+      "padding": 8
+    },
+    "content": {
+      "borderColor": "#30363d",
+      "borderWidth": 1
+    }
+  }
+}
+```
+
+支持的插槽键：
+
+- `top`
+- `bottom`
+- `empty`
+- `toolbarLeading`
+- `toolbarTrailing`
+- `content`
+
+支持的字段只有 `background`、`borderColor`、`borderWidth`（0–8）、`radius`（0–32）和 `padding`（0–32）。插槽样式只在 `qss` 启用时生效；`qss: false` 的主题不会应用 `slots` 规则。主题不能提供任意 QSS；应用会把固定属性选择器追加到内置模板：
+
+```css
+QWidget[centralSlot="top"] { ... }
+```
+
+插槽宿主暴露动态属性 `centralSlot`，用于稳定匹配。没有 `slots` 字段时不会生成额外规则。
 
 #### 可选 `.ui` 中央布局
 
@@ -207,7 +301,7 @@ QStandardPaths::AppDataLocation/themes/<theme-id>/
 
 当前不引入 QML，也不支持替换整个 `QMainWindow`。
 
-后续的排版参数、语法高亮色板、插槽 QSS、Preview 外观、Mermaid 主题、静态 PNG/JPEG 资源、Preview/Source 直接插槽和手动布局变体设计见 [TODO.md](TODO.md) 的 **Theme & Layout Evolution** 一节；这些能力尚未实现。
+后续的 Preview 外观、Mermaid 主题、静态 PNG/JPEG 资源、Preview/Source 直接插槽和手动布局变体设计见 [TODO.md](TODO.md) 的 **Theme & Layout Evolution** 一节；这些能力尚未实现。
 
 ## 支持的 Markdown
 
@@ -290,6 +384,7 @@ scripts/test-idle.sh
 - 导航历史；
 - 设置模板、用户覆盖、设置对话框和旧主题配置迁移；
 - 主题 JSON 加载、QSS token、用户主题、错误回退和内置主题；
+- 主题字体族、文档边距、默认布局间距、语法高亮色板和固定插槽 QSS；
 - 中央布局插槽、默认布局、空插槽零占位、主题 `.ui` 加载、白名单校验和失败回退；
 - Markdown 预处理、目录提取和文档渲染；
 - SVG 缓存、SVG 归一化和对象嵌入；
@@ -331,7 +426,7 @@ APPIMAGE_RUNTIME=/path/to/runtime-x86_64 \
 scripts/package-appimage.sh
 ```
 
-脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.9MB / 33.2MiB。
+脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.9MB / 33.3MiB。
 
 验证：
 

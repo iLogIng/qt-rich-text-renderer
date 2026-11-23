@@ -392,6 +392,9 @@ flowchart TD
 - 内置主题保持原有 QPalette 视觉，不启用 QSS，也不带 `.ui`；
 - 用户主题默认启用 QSS，由固定模板生成；
 - 主题缺失或校验失败时回退到 `light`；
+- 主题排版只提供字体族、默认布局间距和文档边距；字号始终由 Settings 控制；
+- 主题可以覆盖代码和 Markdown Source 的语法高亮色板，切换主题时重新 rehighlight；
+- 具名插槽通过 `centralSlot` 动态属性和固定 QSS 属性选择器应用背景、边框和 padding；
 - `.ui` 只替换 `QMainWindow::centralWidget()` 子树；主窗口、状态栏、Outline dock 和渲染 controller 仍由 C++ 持有；
 - 必需插槽为 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；可选插槽为 `central.top`、`central.bottom`、`central.empty`；
 - `central.preview` 和 `central.source` 是 `central.content` 内部标签页的稳定内容插槽；

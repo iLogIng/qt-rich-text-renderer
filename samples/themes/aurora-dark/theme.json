@@ -27,8 +27,25 @@
     "apiVersion": 1,
     "file": "layout.ui"
   },
+  "slots": {
+    "top": {
+      "background": "#161b22",
+      "borderColor": "#30363d",
+      "borderWidth": 1,
+      "radius": 8,
+      "padding": 6
+    },
+    "bottom": {
+      "background": "#161b22",
+      "borderColor": "#30363d",
+      "borderWidth": 1,
+      "radius": 8,
+      "padding": 6
+    }
+  },
   "metrics": {
     "radius": 10,
-    "spacing": 7
+    "spacing": 7,
+    "documentMargin": 16
   }
 }

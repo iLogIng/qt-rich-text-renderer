@@ -11,7 +11,9 @@
 #include <QJsonValue>
 #include <QPalette>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QStyleFactory>
 
 namespace {
@@ -43,6 +45,9 @@ ThemeSpec lightFallback()
     theme.tooltipBase = QColor(QStringLiteral("#ffffdc"));
     theme.tooltipText = QColor(QStringLiteral("#111111"));
     theme.border = QColor(QStringLiteral("#d0d0d0"));
+    theme.codeSyntax = defaultCodeSyntaxPalette(false);
+    theme.sourceSyntax = defaultMarkdownSourcePalette(false);
+    theme.documentMargin = 12;
     return theme;
 }
 
@@ -72,6 +77,9 @@ ThemeSpec darkFallback()
     theme.tooltipBase = QColor(QStringLiteral("#252526"));
     theme.tooltipText = QColor(QStringLiteral("#e6e6e6"));
     theme.border = QColor(QStringLiteral("#3c3c3c"));
+    theme.codeSyntax = defaultCodeSyntaxPalette(true);
+    theme.sourceSyntax = defaultMarkdownSourcePalette(true);
+    theme.documentMargin = 12;
     return theme;
 }
 
@@ -123,6 +131,295 @@ bool readColor(const QJsonObject &colors,
         return false;
     }
     *color = value;
+    return true;
+}
+
+bool readOptionalString(const QJsonObject &object,
+                        const QString &key,
+                        QString *value,
+                        QString *error)
+{
+    if (!object.contains(key)) {
+        return true;
+    }
+    const QJsonValue jsonValue = object.value(key);
+    if (!jsonValue.isString()) {
+        if (error) {
+            *error = QStringLiteral("%1 must be a string").arg(key);
+        }
+        return false;
+    }
+    *value = jsonValue.toString().trimmed();
+    return true;
+}
+
+bool readOptionalColor(const QJsonObject &object,
+                       const QString &key,
+                       const QString &context,
+                       QColor *value,
+                       QString *error)
+{
+    if (!object.contains(key)) {
+        return true;
+    }
+    const QJsonValue jsonValue = object.value(key);
+    if (!jsonValue.isString()) {
+        if (error) {
+            *error = QStringLiteral("%1.%2 must be a color string").arg(context, key);
+        }
+        return false;
+    }
+    const QColor color(jsonValue.toString());
+    if (!color.isValid()) {
+        if (error) {
+            *error = QStringLiteral("invalid color: %1.%2").arg(context, key);
+        }
+        return false;
+    }
+    *value = color;
+    return true;
+}
+
+bool readOptionalInt(const QJsonObject &object,
+                     const QString &key,
+                     const QString &context,
+                     int minimum,
+                     int maximum,
+                     int *value,
+                     QString *error)
+{
+    if (!object.contains(key)) {
+        return true;
+    }
+    const QJsonValue jsonValue = object.value(key);
+    if (!jsonValue.isDouble()) {
+        if (error) {
+            *error = QStringLiteral("%1.%2 must be an integer").arg(context, key);
+        }
+        return false;
+    }
+    const double number = jsonValue.toDouble();
+    const int integer = jsonValue.toInt();
+    if (number != static_cast<double>(integer) || integer < minimum || integer > maximum) {
+        if (error) {
+            *error = QStringLiteral("%1.%2 must be between %3 and %4")
+                         .arg(context, key)
+                         .arg(minimum)
+                         .arg(maximum);
+        }
+        return false;
+    }
+    *value = integer;
+    return true;
+}
+
+bool readTypography(const QJsonObject &root, ThemeSpec *theme, QString *error)
+{
+    if (!root.contains(QStringLiteral("typography"))) {
+        return true;
+    }
+    if (!root.value(QStringLiteral("typography")).isObject()) {
+        if (error) {
+            *error = QStringLiteral("typography must be a JSON object");
+        }
+        return false;
+    }
+    const QJsonObject typography = root.value(QStringLiteral("typography")).toObject();
+    return readOptionalString(typography,
+                              QStringLiteral("uiFontFamily"),
+                              &theme->uiFontFamily,
+                              error)
+        && readOptionalString(typography,
+                              QStringLiteral("previewFontFamily"),
+                              &theme->previewFontFamily,
+                              error)
+        && readOptionalString(typography,
+                              QStringLiteral("codeFontFamily"),
+                              &theme->codeFontFamily,
+                              error);
+}
+
+bool readCodePalette(const QJsonObject &object,
+                     CodeSyntaxPalette *palette,
+                     QString *error)
+{
+    return readColor(object, QStringLiteral("keyword"), palette->keyword, &palette->keyword, error)
+        && readColor(object, QStringLiteral("string"), palette->string, &palette->string, error)
+        && readColor(object, QStringLiteral("number"), palette->number, &palette->number, error)
+        && readColor(object, QStringLiteral("comment"), palette->comment, &palette->comment, error)
+        && readColor(object,
+                     QStringLiteral("preprocessor"),
+                     palette->preprocessor,
+                     &palette->preprocessor,
+                     error)
+        && readColor(object, QStringLiteral("type"), palette->type, &palette->type, error)
+        && readColor(object,
+                     QStringLiteral("function"),
+                     palette->function,
+                     &palette->function,
+                     error);
+}
+
+bool readSourcePalette(const QJsonObject &object,
+                       MarkdownSourcePalette *palette,
+                       QString *error)
+{
+    return readColor(object, QStringLiteral("heading"), palette->heading, &palette->heading, error)
+        && readColor(object, QStringLiteral("bold"), palette->bold, &palette->bold, error)
+        && readColor(object,
+                     QStringLiteral("emphasis"),
+                     palette->emphasis,
+                     &palette->emphasis,
+                     error)
+        && readColor(object,
+                     QStringLiteral("inlineCode"),
+                     palette->inlineCode,
+                     &palette->inlineCode,
+                     error)
+        && readColor(object, QStringLiteral("link"), palette->link, &palette->link, error)
+        && readColor(object, QStringLiteral("quote"), palette->quote, &palette->quote, error)
+        && readColor(object, QStringLiteral("marker"), palette->marker, &palette->marker, error)
+        && readColor(object, QStringLiteral("fence"), palette->fence, &palette->fence, error)
+        && readColor(object, QStringLiteral("math"), palette->math, &palette->math, error);
+}
+
+bool readSyntax(const QJsonObject &root, ThemeSpec *theme, QString *error)
+{
+    if (!root.contains(QStringLiteral("syntax"))) {
+        return true;
+    }
+    if (!root.value(QStringLiteral("syntax")).isObject()) {
+        if (error) {
+            *error = QStringLiteral("syntax must be a JSON object");
+        }
+        return false;
+    }
+    const QJsonObject syntax = root.value(QStringLiteral("syntax")).toObject();
+
+    if (syntax.contains(QStringLiteral("code"))) {
+        if (!syntax.value(QStringLiteral("code")).isObject()) {
+            if (error) {
+                *error = QStringLiteral("syntax.code must be a JSON object");
+            }
+            return false;
+        }
+        if (!readCodePalette(syntax.value(QStringLiteral("code")).toObject(),
+                             &theme->codeSyntax,
+                             error)) {
+            return false;
+        }
+    }
+    if (syntax.contains(QStringLiteral("source"))) {
+        if (!syntax.value(QStringLiteral("source")).isObject()) {
+            if (error) {
+                *error = QStringLiteral("syntax.source must be a JSON object");
+            }
+            return false;
+        }
+        if (!readSourcePalette(syntax.value(QStringLiteral("source")).toObject(),
+                               &theme->sourceSyntax,
+                               error)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool readSlotStyles(const QJsonObject &root,
+                    QHash<QString, SlotStyle> *styles,
+                    QString *error)
+{
+    if (!root.contains(QStringLiteral("slots"))) {
+        return true;
+    }
+    if (!root.value(QStringLiteral("slots")).isObject()) {
+        if (error) {
+            *error = QStringLiteral("slots must be a JSON object");
+        }
+        return false;
+    }
+
+    static const QSet<QString> allowedSlots = {
+        QString::fromLatin1(ThemeSlotStyle::Top),
+        QString::fromLatin1(ThemeSlotStyle::Bottom),
+        QString::fromLatin1(ThemeSlotStyle::Empty),
+        QString::fromLatin1(ThemeSlotStyle::ToolbarLeading),
+        QString::fromLatin1(ThemeSlotStyle::ToolbarTrailing),
+        QString::fromLatin1(ThemeSlotStyle::Content),
+    };
+    static const QSet<QString> allowedFields = {
+        QStringLiteral("background"),
+        QStringLiteral("borderColor"),
+        QStringLiteral("borderWidth"),
+        QStringLiteral("radius"),
+        QStringLiteral("padding"),
+    };
+
+    const QJsonObject slotObject = root.value(QStringLiteral("slots")).toObject();
+    for (auto it = slotObject.constBegin(); it != slotObject.constEnd(); ++it) {
+        if (!allowedSlots.contains(it.key())) {
+            if (error) {
+                *error = QStringLiteral("unknown slot style: %1").arg(it.key());
+            }
+            return false;
+        }
+        if (!it.value().isObject()) {
+            if (error) {
+                *error = QStringLiteral("slot style must be a JSON object: %1").arg(it.key());
+            }
+            return false;
+        }
+        const QJsonObject fields = it.value().toObject();
+        for (auto field = fields.constBegin(); field != fields.constEnd(); ++field) {
+            if (!allowedFields.contains(field.key())) {
+                if (error) {
+                    *error = QStringLiteral("unknown slot style field: %1.%2")
+                                 .arg(it.key(), field.key());
+                }
+                return false;
+            }
+        }
+
+        SlotStyle style;
+        const QString context = QStringLiteral("slots.%1").arg(it.key());
+        if (!readOptionalColor(fields,
+                               QStringLiteral("background"),
+                               context,
+                               &style.background,
+                               error)
+            || !readOptionalColor(fields,
+                                  QStringLiteral("borderColor"),
+                                  context,
+                                  &style.borderColor,
+                                  error)
+            || !readOptionalInt(fields,
+                                QStringLiteral("borderWidth"),
+                                context,
+                                0,
+                                8,
+                                &style.borderWidth,
+                                error)
+            || !readOptionalInt(fields,
+                                QStringLiteral("radius"),
+                                context,
+                                0,
+                                32,
+                                &style.radius,
+                                error)
+            || !readOptionalInt(fields,
+                                QStringLiteral("padding"),
+                                context,
+                                0,
+                                32,
+                                &style.padding,
+                                error)) {
+            return false;
+        }
+        if (style.borderColor.isValid() && style.borderWidth < 0) {
+            style.borderWidth = 1;
+        }
+        styles->insert(it.key(), style);
+    }
     return true;
 }
 
@@ -262,9 +559,17 @@ bool readTheme(const QString &path,
         return false;
     }
 
+    if (!readTypography(root, &parsed, error)
+        || !readSyntax(root, &parsed, error)
+        || !readSlotStyles(root, &parsed.slotStyles, error)) {
+        return false;
+    }
+
     const QJsonObject metrics = root.value(QStringLiteral("metrics")).toObject();
     parsed.radius = qBound(0, metrics.value(QStringLiteral("radius")).toInt(parsed.radius), 32);
     parsed.spacing = qBound(0, metrics.value(QStringLiteral("spacing")).toInt(parsed.spacing), 32);
+    parsed.documentMargin =
+        qBound(0, metrics.value(QStringLiteral("documentMargin")).toInt(parsed.documentMargin), 64);
 
     readLayout(root, builtIn, packageDirectory, &parsed);
 
@@ -275,6 +580,38 @@ bool readTheme(const QString &path,
 QString colorValue(const QColor &color)
 {
     return color.alpha() == 255 ? color.name() : color.name(QColor::HexArgb);
+}
+
+QString buildSlotRules(const ThemeSpec &theme)
+{
+    QString rules;
+    for (auto it = theme.slotStyles.constBegin(); it != theme.slotStyles.constEnd(); ++it) {
+        const SlotStyle &style = it.value();
+        QStringList declarations;
+        if (style.background.isValid()) {
+            declarations.append(
+                QStringLiteral("background-color: %1;").arg(colorValue(style.background)));
+        }
+        if (style.borderColor.isValid() && style.borderWidth > 0) {
+            declarations.append(QStringLiteral("border: %1px solid %2;")
+                                    .arg(style.borderWidth)
+                                    .arg(colorValue(style.borderColor)));
+        }
+        if (style.radius >= 0) {
+            declarations.append(QStringLiteral("border-radius: %1px;").arg(style.radius));
+        }
+        if (style.padding >= 0) {
+            declarations.append(QStringLiteral("padding: %1px;").arg(style.padding));
+        }
+        if (declarations.isEmpty()) {
+            continue;
+        }
+        rules += QStringLiteral("QWidget[%1=\"%2\"] {\n    %3\n}\n\n")
+                     .arg(QString::fromLatin1(ThemeSlotStyle::Property),
+                          it.key(),
+                          declarations.join(QStringLiteral("\n    ")));
+    }
+    return rules;
 }
 
 } // namespace
@@ -422,6 +759,11 @@ QString ThemeManager::buildStyleSheet(const ThemeSpec &theme, QString *error)
         offset = match.capturedEnd();
     }
     result += source.mid(offset);
+
+    const QString slotRules = buildSlotRules(theme);
+    if (!slotRules.isEmpty()) {
+        result += QLatin1Char('\n') + slotRules;
+    }
     return result;
 }
 

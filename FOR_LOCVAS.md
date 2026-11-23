@@ -118,11 +118,13 @@
   - MathJax/Mermaid 请求超时和 worker 空闲超时；
   - 最近目录和窗口几何。
 - 主题必须使用 Widgets + QPalette + QSS；内置 `light` / `dark` 保持当前视觉。
-- 用户主题只接受 JSON token、QSS 开关和可选静态 `.ui` 布局，不接受任意 QSS、QML 或可执行代码。
+- 所有字号由 Settings 唯一控制；主题只能提供字体族、文档边距和布局间距，不得通过 JSON、QSS 或 `.ui` 覆盖字号。
+- 用户主题支持颜色、字体族、语法高亮色板、固定插槽样式、QSS 开关和可选静态 `.ui` 布局，不接受任意 QSS、QML 或可执行代码。
+- 主题插槽样式只允许 `background`、`borderColor`、`borderWidth`、`radius` 和 `padding`；应用通过 `centralSlot` 动态属性和固定选择器生成 QSS。插槽样式只在 `qss` 启用时生效。
 - 用户主题包目录为 `QStandardPaths::AppDataLocation/themes/<id>/`，`theme.json` 必须位于其中；布局文件也必须留在主题包目录内。
 - 静态 `.ui` 只替换 `QMainWindow::centralWidget()` 的子树。主窗口、菜单、状态栏、Outline `QDockWidget`、文件加载、导航历史、设置和渲染 controller 必须继续由 C++ 持有。
 - `.ui` 根控件必须是 `QWidget` 或 `QFrame`，`objectName` 为 `central.root`。必需插槽为 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；可选插槽为 `central.top`、`central.bottom`、`central.empty`。
-- `.ui` 只允许标准 Qt 控件和布局，不允许未知控件、主题携带的编译控件、`<customwidgets>`、`<resources>`、`<connections>`、外部 URL 或 `styleSheet` 注入。
+- `.ui` 只允许标准 Qt 控件和布局，不允许未知控件、主题携带的编译控件、`<customwidgets>`、`<resources>`、`<connections>`、外部 URL 或 `styleSheet` 注入；`font/pointsize` 等字号属性也不允许。
 - `.ui` 缺失、解析失败、插槽缺失或校验失败时，必须回退 C++ 默认中央布局；布局路径无效只拒绝布局，不回退主题颜色。
 - 自定义控件策略：当前采用标准 Qt 控件 + 插槽宿主；应用预注册的自定义控件留作后续可选能力；主题携带 `.so` / `.dll` 的第三方编译控件不采用。
 - 内置主题可以不带 `.ui`；没有 `.ui` 时继续使用当前 C++ 中央布局。
@@ -156,7 +158,7 @@
   - `mermaid-full-worker.mjs`；
   - `config/settings.ini` 默认模板。
 - AppImage 不得包含测试用 one-shot bundle 或 WebEngine。
-- 当前 AppImage 文件约 34.9MB / 33.2MiB；体积数字不等于自包含性。
+- 当前 AppImage 文件约 34.9MB / 33.3MiB；体积数字不等于自包含性。
 - 打包脚本使用 `linuxdeploy --plugin qt` 和 `appimagetool`；`--appimage-extract-and-run` 路径不要求宿主安装 FUSE。
 - 当前 AppImage 的自包含性尚未确认：产物可能依赖宿主 Qt 平台/图像格式插件，且未包含 `qt.conf` 与完整许可证材料；干净机器启动验证仍待完成。
 - CI 必须固定 linuxdeploy、appimagetool、AppImage runtime 和打包基础镜像版本。

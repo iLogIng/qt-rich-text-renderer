@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SyntaxPalette.h"
+
 #include <QTextCharFormat>
 #include <QSyntaxHighlighter>
 
@@ -12,6 +14,7 @@ public:
                                        QObject *parent = nullptr);
 
     void setDark(bool dark);
+    void setSyntaxPalette(const MarkdownSourcePalette &palette);
     void setEnabled(bool enabled);
 
 protected:
@@ -23,8 +26,8 @@ private:
                     const QRegularExpression &expression,
                     const QTextCharFormat &format);
 
-    bool m_dark = false;
     bool m_enabled = true;
+    MarkdownSourcePalette m_palette;
     QTextCharFormat m_heading;
     QTextCharFormat m_bold;
     QTextCharFormat m_emphasis;
