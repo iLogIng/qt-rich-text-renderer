@@ -204,7 +204,11 @@ QString normalizeRootSize(QString svg)
 
 } // namespace
 
-QString sanitizeSvgForQt(const QString &svg, bool mermaid, const QColor &foreground, bool dark)
+QString sanitizeSvgForQt(const QString &svg,
+                         bool mermaid,
+                         const QColor &foreground,
+                         bool dark,
+                         const QHash<QString, QString> &mermaidVariables)
 {
     if (svg.isEmpty()) {
         return svg;
@@ -234,6 +238,22 @@ QString sanitizeSvgForQt(const QString &svg, bool mermaid, const QColor &foregro
             variables.insert(QStringLiteral("--_ah"), QStringLiteral("#333333"));
             variables.insert(QStringLiteral("--_el"), QStringLiteral("#e8e8e8"));
             variables.insert(QStringLiteral("--_tx"), QStringLiteral("#333333"));
+        }
+
+        static const QHash<QString, QString> cssVariables = {
+            {QStringLiteral("mainBkg"), QStringLiteral("--_mb")},
+            {QStringLiteral("primaryColor"), QStringLiteral("--_p")},
+            {QStringLiteral("nodeBorder"), QStringLiteral("--_nb")},
+            {QStringLiteral("nodeTextColor"), QStringLiteral("--_nt")},
+            {QStringLiteral("lineColor"), QStringLiteral("--_l")},
+            {QStringLiteral("arrowheadColor"), QStringLiteral("--_ah")},
+            {QStringLiteral("edgeLabelBackground"), QStringLiteral("--_el")},
+            {QStringLiteral("textColor"), QStringLiteral("--_tx")},
+        };
+        for (auto it = mermaidVariables.constBegin(); it != mermaidVariables.constEnd(); ++it) {
+            if (cssVariables.contains(it.key())) {
+                variables.insert(cssVariables.value(it.key()), it.value());
+            }
         }
         result = resolveVars(result, variables);
     }

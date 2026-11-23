@@ -3,6 +3,7 @@
 #include "RenderTypes.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QObject>
 #include <QQueue>
 #include <QString>
@@ -16,6 +17,7 @@ struct RendererJob {
     QString source;
     bool display = true;
     QString theme;
+    QHash<QString, QString> themeVariables;
     quint64 generation = 0;
     std::function<void(const RenderResult &)> callback;
 };

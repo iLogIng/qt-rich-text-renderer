@@ -30,6 +30,15 @@ QByteArray makeRequestLine(const RendererJob &job)
         object.insert(QStringLiteral("display"), job.display);
     } else {
         object.insert(QStringLiteral("theme"), job.theme);
+        if (!job.themeVariables.isEmpty()) {
+            QJsonObject variables;
+            for (auto it = job.themeVariables.constBegin();
+                 it != job.themeVariables.constEnd();
+                 ++it) {
+                variables.insert(it.key(), it.value());
+            }
+            object.insert(QStringLiteral("themeVariables"), variables);
+        }
     }
     return QJsonDocument(object).toJson(QJsonDocument::Compact) + '\n';
 }

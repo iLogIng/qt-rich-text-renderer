@@ -83,7 +83,7 @@
 
 ### Theme & Layout Evolution
 
-> 状态：`T1`、`T2`、`T7` 已完成；`T3`、`T4A`、`T4B`、`T5`、`T6`、`T8A` 待实施；`T8B` 为后续候选。
+> 状态：`T1`、`T2`、`T7`、`T3`、`T4A`、`T4B`、`T5`、`T6`、`T8A` 已完成；`T8B` 为后续候选。
 >
 > 本文描述 `rich-text-renderer` 在现有 QSS 主题和静态 `.ui` 中央布局之上的后续 UI 配置能力。编号 `T1`、`T2`、`T7` 等是稳定功能标识，不表示实施顺序；章节按实施顺序排列。
 >
@@ -142,12 +142,12 @@
 - [x] `T1` 主题排版参数
 - [x] `T2` 语法高亮色板
 - [x] `T7` 具名插槽 QSS
-- [ ] `T3` Preview 外观
-- [ ] `T4A` Mermaid 内置主题枚举
-- [ ] `T4B` Mermaid 主题颜色变量（`T4A` 稳定后）
-- [ ] `T5` 安全本地图片资源
-- [ ] `T6` Preview/Source 直接插槽
-- [ ] `T8A` 手动布局变体
+- [x] `T3` Preview 外观
+- [x] `T4A` Mermaid 内置主题枚举
+- [x] `T4B` Mermaid 主题颜色变量（`T4A` 稳定后）
+- [x] `T5` 安全本地图片资源
+- [x] `T6` Preview/Source 直接插槽
+- [x] `T8A` 手动布局变体
 - [ ] `T8B` 按窗口宽度自动切换布局（后续候选，本次不执行）
 
 ---
@@ -180,7 +180,7 @@
 
 - `typography.uiFontFamily`：设置应用字体族；字号继续使用 `AppSettingsData::uiFontPointSize`。
 - `typography.previewFontFamily`：只影响 Preview 文档；字号继续使用 UI/预览字号设置。
-- `typography.codeFontFamily`：影响 Source 视图；Preview 代码块的字体族在 `T3` 的文档后处理中应用。
+- `typography.codeFontFamily`：影响 Source 视图；Preview 代码块的字体族在 `T3` 的文档后处理中应用（已完成）。
 - `metrics.spacing`：作为 C++ 默认中央骨架的间距默认值；`.ui` 布局中显式设置的 margin/spacing 优先。
 - `metrics.documentMargin`：设置 Preview `QTextDocument` 的 margin；默认保持当前值 12。
 - 字段缺失或为空字符串时使用当前默认值，不改变内置主题视觉。
@@ -278,7 +278,7 @@
 
 **目标**
 
-让主题分别控制 `central.top`、`central.bottom`、`central.empty`、`central.toolbar.leading`、`central.toolbar.trailing` 和 `central.content` 的背景、边框、圆角和 padding；后续 `T6` 再扩展到 `central.preview` / `central.source`。
+让主题分别控制 `central.top`、`central.bottom`、`central.empty`、`central.toolbar.leading`、`central.toolbar.trailing`、`central.content`、`central.preview`、`central.source` 和 `central.outline` 的背景、边框、圆角和 padding。
 
 **实施状态**：已完成。新增 `SlotStyle`、固定 QSS 生成、插槽 `centralSlot` 动态属性和运行期 polish，测试覆盖生成规则与默认布局属性。
 
@@ -349,7 +349,7 @@ QWidget[centralSlot="top"] {
 - 插槽属性必须在 QSS 应用前设置，或在设置后执行 `style()->unpolish/polish`；
 - 没有 `slots` 字段时完全不生成额外规则，内置主题视觉不变；
 - `slots` 规则只在 `useQss` 为真时生效；`qss: false` 的主题保留 QPalette-only 行为；
-- `central.preview` / `central.source` 的选择器在 `T6` 完成后加入同一体系。
+- `central.preview`、`central.source` 和 `central.outline` 已在 `T6` 完成后加入同一体系。
 
 **验收**
 
@@ -365,6 +365,8 @@ QWidget[centralSlot="top"] {
 **目标**
 
 在 `T1` 的字体族和文档边距基础上，增加可控的阅读版式。
+
+**实施状态**：已完成。新增 `PreviewStyle`、代码块背景/边距处理、`maxTextWidth` 居中阅读列和视口 resize 重排。
 
 **建议 schema**
 
@@ -415,6 +417,8 @@ QWidget[centralSlot="top"] {
 **目标**
 
 先让 Mermaid 使用可配置的内置主题，再在稳定后让主题颜色与 SVG 归一化一致。
+
+**实施状态**：`T4A`、`T4B` 已完成。主题枚举、颜色变量、worker 协议、缓存签名和 SVG sanitizer 映射均已接入。
 
 ##### T4A Mermaid 内置主题枚举
 
@@ -483,6 +487,8 @@ QWidget[centralSlot="top"] {
 
 允许用户主题包提供静态 PNG/JPEG 图片，用于 Logo、顶部装饰或静态图标；不提供 SVG 资源承诺。
 
+**实施状态**：已完成。支持 `themeAsset` 逻辑资源 ID、PNG/JPEG 校验、主题包路径限制、QLabel 居中/等比缩小和按钮 icon 注入。
+
 **资源 manifest**
 
 ```json
@@ -547,6 +553,8 @@ QWidget[centralSlot="top"] {
 **目标**
 
 让用户主题的 `.ui` 可以分别摆放 Preview 和 Source，而不是只能移动包含两者的 C++ 标签组合。
+
+**实施状态**：已完成。支持 `contentMode: slots`、`central.preview` / `central.source`、可选 `central.outline`、Source 显隐和 tabs/slots 主题切换。
 
 **当前结构**
 
@@ -640,6 +648,8 @@ central.preview     central.source
 **目标**
 
 同一主题提供多个命名中央布局，由用户手动选择；本次不实现按窗口宽度自动切换。
+
+**实施状态**：已完成。支持 `layouts.variants`、`layoutId` 设置、Settings 布局选择、无效 variant 回退到首个 variant 和 C++ 默认布局。
 
 **manifest**
 
@@ -756,7 +766,7 @@ central.preview     central.source
 | 7 | 高 DPI / 字体 / 主题 / 响应式宽度 / 无障碍 | 部分完成 | P1-11、P1-12、P2-14 |
 | 8 | 干净 VM AppImage + CI + 许可证材料 | 部分完成：CI 与 Release AppImage 已有；干净 VM 待验证 | P0-6 |
 | 9 | 真实 AI 输出语料 + golden tests | 待完成 | P0-5 |
-| 10 | Mermaid 版本策略与图类型扩展 | 部分完成：版本固定与 24/24 smoke 已有；升级回归待补 | P1-10 |
+| 10 | Mermaid 版本策略与图类型扩展 | 部分完成：版本固定与 24/24 图类型 + 1 个主题变量 smoke 已有；升级回归待补 | P1-10 |
 | 11 | 跨消息任意拖选（P2，后置） | 待完成 | P2-13 |
 
 #### 为什么是这个顺序

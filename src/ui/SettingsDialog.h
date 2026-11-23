@@ -20,10 +20,12 @@ public:
 
 private:
     void loadValues(const AppSettingsData &data);
+    void populateLayouts(const QString &preferredId = {});
 
     AppSettingsData m_current;
     AppSettingsData m_defaults;
     QComboBox *m_theme = nullptr;
+    QComboBox *m_layout = nullptr;
     QSpinBox *m_uiFontPointSize = nullptr;
     QSpinBox *m_sourceFontPointSize = nullptr;
     QCheckBox *m_sourceHighlighting = nullptr;

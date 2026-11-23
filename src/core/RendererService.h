@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RenderTheme.h"
 #include "RenderTypes.h"
 #include "SvgCache.h"
 
@@ -29,7 +30,7 @@ public:
                    int mermaidRequestTimeoutMs = 15000);
 
     void renderMath(const QString &tex, bool display, Callback callback);
-    void renderMermaid(const QString &source, bool dark, Callback callback);
+    void renderMermaid(const QString &source, const MermaidTheme &theme, Callback callback);
     void cancelAll();
     void shutdown();
 
@@ -42,7 +43,9 @@ private:
     void render(const QString &kind,
                 const QString &source,
                 bool display,
-                const QString &theme,
+                const QString &cacheTheme,
+                const QString &workerTheme,
+                const QHash<QString, QString> &themeVariables,
                 Callback callback);
     void handleWorkerResult(const QString &key, quint64 generation, const RenderResult &result);
 

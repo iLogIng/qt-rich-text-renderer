@@ -76,13 +76,33 @@ def main() -> int:
         if not response.get("svg"):
             failures.append((name, response.get("error", "no SVG")))
 
+    process.stdin.write(
+        json.dumps(
+            {
+                "id": "theme-variables",
+                "source": "flowchart LR\n A-->B",
+                "theme": "base",
+                "themeVariables": {"primaryColor": "#123456"},
+            }
+        )
+        + "\n"
+    )
+    process.stdin.flush()
+    variable_line = process.stdout.readline().strip()
+    try:
+        variable_response = json.loads(variable_line)
+        if "#123456" not in variable_response.get("svg", ""):
+            failures.append(("theme-variables", "theme variable not applied"))
+    except json.JSONDecodeError:
+        failures.append(("theme-variables", f"invalid worker response: {variable_line[:120]}"))
+
     process.stdin.write('{"cmd":"shutdown"}\n')
     process.stdin.flush()
     process.wait(timeout=5)
 
     for name, error in failures:
         print(f"FAIL {name}: {error}", file=sys.stderr)
-    print(f"mermaid full smoke: {len(DIAGRAMS) - len(failures)}/{len(DIAGRAMS)} passed")
+    print(f"mermaid full smoke: {len(DIAGRAMS) + 1 - len(failures)}/{len(DIAGRAMS) + 1} passed")
     return 1 if failures else 0
 
 

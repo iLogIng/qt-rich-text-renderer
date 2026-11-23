@@ -1,6 +1,7 @@
 #include "CodeHighlighter.h"
 #include "MarkdownDocumentBuilder.h"
 #include "MarkdownSourceHighlighter.h"
+#include "PreviewStyle.h"
 #include "SyntaxPalette.h"
 
 #include <QAbstractTextDocumentLayout>
@@ -97,6 +98,34 @@ int main(int argc, char **argv)
         expect(headingBlock.layout()->formats().isEmpty(),
                QStringLiteral("disabling source highlighting clears formats"));
     }
+
+    QTextDocument previewStyleDocument;
+    QTextCursor previewStyleCursor(&previewStyleDocument);
+    QTextBlockFormat previewCodeFormat;
+    previewCodeFormat.setProperty(QTextFormat::BlockCodeLanguage, QStringLiteral("cpp"));
+    previewStyleCursor.setBlockFormat(previewCodeFormat);
+    previewStyleCursor.insertText(QStringLiteral("int value = 1;"));
+    PreviewStyle previewStyle;
+    previewStyle.codeBackground = QColor(QStringLiteral("#202020"));
+    previewStyle.codeBlockMargin = 4;
+    applyPreviewStyle(&previewStyleDocument,
+                      previewStyle,
+                      QStringLiteral("Test Code Mono"));
+    const QTextBlock previewCodeBlock = previewStyleDocument.firstBlock();
+    expect(previewCodeBlock.blockFormat().background().color()
+               == previewStyle.codeBackground,
+           QStringLiteral("preview code background is applied"));
+    expect(previewCodeBlock.blockFormat().topMargin() == 4
+               && previewCodeBlock.blockFormat().bottomMargin() == 4,
+           QStringLiteral("preview code margins apply to code block edges"));
+    expect(previewCodeBlock.blockFormat().stringProperty(QTextFormat::BlockCodeLanguage)
+               == QStringLiteral("cpp"),
+           QStringLiteral("preview code language survives style application"));
+    QTextCursor previewCodeCursor(previewCodeBlock);
+    previewCodeCursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
+    expect(previewCodeCursor.charFormat().fontFamilies().toStringList().first()
+               == QStringLiteral("Test Code Mono"),
+           QStringLiteral("preview code font family is applied"));
 
     QTextDocument fencedDocument;
     fencedDocument.setPlainText(

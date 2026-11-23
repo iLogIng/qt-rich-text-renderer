@@ -1,5 +1,6 @@
 #include "CentralUiLayout.h"
 #include "MainWindow.h"
+#include "PreviewBrowser.h"
 #include "Theme.h"
 
 #include <QApplication>
@@ -9,12 +10,16 @@
 #include <QEvent>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
+#include <QLabel>
 #include <QLayout>
 #include <QPlainTextEdit>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QToolButton>
+#include <QTextBlock>
 #include <QTextBrowser>
 #include <QTextStream>
 #include <QWidget>
@@ -82,6 +87,48 @@ QString validLayoutUi(const QString &markerText = QStringLiteral("Custom layout"
 )UI");
     ui.replace(QStringLiteral("__MARKER__"), markerText);
     return ui;
+}
+
+QString slotsLayoutUi()
+{
+    return QStringLiteral(R"UI(<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CentralWidget</class>
+ <widget class="QWidget" name="central.root">
+  <layout class="QVBoxLayout" name="centralLayout">
+   <item>
+    <layout class="QHBoxLayout" name="toolbarRow">
+     <item>
+      <widget class="QWidget" name="central.toolbar.leading">
+       <layout class="QHBoxLayout" name="leadingLayout"/>
+      </widget>
+     </item>
+     <item>
+      <widget class="QWidget" name="central.toolbar.trailing">
+       <layout class="QHBoxLayout" name="trailingLayout"/>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QWidget" name="central.outline">
+     <layout class="QHBoxLayout" name="outlineLayout"/>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="central.preview">
+     <layout class="QVBoxLayout" name="previewLayout"/>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="central.source">
+     <layout class="QVBoxLayout" name="sourceLayout"/>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</ui>
+)UI");
 }
 
 ThemeSpec themeForLayout(const QString &packageDirectory, const QString &layoutName)
@@ -170,6 +217,42 @@ int main(int argc, char **argv)
     delete valid.root;
 
     {
+        const QString path = directory.filePath(QStringLiteral("slots-layout.ui"));
+        expect(writeFile(path, slotsLayoutUi().toUtf8()),
+               QStringLiteral("write slots layout"));
+        ThemeSpec theme = themeForLayout(directory.path(), QStringLiteral("slots-layout.ui"));
+        theme.contentMode = QStringLiteral("slots");
+        QWidget slotsParent;
+        const CentralUiLayout slotsLayout =
+            CentralUiBuilder::loadTheme(theme, &slotsParent, &error);
+        expect(slotsLayout.isValid(), QStringLiteral("slots layout loads"));
+        expect(slotsLayout.slotsMode && slotsLayout.preview && slotsLayout.source
+                   && slotsLayout.outline,
+               QStringLiteral("slots layout exposes preview, source and outline slots"));
+        expect(!slotsLayout.content, QStringLiteral("slots layout has no content slot"));
+        expect(slotsLayout.preview->property("centralSlot").toString()
+                       == QStringLiteral("preview")
+                   && slotsLayout.source->property("centralSlot").toString()
+                          == QStringLiteral("source"),
+               QStringLiteral("slots layout exposes preview/source QSS properties"));
+        delete slotsLayout.root;
+
+        ThemeSpec contentInSlots = theme;
+        QString invalidUi = slotsLayoutUi();
+        invalidUi.replace(QStringLiteral("<widget class=\"QWidget\" name=\"central.outline\">"),
+                          QStringLiteral("<widget class=\"QWidget\" name=\"central.content\">"));
+        invalidUi.replace(QStringLiteral("name=\"outlineLayout\""),
+                          QStringLiteral("name=\"contentLayout\""));
+        expect(writeFile(directory.filePath(QStringLiteral("slots-content.ui")),
+                         invalidUi.toUtf8()),
+               QStringLiteral("write slots-content layout"));
+        contentInSlots.layoutFile =
+            QFileInfo(directory.filePath(QStringLiteral("slots-content.ui")))
+                .canonicalFilePath();
+        rejected(contentInSlots, QStringLiteral("central.content is not allowed"));
+    }
+
+    {
         const QString path = directory.filePath(QStringLiteral("text-edit.ui"));
         QString ui = validLayoutUi();
         ui.replace(QStringLiteral("class=\"QLabel\" name=\"customMarker\""),
@@ -184,6 +267,47 @@ int main(int argc, char **argv)
         expect(textEditLayout.isValid(),
                QStringLiteral("empty QTextEdit layout loads without generated-style false positives"));
         delete textEditLayout.root;
+    }
+
+    {
+        const QString path = directory.filePath(QStringLiteral("asset-layout.ui"));
+        QString ui = validLayoutUi();
+        ui.replace(QStringLiteral("name=\"customMarker\""),
+                   QStringLiteral("name=\"themeLogo\""));
+        ui.replace(QStringLiteral("<property name=\"text\"><string>Custom layout</string></property>"),
+                   QStringLiteral("<property name=\"themeAsset\" stdset=\"0\">"
+                                  "<string>logo</string></property>"));
+        expect(writeFile(path, ui.toUtf8()), QStringLiteral("write asset layout"));
+        const QString imagePath = directory.filePath(QStringLiteral("assets/logo.png"));
+        QDir().mkpath(QFileInfo(imagePath).absolutePath());
+        QImage image(16, 16, QImage::Format_ARGB32);
+        image.fill(Qt::red);
+        expect(image.save(imagePath, "PNG"), QStringLiteral("write asset image"));
+
+        ThemeSpec theme = themeForLayout(directory.path(), QStringLiteral("asset-layout.ui"));
+        ThemeAsset asset;
+        asset.id = QStringLiteral("logo");
+        asset.filePath = QFileInfo(imagePath).canonicalFilePath();
+        asset.format = QStringLiteral("png");
+        asset.size = image.size();
+        theme.assets.insert(asset.id, asset);
+        QWidget assetParent;
+        const CentralUiLayout assetLayout =
+            CentralUiBuilder::loadTheme(theme, &assetParent, &error);
+        expect(assetLayout.isValid(), QStringLiteral("asset layout loads"));
+        auto *logo = assetLayout.isValid()
+                         ? assetLayout.root->findChild<QLabel *>(QStringLiteral("themeLogo"))
+                         : nullptr;
+        expect(logo && !logo->pixmap().isNull(), QStringLiteral("theme asset is injected"));
+        expect(logo && !logo->hasScaledContents(),
+               QStringLiteral("theme asset is not stretched"));
+        expect(logo && (logo->alignment() & Qt::AlignCenter),
+               QStringLiteral("theme asset is centered"));
+        delete assetLayout.root;
+
+        ThemeSpec missingTheme = theme;
+        missingTheme.assets.clear();
+        rejected(missingTheme, QStringLiteral("unknown theme asset"));
     }
 
     {
@@ -210,7 +334,7 @@ int main(int argc, char **argv)
         const QString path = directory.filePath(QStringLiteral("reserved-slot.ui"));
         QString ui = validLayoutUi();
         ui.replace(QStringLiteral("name=\"customMarker\""),
-                   QStringLiteral("name=\"central.preview\""));
+                   QStringLiteral("name=\"central.forbidden\""));
         expect(writeFile(path, ui.toUtf8()), QStringLiteral("write reserved-slot layout"));
         rejected(themeForLayout(directory.path(), QStringLiteral("reserved-slot.ui")),
                  QStringLiteral("reserved layout slot is not allowed"));
@@ -362,6 +486,64 @@ int main(int argc, char **argv)
                QStringLiteral("theme switch resets the preview font family"));
     }
 
+    const QString previewThemeId = QStringLiteral("preview-style-theme");
+    const QString previewThemeDirectory = QDir(themeRoot).filePath(previewThemeId);
+    QDir(previewThemeDirectory).removeRecursively();
+    const QByteArray previewThemeJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "preview-style-theme",
+        "name": "Preview Style Theme",
+        "dark": false,
+        "preview": {
+            "maxTextWidth": 400,
+            "codeBackground": "#202020",
+            "codeBlockMargin": 4
+        }
+    })JSON";
+    expect(writeFile(QDir(previewThemeDirectory).filePath(QStringLiteral("theme.json")),
+                     previewThemeJson),
+           QStringLiteral("write preview style theme"));
+    const QString previewSettingsPath =
+        directory.filePath(QStringLiteral("preview-settings.ini"));
+    {
+        QSettings settings(previewSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), previewThemeId);
+        settings.sync();
+    }
+    const QString previewDocumentPath =
+        directory.filePath(QStringLiteral("preview-style.md"));
+    expect(writeFile(previewDocumentPath,
+                     QByteArray("# Preview style\n\n```cpp\nint value = 1;\n```\n")),
+           QStringLiteral("write preview style document"));
+    {
+        MainWindow window(false, previewSettingsPath);
+        window.show();
+        window.loadFile(previewDocumentPath);
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        auto *preview = window.findChild<PreviewBrowser *>(QStringLiteral("previewView"));
+        expect(preview && preview->document()->textWidth() == 400,
+               QStringLiteral("preview max text width is applied"));
+        expect(preview && preview->contentMargins().left() > 0
+                   && preview->contentMargins().right() > 0,
+               QStringLiteral("preview content is centered"));
+        if (preview) {
+            bool foundCodeBlock = false;
+            for (QTextBlock block = preview->document()->begin(); block.isValid();
+                 block = block.next()) {
+                if (block.blockFormat().stringProperty(QTextFormat::BlockCodeLanguage)
+                    == QStringLiteral("cpp")) {
+                    foundCodeBlock = true;
+                    expect(block.blockFormat().background().color()
+                               == QColor(QStringLiteral("#202020")),
+                           QStringLiteral("preview code background is applied"));
+                    break;
+                }
+            }
+            expect(foundCodeBlock, QStringLiteral("preview code block exists"));
+        }
+    }
+
     const QString layoutThemeId = QStringLiteral("layout-test-theme");
     const QString layoutThemeDirectory = QDir(themeRoot).filePath(layoutThemeId);
     QDir(layoutThemeDirectory).removeRecursively();
@@ -460,6 +642,188 @@ int main(int argc, char **argv)
                QStringLiteral("theme switch keeps the outline dock"));
     }
 
+    const QString slotsThemeId = QStringLiteral("slots-test-theme");
+    const QString slotsThemeDirectory = QDir(themeRoot).filePath(slotsThemeId);
+    QDir(slotsThemeDirectory).removeRecursively();
+    expect(writeFile(QDir(slotsThemeDirectory).filePath(QStringLiteral("layout.ui")),
+                     slotsLayoutUi().toUtf8()),
+           QStringLiteral("write slots theme layout"));
+    const QByteArray slotsThemeJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "slots-test-theme",
+        "name": "Slots Test Theme",
+        "layout": {
+            "apiVersion": 1,
+            "file": "layout.ui",
+            "contentMode": "slots"
+        }
+    })JSON";
+    expect(writeFile(QDir(slotsThemeDirectory).filePath(QStringLiteral("theme.json")),
+                     slotsThemeJson),
+           QStringLiteral("write slots theme manifest"));
+    const QString slotsSettingsPath =
+        directory.filePath(QStringLiteral("slots-settings.ini"));
+    {
+        QSettings settings(slotsSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), slotsThemeId);
+        settings.sync();
+    }
+    {
+        MainWindow window(false, slotsSettingsPath);
+        window.show();
+        QCoreApplication::processEvents();
+        auto *previewSlot = window.findChild<QWidget *>(QStringLiteral("central.preview"));
+        auto *sourceSlot = window.findChild<QWidget *>(QStringLiteral("central.source"));
+        auto *outlineSlot = window.findChild<QWidget *>(QStringLiteral("central.outline"));
+        auto *preview = window.findChild<PreviewBrowser *>(QStringLiteral("previewView"));
+        auto *source = window.findChild<QPlainTextEdit *>(QStringLiteral("sourceView"));
+        auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
+        auto *outlineToggle =
+            window.findChild<QToolButton *>(QStringLiteral("outlineToggleButton"));
+        expect(previewSlot && sourceSlot && outlineSlot && preview && source && tabs,
+               QStringLiteral("slots mode widgets found"));
+        expect(previewSlot && previewSlot->isAncestorOf(preview),
+               QStringLiteral("preview is injected into central.preview"));
+        expect(sourceSlot && sourceSlot->isAncestorOf(source),
+               QStringLiteral("source is injected into central.source"));
+        expect(tabs && tabs->isHidden(),
+               QStringLiteral("document tabs are hidden in slots mode"));
+        expect(outlineToggle && outlineSlot && outlineSlot->isAncestorOf(outlineToggle),
+               QStringLiteral("outline toggle uses the outline slot"));
+        expect(sourceSlot && !sourceSlot->isHidden(),
+               QStringLiteral("source slot is visible by default"));
+
+        window.setDarkMode(true);
+        QCoreApplication::processEvents();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        expect(tabs && !tabs->isHidden(),
+               QStringLiteral("theme switch restores the tabbed content"));
+        expect(preview && preview->parentWidget()
+                   && preview->parentWidget()->objectName() == QStringLiteral("central.preview"),
+               QStringLiteral("theme switch restores the preview page"));
+        expect(source && source->parentWidget()
+                   && source->parentWidget()->objectName() == QStringLiteral("central.source"),
+               QStringLiteral("theme switch restores the source page"));
+    }
+
+    const QString slotsHiddenSettingsPath =
+        directory.filePath(QStringLiteral("slots-hidden-settings.ini"));
+    {
+        QSettings settings(slotsHiddenSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), slotsThemeId);
+        settings.setValue(QStringLiteral("view/sourceVisible"), false);
+        settings.sync();
+    }
+    {
+        MainWindow window(false, slotsHiddenSettingsPath);
+        window.show();
+        QCoreApplication::processEvents();
+        auto *sourceSlot = window.findChild<QWidget *>(QStringLiteral("central.source"));
+        expect(sourceSlot && sourceSlot->isHidden(),
+               QStringLiteral("source slot honors the source visibility setting"));
+    }
+
+    const QString variantsThemeId = QStringLiteral("variants-test-theme");
+    const QString variantsThemeDirectory = QDir(themeRoot).filePath(variantsThemeId);
+    QDir(variantsThemeDirectory).removeRecursively();
+    expect(writeFile(QDir(variantsThemeDirectory).filePath(QStringLiteral("wide.ui")),
+                     validLayoutUi().toUtf8()),
+           QStringLiteral("write wide variant layout"));
+    expect(writeFile(QDir(variantsThemeDirectory).filePath(QStringLiteral("compact.ui")),
+                     slotsLayoutUi().toUtf8()),
+           QStringLiteral("write compact variant layout"));
+    expect(writeFile(QDir(variantsThemeDirectory).filePath(QStringLiteral("broken.ui")),
+                     QByteArray("<ui version=\"4.0\">")),
+           QStringLiteral("write broken variant layout"));
+    const QByteArray variantsThemeJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "variants-test-theme",
+        "name": "Variants Test Theme",
+        "layouts": {
+            "apiVersion": 1,
+            "variants": [
+                { "id": "wide", "file": "wide.ui", "contentMode": "tabs" },
+                { "id": "compact", "file": "compact.ui", "contentMode": "slots" },
+                { "id": "broken", "file": "broken.ui", "contentMode": "tabs" }
+            ]
+        }
+    })JSON";
+    expect(writeFile(QDir(variantsThemeDirectory).filePath(QStringLiteral("theme.json")),
+                     variantsThemeJson),
+           QStringLiteral("write variants theme manifest"));
+    const QString compactSettingsPath =
+        directory.filePath(QStringLiteral("variants-compact.ini"));
+    {
+        QSettings settings(compactSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), variantsThemeId);
+        settings.setValue(QStringLiteral("appearance/layoutId"), QStringLiteral("compact"));
+        settings.sync();
+    }
+    {
+        MainWindow window(false, compactSettingsPath);
+        window.show();
+        QCoreApplication::processEvents();
+        auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
+        auto *previewSlot = window.findChild<QWidget *>(QStringLiteral("central.preview"));
+        auto *preview = window.findChild<PreviewBrowser *>(QStringLiteral("previewView"));
+        expect(previewSlot && previewSlot->isAncestorOf(preview),
+               QStringLiteral("manual layout selection uses the compact variant"));
+        expect(tabs && tabs->isHidden(),
+               QStringLiteral("manual slots variant hides the document tabs"));
+    }
+    const QString wideSettingsPath =
+        directory.filePath(QStringLiteral("variants-wide.ini"));
+    {
+        QSettings settings(wideSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), variantsThemeId);
+        settings.setValue(QStringLiteral("appearance/layoutId"), QStringLiteral("wide"));
+        settings.sync();
+    }
+    {
+        MainWindow window(false, wideSettingsPath);
+        window.show();
+        QCoreApplication::processEvents();
+        auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
+        auto *content = window.findChild<QWidget *>(QStringLiteral("central.content"));
+        expect(content && tabs && !tabs->isHidden(),
+               QStringLiteral("manual layout selection uses the wide variant"));
+        expect(tabs && content && content->isAncestorOf(tabs),
+               QStringLiteral("wide variant keeps the tabbed content slot"));
+    }
+    const QString fallbackSettingsPath =
+        directory.filePath(QStringLiteral("variants-fallback.ini"));
+    {
+        QSettings settings(fallbackSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), variantsThemeId);
+        settings.setValue(QStringLiteral("appearance/layoutId"), QStringLiteral("missing"));
+        settings.sync();
+    }
+    {
+        MainWindow window(false, fallbackSettingsPath);
+        window.show();
+        QCoreApplication::processEvents();
+        auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
+        auto *content = window.findChild<QWidget *>(QStringLiteral("central.content"));
+        expect(content && tabs && !tabs->isHidden(),
+               QStringLiteral("missing layout id falls back to the first variant"));
+    }
+
+    const QString brokenSettingsPath =
+        directory.filePath(QStringLiteral("variants-broken.ini"));
+    {
+        QSettings settings(brokenSettingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("appearance/themeId"), variantsThemeId);
+        settings.setValue(QStringLiteral("appearance/layoutId"), QStringLiteral("broken"));
+        settings.sync();
+    }
+    {
+        MainWindow window(false, brokenSettingsPath);
+        window.show();
+        QCoreApplication::processEvents();
+        expect(window.findChild<QWidget *>(QStringLiteral("customMarker")) != nullptr,
+               QStringLiteral("broken variant falls back to the first variant"));
+    }
+
     const QString badId = QStringLiteral("layout-bad-theme");
     const QString badDirectory = QDir(themeRoot).filePath(badId);
     QDir(badDirectory).removeRecursively();
@@ -495,6 +859,9 @@ int main(int argc, char **argv)
     }
 
     QDir(typographyDirectory).removeRecursively();
+    QDir(previewThemeDirectory).removeRecursively();
+    QDir(slotsThemeDirectory).removeRecursively();
+    QDir(variantsThemeDirectory).removeRecursively();
     QDir(layoutThemeDirectory).removeRecursively();
     QDir(traversalDirectory).removeRecursively();
     QDir(missingDirectory).removeRecursively();

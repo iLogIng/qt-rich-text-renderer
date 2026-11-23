@@ -1,6 +1,7 @@
 #include "SvgSanitizer.h"
 
 #include <QColor>
+#include <QHash>
 #include <QTextStream>
 
 namespace {
@@ -47,6 +48,20 @@ int main()
                                           true);
     expect(dark.contains(QStringLiteral("#2d2d30")), QStringLiteral("Mermaid dark fill applied"));
     expect(dark.contains(QStringLiteral("#e6e6e6")), QStringLiteral("Mermaid dark text color applied"));
+
+    const QHash<QString, QString> variables = {
+        {QStringLiteral("primaryColor"), QStringLiteral("#123456")},
+        {QStringLiteral("textColor"), QStringLiteral("#abcdef")},
+    };
+    const QString custom = sanitizeSvgForQt(mermaidSvg,
+                                            true,
+                                            QColor(QStringLiteral("#abcdef")),
+                                            false,
+                                            variables);
+    expect(custom.contains(QStringLiteral("#123456")),
+           QStringLiteral("Mermaid primary color variable is applied"));
+    expect(custom.contains(QStringLiteral("#abcdef")),
+           QStringLiteral("Mermaid text color variable is applied"));
 
     if (failures == 0) {
         QTextStream(stdout) << "SVG sanitizer tests passed\n";

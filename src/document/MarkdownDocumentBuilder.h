@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QHash>
 #include <QString>
 
 class QTextDocument;
@@ -15,5 +16,6 @@ public:
                          bool dark,
                          const QColor &foreground,
                          int maxWidth,
-                         QString *errorOut = nullptr);
+                         QString *errorOut = nullptr,
+                         const QHash<QString, QString> &mermaidVariables = {});
 };
