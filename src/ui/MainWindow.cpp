@@ -52,6 +52,9 @@
 
 namespace {
 
+constexpr int kDefaultOutlineWidth = 200;
+constexpr int kMinimumOutlineWidth = 200;
+
 QString runtimeRoot()
 {
     const QString appDir = QCoreApplication::applicationDirPath();
@@ -129,8 +132,9 @@ MainWindow::MainWindow(bool dark, const QString &settingsPath, QWidget *parent)
     m_outlineDock->setWidget(m_outlinePanel);
     m_outlineDock->setAllowedAreas(Qt::LeftDockWidgetArea);
     m_outlineDock->setFeatures(QDockWidget::NoDockWidgetFeatures);
+    m_outlineDock->setMinimumWidth(kMinimumOutlineWidth);
     addDockWidget(Qt::LeftDockWidgetArea, m_outlineDock);
-    resizeDocks({m_outlineDock}, {240}, Qt::Horizontal);
+    resizeDocks({m_outlineDock}, {kDefaultOutlineWidth}, Qt::Horizontal);
     connect(m_outlinePanel, &OutlinePanel::blockRequested,
             this, &MainWindow::scrollPreviewToBlock);
     connect(m_outlineToggleButton, &QToolButton::toggled, this, [this](bool visible) {
@@ -224,6 +228,7 @@ void MainWindow::buildCentralShell()
         m_activeLayoutFile = selectedLayout.file;
         m_activeLayoutId = selectedLayout.id;
     }
+    shell.root->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_centralSlots = shell;
 }
 
@@ -244,6 +249,9 @@ void MainWindow::createCentralUiWidgets()
     m_status = new QLabel(QStringLiteral("No document open"), shell);
     m_status->setObjectName(QStringLiteral("statusLabel"));
     m_status->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // The status text is informational and must not raise the whole window's
+    // minimum width, which would squeeze the Outline dock on narrow screens.
+    m_status->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_backButton = new QToolButton(shell);
     m_backButton->setObjectName(QStringLiteral("historyBackButton"));
     m_backButton->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
@@ -475,9 +483,25 @@ void MainWindow::showPreviewContent()
 
 void MainWindow::rebuildCentralLayout()
 {
+    const int outlineWidth = m_outlineDock
+                                 ? qMax(kDefaultOutlineWidth, m_outlineDock->width())
+                                 : kDefaultOutlineWidth;
+
     buildCentralShell();
     populateCentralShell();
     setCentralWidget(m_centralSlots.root);
+    if (m_outlineDock) {
+        // Replacing the central widget can leave the dock at a stale width,
+        // either squeezed by the old minimum width or expanded into the new
+        // space. Restore a usable Outline width after each rebuild. The
+        // queued call runs after the new central layout has been activated.
+        resizeDocks({m_outlineDock}, {outlineWidth}, Qt::Horizontal);
+        QTimer::singleShot(0, this, [this, outlineWidth]() {
+            if (m_outlineDock) {
+                resizeDocks({m_outlineDock}, {outlineWidth}, Qt::Horizontal);
+            }
+        });
+    }
     updateToolbarHeights();
 }
 

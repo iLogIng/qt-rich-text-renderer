@@ -40,7 +40,7 @@
 - 代码高亮必须使用 Qt `QSyntaxHighlighter`，覆盖 C++、Python、JavaScript、JSON、Bash 和 LaTeX。
 - Source 必须是只读视图，不提供编辑、保存或 dirty 状态。
 - 标题目录必须从 `QTextDocument` 的标题层级生成；点击条目把目标 block 对齐到 Preview 顶部。
-- Outline 固定在主窗口左侧，只能隐藏，不能浮动或取下。
+- Outline 固定在主窗口左侧，只能隐藏，不能浮动或取下；最小宽度为 200px，中央布局重建后恢复可用宽度。
 
 ### 2.3 加载与布局
 
@@ -125,6 +125,7 @@
 - 主题图片只支持主题包内 PNG/JPEG，上限 2MiB、4096×4096；图片在宿主内容矩形中居中，不拉伸、不铺满，超出视口时仅等比缩小。不提供 SVG 主题资源。
 - `.ui` 支持 `contentMode: tabs|slots`；`slots` 模式通过 `central.preview` / `central.source` 注入内容，可选 `central.outline`，并禁止 `central.content`。
 - 布局变体支持手动选择和 `appearance/layoutId`，不支持按窗口宽度自动切换。
+- Outline dock 至少保留 200px 可用宽度；工具栏状态文本允许收缩，不能把中央布局最小宽度推到挤压 Outline 的程度。
 - 主题插槽样式只允许 `background`、`borderColor`、`borderWidth`、`radius` 和 `padding`；应用通过 `centralSlot` 动态属性和固定选择器生成 QSS。插槽样式只在 `qss` 启用时生效。
 - 用户主题包目录为 `QStandardPaths::AppDataLocation/themes/<id>/`，`theme.json` 必须位于其中；布局文件也必须留在主题包目录内。
 - 静态 `.ui` 只替换 `QMainWindow::centralWidget()` 的子树。主窗口、菜单、状态栏、Outline `QDockWidget`、文件加载、导航历史、设置和渲染 controller 必须继续由 C++ 持有。

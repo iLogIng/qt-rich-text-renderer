@@ -345,7 +345,7 @@ int main(int argc, char **argv)
                && nixie.previewFontFamily == QStringLiteral("Noto Sans Mono")
                && nixie.codeFontFamily == QStringLiteral("Noto Sans Mono"),
            QStringLiteral("nixie sample theme sets the mono families"));
-    expect(nixie.preview.maxTextWidth == 840
+    expect(nixie.preview.maxTextWidth == 0
                && nixie.preview.codeBackground == QColor(QStringLiteral("#160d07"))
                && nixie.preview.codeBlockMargin == 6,
            QStringLiteral("nixie sample theme sets the preview layout"));

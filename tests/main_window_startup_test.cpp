@@ -104,6 +104,11 @@ int main(int argc, char **argv)
     auto *statusLabel = window.findChild<QLabel *>(QStringLiteral("statusLabel"));
     expect(statusLabel && toolbarTrailing->isAncestorOf(statusLabel),
            QStringLiteral("status is injected into the trailing slot"));
+    expect(statusLabel
+               && statusLabel->sizePolicy().horizontalPolicy() == QSizePolicy::Ignored,
+           QStringLiteral("status text can shrink without inflating the window minimum"));
+    expect(outlineDock->minimumWidth() >= 200,
+           QStringLiteral("outline dock keeps a usable minimum width"));
     expect(centralTop->property("centralSlot").toString() == QStringLiteral("top")
                && centralBottom->property("centralSlot").toString() == QStringLiteral("bottom")
                && centralEmpty->property("centralSlot").toString() == QStringLiteral("empty")
@@ -183,6 +188,23 @@ int main(int argc, char **argv)
 
     window.show();
     QCoreApplication::processEvents();
+
+    auto *previewView = window.findChild<QTextBrowser *>(QStringLiteral("previewView"));
+    window.resize(1024, 700);
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    const qreal narrowPreviewWidth =
+        previewView ? previewView->document()->textWidth() : 0;
+    expect(window.centralWidget()->minimumSizeHint().width() < 1000,
+           QStringLiteral("central layout minimum width leaves room for the outline"));
+    expect(outlineDock->width() >= outlineDock->minimumWidth(),
+           QStringLiteral("outline dock is not squeezed on a narrow window"));
+    window.resize(1280, 860);
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    expect(previewView && narrowPreviewWidth > 0
+               && previewView->document()->textWidth() > narrowPreviewWidth,
+           QStringLiteral("preview text width follows viewport expansion"));
 
     const QString visiblePath = directory.filePath(QStringLiteral("visible-load.md"));
     QString visibleContent =

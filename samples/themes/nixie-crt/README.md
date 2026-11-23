@@ -5,9 +5,10 @@ and early CRT monitors. It uses a near-black brown background, a bright
 fluorescent orange text color and a small glowing tube mark, while keeping the
 document readable for long sessions.
 
-The theme is a complete example package: it uses every user-theme capability
-that `rich-text-renderer` currently offers except automatic responsive layout
-switching, which is not implemented.
+The theme exercises the current user-theme schema: colors, typography, syntax
+palettes, preview styling, Mermaid variables, a PNG asset, all slot style keys,
+both content modes and metrics. Automatic responsive layout switching is not
+implemented.
 
 ## Install
 
@@ -50,6 +51,8 @@ and then to the built-in default central layout.
 
 The accent is deliberately brighter than a real amber CRT so headings, links,
 selection and diagram borders remain legible against the warm black surfaces.
+`preview.maxTextWidth` is explicitly `0`: a fixed reading column would ignore
+Preview pane or splitter expansion, which is not desirable for the dual layout.
 
 ## Capabilities used
 
@@ -59,8 +62,9 @@ selection and diagram borders remain legible against the warm black surfaces.
   still controlled by Settings.
 - **Syntax palettes**: separate code and Source palettes, from bright headings
   to dim comments.
-- **Preview**: an 840 px centered reading column, code background and code
-  block spacing.
+- **Preview**: width follows the pane or splitter, so expanding the Preview
+  area makes the rendered document wider; the theme only sets the code
+  background, code block spacing and a 20 px document margin.
 - **Mermaid**: the `base` theme with all eight supported color variables, so
   diagrams use dark node fills and orange borders, lines and labels.
 - **PNG asset**: `assets/nixie-mark.png` is a 96×34 transparent tube mark.
