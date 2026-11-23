@@ -133,7 +133,7 @@ Mermaid v13 alpha 的关键性质：
 
 - 官方声明无 DOM、确定性输出、Node/Deno/web worker 可运行；
 - `mermaid/slim` + flowchart/sequence/state 可以运行；完整 `mermaid` worker 也已验证；
-- 完整 worker 的常用图类型 smoke test 24/24 通过；
+- 完整 worker 的常用图类型 smoke test 24/24 通过，并增加 1 个主题变量检查，总计 25/25 通过；
 - 输出 SVG 使用大量 CSS 变量（`--_p`、`--_tx`、`--_el` 等）；
 - QtSvg 不解析 CSS 变量和 `color(from ...)`，原始 SVG 会出现黑块/缺失文字；
 - 8 位 hex 颜色（`#e8e8e8cc`）在 QtSvg 中会变成黑色，需要转成 6 位；
@@ -280,15 +280,21 @@ documentLayout()->documentSize();
 
 - 内置 `light` / `dark` 使用 QPalette，不启用 QSS，不提供 `.ui`，默认中央布局保持原视觉；
 - 深色主题补齐 Active/Inactive/Disabled 组以及 `Light`、`Midlight`、`Dark`、`Mid`、`Shadow` 等 bevel 角色，避免 Outline 切换按钮和边框残留浅色调色板；
-- 用户主题支持 JSON 颜色、字体族、布局间距、Preview 文档边距、语法高亮色板、固定插槽样式、QSS 模板 token 和可选 `layout.ui`；
+- 用户主题支持 JSON 颜色、字体族、布局间距、Preview 文档边距与阅读列、语法高亮色板、Mermaid 主题、PNG/JPEG 资源、固定插槽样式、QSS 模板 token 和可选 `layout.ui`；
 - 字号仍由 Settings 唯一控制；主题和 `.ui` 不能覆盖字号，`.ui` 的 `font/pointsize` 会被拒绝；
+- Preview 支持 `maxTextWidth` 居中阅读列、代码块背景和代码块边距；`maxTextWidth=0` 保持 viewport 宽度；
+- Mermaid 支持 `default` / `dark` / `forest` / `neutral` / `base` 主题和 8 个颜色变量；主题签名进入缓存 key，SVG sanitizer 使用相同颜色变量；
+- 主题图片只支持 PNG/JPEG（≤2MiB、≤4096×4096），通过 `themeAsset` 逻辑 ID 注入，居中且不拉伸；
+- `.ui` 支持 `contentMode: tabs|slots`；`slots` 模式使用 `central.preview` / `central.source`，可选 `central.outline`；
+- `layouts` 支持手动布局变体，Settings 保存 `appearance/layoutId`；自动按宽度切换不实施；
 - `.ui` 只替换 `QMainWindow::centralWidget()` 子树，Outline dock、标签页、工具栏、历史、设置和渲染 controller 保持 C++ 管理；
 - 具名插槽通过 `centralSlot` 动态属性生成固定 QSS 规则，支持背景、边框、圆角和 padding；
 - `samples/themes/aurora-dark` 同时验证 QSS、插槽样式和静态 `.ui` 布局；
-- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本、字号属性和失败回退；
+- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本、字号属性、tabs/slots 切换、Source 显隐、布局变体和失败回退；
+- `theme-test` 覆盖 Preview、Mermaid、图片资源和布局变体 schema；`svg-sanitizer-test` 和 `svg-cache-test` 覆盖 Mermaid 变量映射与缓存签名；
 - 主题切换到内置主题时会重建默认中央布局，文档、历史、设置和 Outline 不受影响；
 - 内置 light/dark 与阶段改动前截图对比，仅状态栏计时文本和极少量抗锯齿像素不同；
-- 当前 CTest 共 15 个目标，全部通过。
+- 当前 CTest 共 15 个目标，全部通过；Mermaid smoke 24 个图类型 + 1 个主题变量检查全部通过。
 
 ## 7. 缓存与“渲染是纯函数”
 

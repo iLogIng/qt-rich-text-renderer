@@ -1,6 +1,6 @@
 # 程序流程图
 
-> 对应代码：`src/app/main.cpp`、`src/ui/MainWindow.cpp`、`src/core/AppSettings.cpp`、`src/core/RendererService.cpp`、`src/core/RendererWorker.cpp`、`src/core/MarkdownPreprocessor.cpp`、`src/document/MarkdownDocumentBuilder.cpp`、`src/document/MarkdownOutline.cpp`、`src/ui/OutlinePanel.cpp`、`src/ui/SettingsDialog.cpp`、`src/ui/Theme.cpp`、`src/ui/CentralUiLayout.cpp`、`src/document/SvgObjectHandler.cpp`
+> 对应代码：`src/app/main.cpp`、`src/ui/MainWindow.cpp`、`src/core/AppSettings.cpp`、`src/core/RendererService.cpp`、`src/core/RendererWorker.cpp`、`src/core/MarkdownPreprocessor.cpp`、`src/document/MarkdownDocumentBuilder.cpp`、`src/document/MarkdownOutline.cpp`、`src/ui/OutlinePanel.cpp`、`src/ui/SettingsDialog.cpp`、`src/ui/Theme.cpp`、`src/ui/CentralUiLayout.cpp`、`src/core/RenderTheme.cpp`、`src/document/PreviewStyle.cpp`、`src/document/SvgObjectHandler.cpp`
 >
 > 本文件只放流程图；架构与模块说明见 [README.md](../README.md)、[ADR-0001](ADR-0001-rendering-pipeline.md)。
 
@@ -365,7 +365,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A["AppSettingsData::themeId"] --> B["ThemeManager::loadTheme()"]
+    A["AppSettingsData::themeId + layoutId"] --> B["ThemeManager::loadTheme()"]
     B --> C{"内置 light/dark?"}
     C -- 是 --> D["Qt 资源中的 theme JSON"]
     C -- 否 --> E["AppDataLocation/themes/&lt;id&gt;/theme.json"]
@@ -378,7 +378,7 @@ flowchart TD
     G --> K["QApplication"]
     I --> K
     J --> K
-    F --> L{"layoutFile?"}
+    F --> L{"layout or layouts?"}
     L -- 否 --> M["C++ 默认中央骨架"]
     L -- 是 --> N["CentralUiBuilder::loadTheme()"]
     N --> O{"校验通过?"}
@@ -394,11 +394,13 @@ flowchart TD
 - 主题缺失或校验失败时回退到 `light`；
 - 主题排版只提供字体族、默认布局间距和文档边距；字号始终由 Settings 控制；
 - 主题可以覆盖代码和 Markdown Source 的语法高亮色板，切换主题时重新 rehighlight；
+- Preview 支持居中阅读列、代码块背景和代码块边距；
+- Mermaid 支持内置主题枚举和颜色变量；主题签名进入 SVG cache key，颜色变量同时进入 worker 和 SVG sanitizer；
+- 主题包 PNG/JPEG 资源只通过 `themeAsset` 逻辑 ID 注入；图片居中、不拉伸，超出视口时仅等比缩小；
 - 具名插槽通过 `centralSlot` 动态属性和固定 QSS 属性选择器应用背景、边框和 padding；
 - `.ui` 只替换 `QMainWindow::centralWidget()` 子树；主窗口、状态栏、Outline dock 和渲染 controller 仍由 C++ 持有；
-- 必需插槽为 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；可选插槽为 `central.top`、`central.bottom`、`central.empty`；
-- `central.preview` 和 `central.source` 是 `central.content` 内部标签页的稳定内容插槽；
+- `tabs` 模式必需 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；`slots` 模式必需 `central.toolbar.leading`、`central.toolbar.trailing`、`central.preview`、`central.source`，可选 `central.outline`；
 - `.ui` 只允许标准 Qt 控件和布局；未知控件、`<customwidgets>`、`<resources>`、`<connections>`、外部 URL 和 `styleSheet` 注入会被拒绝；
 - `.ui` 缺失、解析失败、插槽缺失或校验失败时回退 C++ 默认中央布局；布局路径无效只拒绝布局，不回退主题颜色；
-- 代码高亮、Source 高亮和 Mermaid 仍使用主题的 `dark` 标志；
+- `layouts` 支持手动选择命名 variant，`layoutId` 保存选择；variant 失败回退首个 variant，再回退默认中央布局；不自动按窗口宽度切换；
 - 当前不引入 QML。

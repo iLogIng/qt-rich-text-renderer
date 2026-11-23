@@ -129,7 +129,7 @@ Linux 上通常为：
 
 Settings 对话框提供 Appearance、View、Preview、Advanced 四组设置，并支持 Restore Defaults。主要配置项包括：
 
-- 主题、应用/预览字号、Source 字号和 Source 高亮；
+- 主题、命名布局 variant、应用/预览字号、Source 字号和 Source 高亮；
 - Outline 与 Source 可见性；
 - 预览 SVG 最大宽度；
 - MathJax / Mermaid 请求超时与 worker 空闲超时；
@@ -151,7 +151,7 @@ Linux 上通常为：
 ~/.local/share/rich-text-renderer/rich-text-renderer/themes/<theme-id>/theme.json
 ```
 
-主题 JSON 支持颜色、字体族、尺寸、语法高亮色板、插槽样式、QSS 开关和可选的静态 `.ui` 布局声明，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
+主题 JSON 支持颜色、字体族、尺寸、语法高亮色板、Preview 外观、Mermaid 主题、PNG/JPEG 资源、插槽样式、QSS 开关和可选的静态 `.ui` 布局声明，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
 
 所有字号仍由 Settings 控制。主题不提供字号字段，`.ui` 中的 `font/pointsize` 会被拒绝；主题只能提供字体族。
 
@@ -175,7 +175,7 @@ Linux 上通常为：
 
 - `typography.uiFontFamily` 设置应用字体族；
 - `typography.previewFontFamily` 只影响 Preview 文档；
-- `typography.codeFontFamily` 影响 Source 视图，Preview 代码块字体族会在后续的 Preview 文档处理阶段接入；
+- `typography.codeFontFamily` 影响 Source 视图和 Preview 代码块字体族；
 - `metrics.spacing` 是 C++ 默认中央布局的间距默认值，`.ui` 显式设置的间距优先；
 - `metrics.documentMargin` 设置 Preview 文档边距，默认 12。
 
@@ -240,6 +240,9 @@ Linux 上通常为：
 - `toolbarLeading`
 - `toolbarTrailing`
 - `content`
+- `preview`（`contentMode: slots`）
+- `source`（`contentMode: slots`）
+- `outline`（`contentMode: slots`）
 
 支持的字段只有 `background`、`borderColor`、`borderWidth`（0–8）、`radius`（0–32）和 `padding`（0–32）。插槽样式只在 `qss` 启用时生效；`qss: false` 的主题不会应用 `slots` 规则。主题不能提供任意 QSS；应用会把固定属性选择器追加到内置模板：
 
@@ -248,6 +251,120 @@ QWidget[centralSlot="top"] { ... }
 ```
 
 插槽宿主暴露动态属性 `centralSlot`，用于稳定匹配。没有 `slots` 字段时不会生成额外规则。
+
+#### Preview 外观
+
+```json
+{
+  "preview": {
+    "maxTextWidth": 0,
+    "codeBackground": "#161b22",
+    "codeBlockMargin": 8
+  }
+}
+```
+
+- `maxTextWidth`：默认 `0`，沿用当前 viewport 宽度；正整数时启用居中阅读列；
+- `codeBackground`：代码块背景色；
+- `codeBlockMargin`：代码块首尾的上下间距；
+- `documentMargin` 仍由 `metrics.documentMargin` 控制；
+- 字号仍由 Settings 控制。
+
+#### Mermaid 主题
+
+```json
+{
+  "mermaid": {
+    "theme": "base",
+    "variables": {
+      "primaryColor": "#2dd4bf",
+      "lineColor": "#8b949e",
+      "textColor": "#e6edf3"
+    }
+  }
+}
+```
+
+内置主题枚举支持 `default`、`dark`、`forest`、`neutral`、`base`。变量只允许颜色键：
+
+- `primaryColor`
+- `lineColor`
+- `textColor`
+- `mainBkg`
+- `nodeBorder`
+- `nodeTextColor`
+- `arrowheadColor`
+- `edgeLabelBackground`
+
+主题变量会进入 Mermaid worker 和 SVG sanitizer，也会进入缓存 key。字号和字体族不通过 Mermaid 变量覆盖。
+
+#### 静态图片资源
+
+```json
+{
+  "assets": {
+    "logo": "assets/logo.png"
+  }
+}
+```
+
+`.ui` 只使用逻辑资源 ID：
+
+```xml
+<widget class="QLabel" name="themeLogo">
+  <property name="themeAsset" stdset="0">
+    <string>logo</string>
+  </property>
+</widget>
+```
+
+- 只支持 PNG、JPEG；
+- 文件大小 ≤ 2MB，图像尺寸 ≤ 4096×4096；
+- 不允许 SVG、动画、外部 URL 或主题包外路径；
+- `QLabel` 图片居中显示，不拉伸、不铺满；图片大于视口时按比例缩小；
+- `QToolButton` / `QPushButton` 设置居中 icon；
+- 资源校验失败时回退 C++ 默认中央布局。
+
+#### 直接 Preview/Source 插槽
+
+`layout.contentMode` 支持：
+
+```json
+{
+  "layout": {
+    "apiVersion": 1,
+    "file": "layout.ui",
+    "contentMode": "slots"
+  }
+}
+```
+
+- `tabs`：默认模式，Preview 和 Source 位于 C++ 管理的 `QTabWidget`；
+- `slots`：Preview 和 Source 分别注入 `central.preview` / `central.source`；
+- `slots` 模式必需 `central.toolbar.leading`、`central.toolbar.trailing`、`central.preview`、`central.source`；
+- 可选 `central.outline` 用于放置 Outline 切换按钮；缺失时回退到 `central.toolbar.trailing`；
+- `slots` 模式不允许 `central.content`；
+- `view.sourceVisible=false` 会隐藏 Source 插槽；如果它是 `QTabWidget` 页面，会同时隐藏对应标签页。
+
+#### 布局变体
+
+```json
+{
+  "layouts": {
+    "apiVersion": 1,
+    "variants": [
+      { "id": "wide", "file": "wide.ui", "contentMode": "tabs" },
+      { "id": "compact", "file": "compact.ui", "contentMode": "slots" }
+    ]
+  }
+}
+```
+
+- `layout` 和 `layouts` 互斥；
+- Settings 的 Appearance 页提供布局选择，保存到 `appearance/layoutId`；
+- 缺省或未知 `layoutId` 使用第一个 variant；
+- variant 加载失败时回退到第一个 variant，再回退 C++ 默认中央布局；
+- 当前只支持手动选择，不按窗口宽度自动切换。
 
 #### 可选 `.ui` 中央布局
 
@@ -272,11 +389,13 @@ QStandardPaths::AppDataLocation/themes/<theme-id>/
 
 布局只替换 `QMainWindow::centralWidget()` 的子树。主窗口、菜单、状态栏、Outline `QDockWidget`、文件加载、导航历史、设置、渲染 controller 和 worker 仍由 C++ 持有。内置主题可以不带 `.ui`；没有 `.ui` 时继续使用 C++ 默认中央布局。
 
-`.ui` 根控件必须是 `QWidget` 或 `QFrame`，`objectName` 为 `central.root`。必需插槽：
+`.ui` 根控件必须是 `QWidget` 或 `QFrame`，`objectName` 为 `central.root`。`tabs` 模式的必需插槽：
 
 - `central.toolbar.leading`：必须使用 `QHBoxLayout`；
 - `central.toolbar.trailing`：必须使用 `QHBoxLayout`；
 - `central.content`：承载 Preview/Source 标签组合。
+
+`slots` 模式的必需插槽和可选 `central.outline` 见上一节。
 
 可选插槽：
 
@@ -301,7 +420,7 @@ QStandardPaths::AppDataLocation/themes/<theme-id>/
 
 当前不引入 QML，也不支持替换整个 `QMainWindow`。
 
-后续的 Preview 外观、Mermaid 主题、静态 PNG/JPEG 资源、Preview/Source 直接插槽和手动布局变体设计见 [TODO.md](TODO.md) 的 **Theme & Layout Evolution** 一节；这些能力尚未实现。
+按窗口宽度自动切换布局（`T8B`）仍为后续候选，设计见 [TODO.md](TODO.md) 的 **Theme & Layout Evolution** 一节。
 
 ## 支持的 Markdown
 
@@ -384,8 +503,9 @@ scripts/test-idle.sh
 - 导航历史；
 - 设置模板、用户覆盖、设置对话框和旧主题配置迁移；
 - 主题 JSON 加载、QSS token、用户主题、错误回退和内置主题；
-- 主题字体族、文档边距、默认布局间距、语法高亮色板和固定插槽 QSS；
-- 中央布局插槽、默认布局、空插槽零占位、主题 `.ui` 加载、白名单校验和失败回退；
+- 主题字体族、文档边距、默认布局间距、语法高亮色板、Preview 外观、Mermaid 主题和固定插槽 QSS；
+- PNG/JPEG 资源校验、居中注入、路径越界和非法格式拒绝；
+- 中央布局插槽、tabs/slots 切换、Source 显隐、布局变体选择和主题 `.ui` 加载、白名单校验和失败回退；
 - Markdown 预处理、目录提取和文档渲染；
 - SVG 缓存、SVG 归一化和对象嵌入；
 - 启动、Outline、设置应用和加载后的完整文档布局；

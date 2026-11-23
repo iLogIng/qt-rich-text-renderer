@@ -65,7 +65,7 @@
 
 - Mermaid 必须通过 QuickJS-ng 的全量 worker 渲染为 SVG。
 - 版本固定为 `13.0.0-alpha.3`；不得在运行时下载或切换版本。
-- 常用图类型的 smoke test 必须保持 24/24 通过；全部 33 种图不构成当前保证。
+- 常用图类型的 smoke test 必须保持 24/24 通过，并覆盖 1 个 Mermaid 主题变量检查；全部 33 种图不构成当前保证。
 - 输出必须使用确定性 ID。
 - CSS 变量、8 位十六进制颜色和 `width="100%"` 必须在嵌入前归一化，保证 QtSvg 兼容。
 
@@ -112,18 +112,23 @@
 - `config/settings.ini` 是只读默认模板；用户覆盖写入 `QStandardPaths::AppConfigLocation/settings.ini`。
 - 用户覆盖不得重写模板，避免丢失模板注释。
 - 设置项至少覆盖：
-  - `appearance.themeId`、应用/预览字号、Source 字号、Source 高亮；
+  - `appearance.themeId`、`appearance.layoutId`、应用/预览字号、Source 字号、Source 高亮；
   - `view.outlineVisible`、`view.sourceVisible`；
   - `preview.maxSvgWidth`；
   - MathJax/Mermaid 请求超时和 worker 空闲超时；
   - 最近目录和窗口几何。
 - 主题必须使用 Widgets + QPalette + QSS；内置 `light` / `dark` 保持当前视觉。
 - 所有字号由 Settings 唯一控制；主题只能提供字体族、文档边距和布局间距，不得通过 JSON、QSS 或 `.ui` 覆盖字号。
-- 用户主题支持颜色、字体族、语法高亮色板、固定插槽样式、QSS 开关和可选静态 `.ui` 布局，不接受任意 QSS、QML 或可执行代码。
+- 用户主题支持颜色、字体族、语法高亮色板、Preview 外观、Mermaid 主题、PNG/JPEG 资源、固定插槽样式、QSS 开关和可选静态 `.ui` 布局，不接受任意 QSS、QML 或可执行代码。
+- Preview 支持 `maxTextWidth`、代码块背景和代码块边距；`maxTextWidth=0` 保持 viewport 宽度。
+- Mermaid 支持内置主题枚举和颜色变量；变量不得覆盖字号或字体族。
+- 主题图片只支持主题包内 PNG/JPEG，上限 2MiB、4096×4096；图片在宿主内容矩形中居中，不拉伸、不铺满，超出视口时仅等比缩小。不提供 SVG 主题资源。
+- `.ui` 支持 `contentMode: tabs|slots`；`slots` 模式通过 `central.preview` / `central.source` 注入内容，可选 `central.outline`，并禁止 `central.content`。
+- 布局变体支持手动选择和 `appearance/layoutId`，不支持按窗口宽度自动切换。
 - 主题插槽样式只允许 `background`、`borderColor`、`borderWidth`、`radius` 和 `padding`；应用通过 `centralSlot` 动态属性和固定选择器生成 QSS。插槽样式只在 `qss` 启用时生效。
 - 用户主题包目录为 `QStandardPaths::AppDataLocation/themes/<id>/`，`theme.json` 必须位于其中；布局文件也必须留在主题包目录内。
 - 静态 `.ui` 只替换 `QMainWindow::centralWidget()` 的子树。主窗口、菜单、状态栏、Outline `QDockWidget`、文件加载、导航历史、设置和渲染 controller 必须继续由 C++ 持有。
-- `.ui` 根控件必须是 `QWidget` 或 `QFrame`，`objectName` 为 `central.root`。必需插槽为 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；可选插槽为 `central.top`、`central.bottom`、`central.empty`。
+- `.ui` 根控件必须是 `QWidget` 或 `QFrame`，`objectName` 为 `central.root`。`tabs` 模式必需 `central.toolbar.leading`、`central.toolbar.trailing`、`central.content`；`slots` 模式必需 `central.toolbar.leading`、`central.toolbar.trailing`、`central.preview`、`central.source`，可选 `central.outline`。两种模式都支持 `central.top`、`central.bottom`、`central.empty`。
 - `.ui` 只允许标准 Qt 控件和布局，不允许未知控件、主题携带的编译控件、`<customwidgets>`、`<resources>`、`<connections>`、外部 URL 或 `styleSheet` 注入；`font/pointsize` 等字号属性也不允许。
 - `.ui` 缺失、解析失败、插槽缺失或校验失败时，必须回退 C++ 默认中央布局；布局路径无效只拒绝布局，不回退主题颜色。
 - 自定义控件策略：当前采用标准 Qt 控件 + 插槽宿主；应用预注册的自定义控件留作后续可选能力；主题携带 `.so` / `.dll` 的第三方编译控件不采用。
@@ -198,7 +203,7 @@ scripts/test-process-bound.sh
 scripts/test-idle.sh
 ```
 
-`scripts/test.sh` 运行 15 个 CTest 目标，并执行渲染器 smoke test。
+`scripts/test.sh` 运行 15 个 CTest 目标，并执行渲染器 smoke test；Mermaid smoke 覆盖 24 个图类型和 1 个主题变量检查。
 
 ### 10.2 契约映射
 
@@ -211,6 +216,10 @@ scripts/test-idle.sh
 | 导航历史 | `NavigationHistory` | `navigation-history-test` |
 | 设置与主题 | `AppSettings`、`SettingsDialog`、`ThemeManager` | `app-settings-test`、`settings-dialog-test`、`theme-test` |
 | 中央布局与 `.ui` | `CentralUiBuilder`、`MainWindow` | `ui-layout-test`、`main-window-startup-test` |
+| Preview 外观 | `PreviewStyle`、`MainWindow` | `document-rendering-test`、`ui-layout-test` |
+| Mermaid 主题 | `MermaidTheme`、`RendererService`、worker、`SvgSanitizer` | `theme-test`、`svg-cache-test`、`svg-sanitizer-test`、`scripts/test-mermaid-full.py` |
+| 主题图片资源 | `ThemeManager`、`CentralUiBuilder` | `theme-test`、`ui-layout-test` |
+| 布局变体 | `ThemeManager`、`MainWindow`、`SettingsDialog` | `ui-layout-test`、`settings-dialog-test` |
 | 目录与启动 | `MarkdownOutline`、`MainWindow` | `markdown-outline-test`、`main-window-startup-test` |
 | 加载与布局收尾 | `MainWindow::loadFile()`、`openLocalFile()`、`finishPreviewLoad()` | `main-window-startup-test` |
 | 媒体预览 | `MediaPreviewWindow` | `media-preview-test` |
