@@ -37,7 +37,7 @@
 | Mermaid full worker bundle | 2.1MB |
 | Qt 应用二进制 | 6.7MB |
 | AppDir（含 Qt 依赖/插件） | 约 85MB |
-| AppImage（完整） | **34.9MB / 33.2MiB** |
+| AppImage（完整） | **34.9MB / 33.3MiB** |
 | qjs + 4 个 JS bundle（含测试入口） | 约 7.9MB |
 
 对比：QtWebEngine 通常会带来 130–180MB 的额外体积。这个方案避开了它。
@@ -279,11 +279,14 @@ documentLayout()->documentSize();
 ## 6.7 主题与静态 `.ui`
 
 - 内置 `light` / `dark` 使用 QPalette，不启用 QSS，不提供 `.ui`，默认中央布局保持原视觉；
-- 用户主题支持 JSON 颜色、QSS 模板 token 和可选 `layout.ui`；
+- 用户主题支持 JSON 颜色、字体族、布局间距、Preview 文档边距、语法高亮色板、固定插槽样式、QSS 模板 token 和可选 `layout.ui`；
+- 字号仍由 Settings 唯一控制；主题和 `.ui` 不能覆盖字号，`.ui` 的 `font/pointsize` 会被拒绝；
 - `.ui` 只替换 `QMainWindow::centralWidget()` 子树，Outline dock、标签页、工具栏、历史、设置和渲染 controller 保持 C++ 管理；
-- `samples/themes/aurora-dark` 同时验证 QSS 和静态 `.ui` 布局；
-- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本和失败回退；
+- 具名插槽通过 `centralSlot` 动态属性生成固定 QSS 规则，支持背景、边框、圆角和 padding；
+- `samples/themes/aurora-dark` 同时验证 QSS、插槽样式和静态 `.ui` 布局；
+- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本、字号属性和失败回退；
 - 主题切换到内置主题时会重建默认中央布局，文档、历史、设置和 Outline 不受影响；
+- 内置 light/dark 与阶段改动前截图对比，仅状态栏计时文本和极少量抗锯齿像素不同；
 - 当前 CTest 共 15 个目标，全部通过。
 
 ## 7. 缓存与“渲染是纯函数”
@@ -328,7 +331,7 @@ key = SHA256(
 
 结果：
 
-- 完整 AppImage：**34.9MB / 33.2MiB**；
+- 完整 AppImage：**34.9MB / 33.3MiB**；
 - AppDir（未压缩）：约 85MB；
 - 运行时渲染链（qjs + MathJax worker + Mermaid full worker）：约 5.4MB；
 - 不再包含 WebEngine；
