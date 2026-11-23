@@ -1,14 +1,41 @@
 #pragma once
 
+#include "SyntaxPalette.h"
+
 #include <QColor>
+#include <QHash>
 #include <QString>
 #include <QVector>
+
+namespace ThemeSlotStyle {
+inline constexpr char Property[] = "centralSlot";
+inline constexpr char Top[] = "top";
+inline constexpr char Bottom[] = "bottom";
+inline constexpr char Empty[] = "empty";
+inline constexpr char ToolbarLeading[] = "toolbarLeading";
+inline constexpr char ToolbarTrailing[] = "toolbarTrailing";
+inline constexpr char Content[] = "content";
+inline constexpr char Preview[] = "preview";
+inline constexpr char Source[] = "source";
+} // namespace ThemeSlotStyle
+
+struct SlotStyle {
+    QColor background;
+    QColor borderColor;
+    int borderWidth = -1;
+    int radius = -1;
+    int padding = -1;
+};
 
 struct ThemeSpec {
     QString id;
     QString name;
     bool dark = false;
     bool useQss = false;
+
+    QString uiFontFamily;
+    QString previewFontFamily;
+    QString codeFontFamily;
 
     QString packageDirectory;
     QString layoutFile;
@@ -33,8 +60,13 @@ struct ThemeSpec {
     QColor tooltipText;
     QColor border;
 
+    CodeSyntaxPalette codeSyntax;
+    MarkdownSourcePalette sourceSyntax;
+    QHash<QString, SlotStyle> slotStyles;
+
     int radius = 6;
     int spacing = 6;
+    int documentMargin = 12;
 };
 
 struct ThemeInfo {

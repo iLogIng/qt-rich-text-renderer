@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SyntaxPalette.h"
+
 #include <QRegularExpression>
 #include <QTextCharFormat>
 #include <QSyntaxHighlighter>
@@ -9,6 +11,7 @@ public:
     explicit CodeHighlighter(QTextDocument *document, bool dark = false, QObject *parent = nullptr);
 
     void setDark(bool dark);
+    void setSyntaxPalette(const CodeSyntaxPalette &palette);
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -23,7 +26,7 @@ private:
     void highlightLatex(const QString &text);
     void applyRegex(const QString &text, const QRegularExpression &expression, const QTextCharFormat &format);
 
-    bool m_dark = false;
+    CodeSyntaxPalette m_palette;
     QTextCharFormat m_keyword;
     QTextCharFormat m_string;
     QTextCharFormat m_number;

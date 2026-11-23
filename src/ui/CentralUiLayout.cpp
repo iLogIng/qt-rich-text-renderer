@@ -16,6 +16,7 @@
 #include <QMetaType>
 #include <QSet>
 #include <QSizePolicy>
+#include <QStyle>
 #include <QStringList>
 #include <QTextDocument>
 #include <QUrl>
@@ -85,7 +86,6 @@ bool isAllowedXmlElement(const QString &name)
         QStringLiteral("sizehint"),
         QStringLiteral("font"),
         QStringLiteral("family"),
-        QStringLiteral("pointsize"),
         QStringLiteral("weight"),
         QStringLiteral("italic"),
         QStringLiteral("bold"),
@@ -470,6 +470,18 @@ bool validateLoadedValues(QWidget *root, QString *error)
     return true;
 }
 
+void setSlotStyleProperty(QWidget *slot, const QString &value)
+{
+    if (!slot) {
+        return;
+    }
+    slot->setProperty(ThemeSlotStyle::Property, value);
+    if (QStyle *style = slot->style()) {
+        style->unpolish(slot);
+        style->polish(slot);
+    }
+}
+
 bool validateWidgetCount(QWidget *root, QString *error)
 {
     int count = 0;
@@ -530,13 +542,15 @@ QWidget *CentralUiBuilder::createSlot(QWidget *parent, const QString &name)
     return slot;
 }
 
-QWidget *CentralUiBuilder::createToolbarSlot(QWidget *parent, const QString &name)
+QWidget *CentralUiBuilder::createToolbarSlot(QWidget *parent,
+                                             const QString &name,
+                                             int spacing)
 {
     auto *slot = new QWidget(parent);
     slot->setObjectName(name);
     auto *layout = new QHBoxLayout(slot);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(6);
+    layout->setSpacing(spacing);
     return slot;
 }
 
@@ -588,7 +602,7 @@ bool CentralUiBuilder::slotHasContent(QWidget *slot)
     return !slot->findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly).isEmpty();
 }
 
-CentralUiLayout CentralUiBuilder::createDefault(QWidget *parent)
+CentralUiLayout CentralUiBuilder::createDefault(QWidget *parent, int spacing)
 {
     CentralUiLayout layout;
     layout.root = new QWidget(parent);
@@ -596,9 +610,10 @@ CentralUiLayout CentralUiBuilder::createDefault(QWidget *parent)
 
     auto *outer = new QVBoxLayout(layout.root);
     outer->setContentsMargins(8, 8, 8, 8);
-    outer->setSpacing(6);
+    outer->setSpacing(spacing);
 
     layout.top = createSlot(layout.root, QString::fromLatin1(CentralUiSlotNames::Top));
+    setSlotStyleProperty(layout.top, QString::fromLatin1(ThemeSlotStyle::Top));
     setSlotEmpty(layout.top, true);
     outer->addWidget(layout.top);
 
@@ -606,10 +621,14 @@ CentralUiLayout CentralUiBuilder::createDefault(QWidget *parent)
     toolbarRow->setContentsMargins(0, 0, 0, 0);
     toolbarRow->setSpacing(0);
 
-    layout.toolbarLeading =
-        createToolbarSlot(layout.root, QString::fromLatin1(CentralUiSlotNames::ToolbarLeading));
-    layout.toolbarTrailing =
-        createToolbarSlot(layout.root, QString::fromLatin1(CentralUiSlotNames::ToolbarTrailing));
+    layout.toolbarLeading = createToolbarSlot(
+        layout.root, QString::fromLatin1(CentralUiSlotNames::ToolbarLeading), spacing);
+    layout.toolbarTrailing = createToolbarSlot(
+        layout.root, QString::fromLatin1(CentralUiSlotNames::ToolbarTrailing), spacing);
+    setSlotStyleProperty(layout.toolbarLeading,
+                         QString::fromLatin1(ThemeSlotStyle::ToolbarLeading));
+    setSlotStyleProperty(layout.toolbarTrailing,
+                         QString::fromLatin1(ThemeSlotStyle::ToolbarTrailing));
     setSlotEmpty(layout.toolbarLeading, true);
     setSlotEmpty(layout.toolbarTrailing, true);
     toolbarRow->addWidget(layout.toolbarLeading, 0);
@@ -617,15 +636,18 @@ CentralUiLayout CentralUiBuilder::createDefault(QWidget *parent)
     outer->addLayout(toolbarRow);
 
     layout.content = createSlot(layout.root, QString::fromLatin1(CentralUiSlotNames::Content));
+    setSlotStyleProperty(layout.content, QString::fromLatin1(ThemeSlotStyle::Content));
     setSlotEmpty(layout.content, true);
     layout.content->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     outer->addWidget(layout.content, 1);
 
     layout.bottom = createSlot(layout.root, QString::fromLatin1(CentralUiSlotNames::Bottom));
+    setSlotStyleProperty(layout.bottom, QString::fromLatin1(ThemeSlotStyle::Bottom));
     setSlotEmpty(layout.bottom, true);
     outer->addWidget(layout.bottom);
 
     layout.empty = createSlot(layout.root, QString::fromLatin1(CentralUiSlotNames::Empty));
+    setSlotStyleProperty(layout.empty, QString::fromLatin1(ThemeSlotStyle::Empty));
     setSlotEmpty(layout.empty, true);
     outer->addWidget(layout.empty);
 
@@ -695,6 +717,21 @@ CentralUiLayout CentralUiBuilder::resolveSlots(QWidget *root, QString *error)
     if (error && !error->isEmpty()) {
         return {};
     }
+
+    if (layout.top) {
+        setSlotStyleProperty(layout.top, QString::fromLatin1(ThemeSlotStyle::Top));
+    }
+    if (layout.bottom) {
+        setSlotStyleProperty(layout.bottom, QString::fromLatin1(ThemeSlotStyle::Bottom));
+    }
+    if (layout.empty) {
+        setSlotStyleProperty(layout.empty, QString::fromLatin1(ThemeSlotStyle::Empty));
+    }
+    setSlotStyleProperty(layout.toolbarLeading,
+                         QString::fromLatin1(ThemeSlotStyle::ToolbarLeading));
+    setSlotStyleProperty(layout.toolbarTrailing,
+                         QString::fromLatin1(ThemeSlotStyle::ToolbarTrailing));
+    setSlotStyleProperty(layout.content, QString::fromLatin1(ThemeSlotStyle::Content));
 
     for (QWidget *slot : {layout.top, layout.bottom, layout.empty}) {
         if (slot) {

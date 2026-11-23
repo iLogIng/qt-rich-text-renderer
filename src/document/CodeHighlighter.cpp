@@ -46,7 +46,7 @@ bool isLatex(const QString &language)
 
 CodeHighlighter::CodeHighlighter(QTextDocument *document, bool dark, QObject *parent)
     : QSyntaxHighlighter(document)
-    , m_dark(dark)
+    , m_palette(defaultCodeSyntaxPalette(dark))
 {
     if (parent) {
         setParent(parent);
@@ -56,33 +56,27 @@ CodeHighlighter::CodeHighlighter(QTextDocument *document, bool dark, QObject *pa
 
 void CodeHighlighter::setDark(bool dark)
 {
-    if (m_dark == dark) {
-        return;
-    }
-    m_dark = dark;
+    m_palette = defaultCodeSyntaxPalette(dark);
+    rebuildFormats();
+    rehighlight();
+}
+
+void CodeHighlighter::setSyntaxPalette(const CodeSyntaxPalette &palette)
+{
+    m_palette = palette;
     rebuildFormats();
     rehighlight();
 }
 
 void CodeHighlighter::rebuildFormats()
 {
-    if (m_dark) {
-        m_keyword = makeFormat(QColor(QStringLiteral("#cf8e6d")));
-        m_string = makeFormat(QColor(QStringLiteral("#6aab73")));
-        m_number = makeFormat(QColor(QStringLiteral("#2aacb8")));
-        m_comment = makeFormat(QColor(QStringLiteral("#7a7a7a")));
-        m_preprocessor = makeFormat(QColor(QStringLiteral("#b5a642")));
-        m_type = makeFormat(QColor(QStringLiteral("#56a8f5")));
-        m_function = makeFormat(QColor(QStringLiteral("#56a8f5")));
-    } else {
-        m_keyword = makeFormat(QColor(QStringLiteral("#0033b3")));
-        m_string = makeFormat(QColor(QStringLiteral("#067d17")));
-        m_number = makeFormat(QColor(QStringLiteral("#1750eb")));
-        m_comment = makeFormat(QColor(QStringLiteral("#8c8c8c")));
-        m_preprocessor = makeFormat(QColor(QStringLiteral("#9e880d")));
-        m_type = makeFormat(QColor(QStringLiteral("#00627a")));
-        m_function = makeFormat(QColor(QStringLiteral("#00627a")));
-    }
+    m_keyword = makeFormat(m_palette.keyword);
+    m_string = makeFormat(m_palette.string);
+    m_number = makeFormat(m_palette.number);
+    m_comment = makeFormat(m_palette.comment);
+    m_preprocessor = makeFormat(m_palette.preprocessor);
+    m_type = makeFormat(m_palette.type);
+    m_function = makeFormat(m_palette.function);
 }
 
 void CodeHighlighter::highlightBlock(const QString &text)

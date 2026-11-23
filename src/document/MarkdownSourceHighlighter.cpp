@@ -19,7 +19,7 @@ MarkdownSourceHighlighter::MarkdownSourceHighlighter(QTextDocument *document,
                                                      bool dark,
                                                      QObject *parent)
     : QSyntaxHighlighter(document)
-    , m_dark(dark)
+    , m_palette(defaultMarkdownSourcePalette(dark))
 {
     if (parent) {
         setParent(parent);
@@ -29,10 +29,14 @@ MarkdownSourceHighlighter::MarkdownSourceHighlighter(QTextDocument *document,
 
 void MarkdownSourceHighlighter::setDark(bool dark)
 {
-    if (m_dark == dark) {
-        return;
-    }
-    m_dark = dark;
+    m_palette = defaultMarkdownSourcePalette(dark);
+    rebuildFormats();
+    rehighlight();
+}
+
+void MarkdownSourceHighlighter::setSyntaxPalette(const MarkdownSourcePalette &palette)
+{
+    m_palette = palette;
     rebuildFormats();
     rehighlight();
 }
@@ -48,33 +52,18 @@ void MarkdownSourceHighlighter::setEnabled(bool enabled)
 
 void MarkdownSourceHighlighter::rebuildFormats()
 {
-    if (m_dark) {
-        m_heading = makeFormat(QColor(QStringLiteral("#8ab4f8")));
-        m_heading.setFontWeight(QFont::Bold);
-        m_bold = makeFormat(QColor(QStringLiteral("#e6e6e6")));
-        m_bold.setFontWeight(QFont::Bold);
-        m_emphasis = makeFormat(QColor(QStringLiteral("#e6e6e6")));
-        m_emphasis.setFontItalic(true);
-        m_inlineCode = makeFormat(QColor(QStringLiteral("#d7ba7d")));
-        m_link = makeFormat(QColor(QStringLiteral("#8ab4f8")));
-        m_quote = makeFormat(QColor(QStringLiteral("#9a9a9a")));
-        m_marker = makeFormat(QColor(QStringLiteral("#c586c0")));
-        m_fence = makeFormat(QColor(QStringLiteral("#6aab73")));
-        m_math = makeFormat(QColor(QStringLiteral("#b5a642")));
-    } else {
-        m_heading = makeFormat(QColor(QStringLiteral("#0b57d0")));
-        m_heading.setFontWeight(QFont::Bold);
-        m_bold = makeFormat(QColor(QStringLiteral("#111111")));
-        m_bold.setFontWeight(QFont::Bold);
-        m_emphasis = makeFormat(QColor(QStringLiteral("#111111")));
-        m_emphasis.setFontItalic(true);
-        m_inlineCode = makeFormat(QColor(QStringLiteral("#9e880d")));
-        m_link = makeFormat(QColor(QStringLiteral("#0b57d0")));
-        m_quote = makeFormat(QColor(QStringLiteral("#6a6a6a")));
-        m_marker = makeFormat(QColor(QStringLiteral("#7a3e9d")));
-        m_fence = makeFormat(QColor(QStringLiteral("#067d17")));
-        m_math = makeFormat(QColor(QStringLiteral("#9e880d")));
-    }
+    m_heading = makeFormat(m_palette.heading);
+    m_heading.setFontWeight(QFont::Bold);
+    m_bold = makeFormat(m_palette.bold);
+    m_bold.setFontWeight(QFont::Bold);
+    m_emphasis = makeFormat(m_palette.emphasis);
+    m_emphasis.setFontItalic(true);
+    m_inlineCode = makeFormat(m_palette.inlineCode);
+    m_link = makeFormat(m_palette.link);
+    m_quote = makeFormat(m_palette.quote);
+    m_marker = makeFormat(m_palette.marker);
+    m_fence = makeFormat(m_palette.fence);
+    m_math = makeFormat(m_palette.math);
 }
 
 void MarkdownSourceHighlighter::applyRegex(const QString &text,

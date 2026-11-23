@@ -6,6 +6,7 @@
 #include <QDockWidget>
 #include <QFile>
 #include <QLabel>
+#include <QLayout>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollBar>
@@ -101,6 +102,21 @@ int main(int argc, char **argv)
     auto *statusLabel = window.findChild<QLabel *>(QStringLiteral("statusLabel"));
     expect(statusLabel && toolbarTrailing->isAncestorOf(statusLabel),
            QStringLiteral("status is injected into the trailing slot"));
+    expect(centralTop->property("centralSlot").toString() == QStringLiteral("top")
+               && centralBottom->property("centralSlot").toString() == QStringLiteral("bottom")
+               && centralEmpty->property("centralSlot").toString() == QStringLiteral("empty")
+               && toolbarLeading->property("centralSlot").toString()
+                      == QStringLiteral("toolbarLeading")
+               && toolbarTrailing->property("centralSlot").toString()
+                      == QStringLiteral("toolbarTrailing")
+               && centralContent->property("centralSlot").toString()
+                      == QStringLiteral("content")
+               && previewPage->property("centralSlot").toString() == QStringLiteral("preview")
+               && sourcePage->property("centralSlot").toString() == QStringLiteral("source"),
+           QStringLiteral("central slots expose their QSS style property"));
+    expect(window.centralWidget() && window.centralWidget()->layout()
+               && window.centralWidget()->layout()->spacing() == 6,
+           QStringLiteral("default central layout keeps the theme spacing"));
     expect(centralTop->isHidden() && centralBottom->isHidden() && centralEmpty->isHidden(),
            QStringLiteral("optional empty slots are hidden"));
     expect(centralTop->maximumSize() == QSize(0, 0)
@@ -184,6 +200,8 @@ int main(int argc, char **argv)
                QStringLiteral("visible-window load updates the outline children"));
     }
     if (preview) {
+        expect(preview->document()->documentMargin() == 12,
+               QStringLiteral("default preview document margin is preserved"));
         expect(preview->document()->toPlainText().contains(QStringLiteral("Second section")),
                QStringLiteral("visible-window load keeps all preview sections"));
         expect(preview->verticalScrollBar()->value() == 0,

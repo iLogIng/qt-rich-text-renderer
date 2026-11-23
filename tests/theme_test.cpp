@@ -51,6 +51,15 @@ int main(int argc, char **argv)
     expect(!light.useQss, QStringLiteral("built-in light theme does not use QSS"));
     expect(light.window == QColor(QStringLiteral("#ffffff")),
            QStringLiteral("light theme preserves the window color"));
+    expect(light.documentMargin == 12, QStringLiteral("light theme keeps the document margin"));
+    expect(light.spacing == 6, QStringLiteral("light theme keeps the layout spacing"));
+    expect(light.codeSyntax.keyword == QColor(QStringLiteral("#0033b3")),
+           QStringLiteral("light theme keeps the code syntax defaults"));
+    expect(light.sourceSyntax.heading == QColor(QStringLiteral("#0b57d0")),
+           QStringLiteral("light theme keeps the source syntax defaults"));
+    const QString lightStyle = ThemeManager::buildStyleSheet(light, &error);
+    expect(error.isEmpty() && !lightStyle.contains(QStringLiteral("centralSlot")),
+           QStringLiteral("theme without slot styles emits no slot QSS"));
 
     const ThemeSpec dark = ThemeManager::loadTheme(QStringLiteral("dark"), &error);
     expect(error.isEmpty(), QStringLiteral("dark theme loads without error"));
@@ -58,6 +67,8 @@ int main(int argc, char **argv)
     expect(dark.dark, QStringLiteral("dark theme is dark"));
     expect(dark.text == QColor(QStringLiteral("#e6e6e6")),
            QStringLiteral("dark theme preserves the text color"));
+    expect(dark.codeSyntax.keyword == QColor(QStringLiteral("#cf8e6d")),
+           QStringLiteral("dark theme keeps the code syntax defaults"));
 
     const QString userDirectory = ThemeManager::themeDirectory();
     const QString customDirectory = QDir(userDirectory).filePath(QStringLiteral("test-custom"));
@@ -73,9 +84,32 @@ int main(int argc, char **argv)
             "highlight": "#e07a5f",
             "border": "#3c4043"
         },
+        "typography": {
+            "uiFontFamily": "Test UI Sans",
+            "previewFontFamily": "Test Preview Serif",
+            "codeFontFamily": "Test Code Mono"
+        },
         "metrics": {
             "radius": 10,
-            "spacing": 7
+            "spacing": 7,
+            "documentMargin": 18
+        },
+        "syntax": {
+            "code": {
+                "keyword": "#112233"
+            },
+            "source": {
+                "heading": "#445566"
+            }
+        },
+        "slots": {
+            "top": {
+                "background": "#101010",
+                "borderColor": "#202020",
+                "borderWidth": 2,
+                "radius": 4,
+                "padding": 3
+            }
         }
     })JSON";
     expect(writeFile(QDir(customDirectory).filePath(QStringLiteral("theme.json")), customJson),
@@ -88,6 +122,19 @@ int main(int argc, char **argv)
     expect(custom.highlight == QColor(QStringLiteral("#e07a5f")),
            QStringLiteral("custom theme color loads"));
     expect(custom.radius == 10, QStringLiteral("custom theme radius loads"));
+    expect(custom.documentMargin == 18, QStringLiteral("custom theme document margin loads"));
+    expect(custom.uiFontFamily == QStringLiteral("Test UI Sans"),
+           QStringLiteral("custom theme UI font family loads"));
+    expect(custom.previewFontFamily == QStringLiteral("Test Preview Serif"),
+           QStringLiteral("custom theme preview font family loads"));
+    expect(custom.codeFontFamily == QStringLiteral("Test Code Mono"),
+           QStringLiteral("custom theme code font family loads"));
+    expect(custom.codeSyntax.keyword == QColor(QStringLiteral("#112233")),
+           QStringLiteral("custom theme code syntax color loads"));
+    expect(custom.sourceSyntax.heading == QColor(QStringLiteral("#445566")),
+           QStringLiteral("custom theme source syntax color loads"));
+    expect(custom.slotStyles.contains(QStringLiteral("top")),
+           QStringLiteral("custom theme slot style loads"));
 
     const QString style = ThemeManager::buildStyleSheet(custom, &error);
     expect(error.isEmpty(), QStringLiteral("custom QSS builds without error"));
@@ -95,6 +142,16 @@ int main(int argc, char **argv)
     expect(!style.contains(QLatin1Char('@')), QStringLiteral("all QSS tokens are replaced"));
     expect(style.contains(QStringLiteral("#e07a5f")),
            QStringLiteral("QSS contains the custom accent"));
+    expect(style.contains(QStringLiteral("QWidget[centralSlot=\"top\"]")),
+           QStringLiteral("QSS contains the fixed slot selector"));
+    expect(style.contains(QStringLiteral("background-color: #101010")),
+           QStringLiteral("QSS contains the slot background"));
+    expect(style.contains(QStringLiteral("border: 2px solid #202020")),
+           QStringLiteral("QSS contains the slot border"));
+    expect(style.contains(QStringLiteral("border-radius: 4px")),
+           QStringLiteral("QSS contains the slot radius"));
+    expect(style.contains(QStringLiteral("padding: 3px")),
+           QStringLiteral("QSS contains the slot padding"));
 
     ThemeManager::apply(custom);
     expect(qApp->styleSheet() == style, QStringLiteral("custom QSS is applied"));
@@ -111,6 +168,50 @@ int main(int argc, char **argv)
         [](const ThemeInfo &info) { return info.id == QStringLiteral("test-custom"); });
     expect(hasCustom, QStringLiteral("available themes include custom theme"));
 
+    const QString invalidSlotDirectory =
+        QDir(userDirectory).filePath(QStringLiteral("invalid-slot-theme"));
+    const QByteArray invalidSlotJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "invalid-slot-theme",
+        "name": "Invalid Slot Theme",
+        "slots": {
+            "unknown": {
+                "background": "#000000"
+            }
+        }
+    })JSON";
+    expect(writeFile(QDir(invalidSlotDirectory).filePath(QStringLiteral("theme.json")),
+                     invalidSlotJson),
+           QStringLiteral("write invalid slot theme"));
+    error.clear();
+    const ThemeSpec invalidSlot =
+        ThemeManager::loadTheme(QStringLiteral("invalid-slot-theme"), &error);
+    expect(!error.isEmpty(), QStringLiteral("unknown slot style reports an error"));
+    expect(invalidSlot.id == ThemeManager::fallbackThemeId(),
+           QStringLiteral("unknown slot style falls back to the default"));
+
+    const QString invalidSyntaxDirectory =
+        QDir(userDirectory).filePath(QStringLiteral("invalid-syntax-theme"));
+    const QByteArray invalidSyntaxJson = R"JSON({
+        "schemaVersion": 1,
+        "id": "invalid-syntax-theme",
+        "name": "Invalid Syntax Theme",
+        "syntax": {
+            "code": {
+                "keyword": "not-a-color"
+            }
+        }
+    })JSON";
+    expect(writeFile(QDir(invalidSyntaxDirectory).filePath(QStringLiteral("theme.json")),
+                     invalidSyntaxJson),
+           QStringLiteral("write invalid syntax theme"));
+    error.clear();
+    const ThemeSpec invalidSyntax =
+        ThemeManager::loadTheme(QStringLiteral("invalid-syntax-theme"), &error);
+    expect(!error.isEmpty(), QStringLiteral("invalid syntax color reports an error"));
+    expect(invalidSyntax.id == ThemeManager::fallbackThemeId(),
+           QStringLiteral("invalid syntax color falls back to the default"));
+
     const QString invalidDirectory = QDir(userDirectory).filePath(QStringLiteral("invalid-theme"));
     expect(writeFile(QDir(invalidDirectory).filePath(QStringLiteral("theme.json")),
                      QByteArray("{ invalid json")),
@@ -122,6 +223,8 @@ int main(int argc, char **argv)
            QStringLiteral("invalid theme falls back to the default"));
 
     QDir(customDirectory).removeRecursively();
+    QDir(invalidSlotDirectory).removeRecursively();
+    QDir(invalidSyntaxDirectory).removeRecursively();
     QDir(invalidDirectory).removeRecursively();
 
     if (failures == 0) {
