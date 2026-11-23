@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QHash>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -125,9 +126,76 @@ bool readColor(const QJsonObject &colors,
     return true;
 }
 
+void readLayout(const QJsonObject &root,
+                bool builtIn,
+                const QString &packageDirectory,
+                ThemeSpec *theme)
+{
+    if (!root.contains(QStringLiteral("layout"))) {
+        return;
+    }
+    if (builtIn) {
+        theme->layoutError = QStringLiteral("built-in themes cannot provide a .ui layout");
+        return;
+    }
+    if (!root.value(QStringLiteral("layout")).isObject()) {
+        theme->layoutError = QStringLiteral("layout must be a JSON object");
+        return;
+    }
+
+    const QJsonObject layout = root.value(QStringLiteral("layout")).toObject();
+    const int apiVersion = layout.value(QStringLiteral("apiVersion")).toInt(0);
+    if (apiVersion != 1) {
+        theme->layoutError =
+            QStringLiteral("unsupported layout API version: %1").arg(apiVersion);
+        return;
+    }
+
+    const QString file = layout.value(QStringLiteral("file")).toString().trimmed();
+    if (file.isEmpty()) {
+        theme->layoutError = QStringLiteral("layout.file is required");
+        return;
+    }
+    if (QDir::isAbsolutePath(file)
+        || file.contains(QLatin1Char('\\'))
+        || file.contains(QStringLiteral("://"))
+        || file != QDir::cleanPath(file)
+        || file == QStringLiteral("..")
+        || file.startsWith(QStringLiteral("../"))) {
+        theme->layoutError = QStringLiteral("layout.file must stay inside the theme package");
+        return;
+    }
+    if (!file.endsWith(QStringLiteral(".ui"), Qt::CaseInsensitive)) {
+        theme->layoutError = QStringLiteral("layout.file must use the .ui suffix");
+        return;
+    }
+
+    const QFileInfo packageInfo(packageDirectory);
+    const QString packagePath = packageInfo.canonicalFilePath();
+    if (packagePath.isEmpty() || !packageInfo.isDir()) {
+        theme->layoutError = QStringLiteral("theme package directory is not accessible");
+        return;
+    }
+
+    const QFileInfo layoutInfo(QDir(packageDirectory).filePath(file));
+    const QString layoutPath = layoutInfo.canonicalFilePath();
+    if (!layoutInfo.isFile() || layoutPath.isEmpty()) {
+        theme->layoutError = QStringLiteral("layout file is missing");
+        return;
+    }
+    if (!layoutPath.startsWith(packagePath + QDir::separator())) {
+        theme->layoutError = QStringLiteral("layout file is outside the theme package");
+        return;
+    }
+
+    theme->layoutApiVersion = apiVersion;
+    theme->layoutFile = layoutPath;
+}
+
 bool readTheme(const QString &path,
                const QString &requestedId,
                bool builtIn,
+               const QString &packageDirectory,
                ThemeSpec *theme,
                QString *error)
 {
@@ -165,6 +233,7 @@ bool readTheme(const QString &path,
     const bool dark = root.value(QStringLiteral("dark")).toBool(false);
     ThemeSpec parsed = dark ? darkFallback() : lightFallback();
     parsed.id = id;
+    parsed.packageDirectory = packageDirectory;
     parsed.name = root.value(QStringLiteral("name")).toString().trimmed();
     if (parsed.name.isEmpty()) {
         parsed.name = id;
@@ -196,6 +265,8 @@ bool readTheme(const QString &path,
     const QJsonObject metrics = root.value(QStringLiteral("metrics")).toObject();
     parsed.radius = qBound(0, metrics.value(QStringLiteral("radius")).toInt(parsed.radius), 32);
     parsed.spacing = qBound(0, metrics.value(QStringLiteral("spacing")).toInt(parsed.spacing), 32);
+
+    readLayout(root, builtIn, packageDirectory, &parsed);
 
     *theme = parsed;
     return true;
@@ -264,7 +335,7 @@ ThemeSpec ThemeManager::loadTheme(const QString &id, QString *error)
 
     if (id == QStringLiteral("light") || id == QStringLiteral("dark")) {
         ThemeSpec theme;
-        if (!readTheme(builtInPath(id), id, true, &theme, error)) {
+        if (!readTheme(builtInPath(id), id, true, QString(), &theme, error)) {
             return fallbackTheme();
         }
         return theme;
@@ -279,9 +350,10 @@ ThemeSpec ThemeManager::loadTheme(const QString &id, QString *error)
         return fallbackTheme();
     }
 
-    const QString path = QDir(themeDirectory()).filePath(id + QStringLiteral("/theme.json"));
+    const QString packageDirectory = QDir(themeDirectory()).filePath(id);
+    const QString path = QDir(packageDirectory).filePath(QStringLiteral("theme.json"));
     ThemeSpec theme;
-    if (!readTheme(path, id, false, &theme, error)) {
+    if (!readTheme(path, id, false, packageDirectory, &theme, error)) {
         return fallbackTheme();
     }
     return theme;

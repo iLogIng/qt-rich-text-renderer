@@ -1,11 +1,11 @@
 # 验证结果：QuickJS + MathJax + Mermaid → SVG → QtSvg
 
-记录日期：2026-11-18（链接与历史更新：2026-11-20）
+记录日期：2026-11-18（链接与历史更新：2026-11-20；主题与 `.ui` 更新：2026-11-23）
 
 环境：
 
 - Fedora Linux，x86_64；
-- Qt 6.11.2（Widgets、Svg、SvgWidgets）；
+- Qt 6.11.2（Widgets、Svg、SvgWidgets、UiTools）；
 - CMake 4.3.0，GCC 16.2.1；
 - QuickJS-ng 0.18.0；
 - Node.js 22.23.1，npm 11.18.0；
@@ -25,7 +25,7 @@
 | Mermaid SVG → QSvgRenderer | ⚠️ 需清洗 | 原始 SVG 出现黑块；归一化 CSS 变量/颜色后正常 |
 | `QTextDocument` 嵌入 SVG | ✅ | `SvgObjectHandler` + `QTextObjectInterface`，绘制时直接渲染 SVG |
 | 文件缓存 | ✅ | 二次渲染 30 blocks 约 30–50ms |
-| AppImage | ✅ | 34.4MB，含 Qt + qjs + MathJax + Mermaid full，无 WebEngine |
+| AppImage | ✅ | 34.9MB，含 Qt + qjs + MathJax + Mermaid full，无 WebEngine |
 
 ## 2. 体积
 
@@ -37,7 +37,7 @@
 | Mermaid full worker bundle | 2.1MB |
 | Qt 应用二进制 | 6.7MB |
 | AppDir（含 Qt 依赖/插件） | 约 85MB |
-| AppImage（完整） | **34.4MB / 32.8MiB** |
+| AppImage（完整） | **34.9MB / 33.2MiB** |
 | qjs + 4 个 JS bundle（含测试入口） | 约 7.9MB |
 
 对比：QtWebEngine 通常会带来 130–180MB 的额外体积。这个方案避开了它。
@@ -276,6 +276,16 @@ documentLayout()->documentSize();
 
 加载后 Preview 会切回 Preview tab，完成整篇文档布局，再回到顶部并刷新视口。Outline 跳转也会把目标标题 block 对齐到视口顶部，而不是只做最小可见滚动。
 
+## 6.7 主题与静态 `.ui`
+
+- 内置 `light` / `dark` 使用 QPalette，不启用 QSS，不提供 `.ui`，默认中央布局保持原视觉；
+- 用户主题支持 JSON 颜色、QSS 模板 token 和可选 `layout.ui`；
+- `.ui` 只替换 `QMainWindow::centralWidget()` 子树，Outline dock、标签页、工具栏、历史、设置和渲染 controller 保持 C++ 管理；
+- `samples/themes/aurora-dark` 同时验证 QSS 和静态 `.ui` 布局；
+- `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本和失败回退；
+- 主题切换到内置主题时会重建默认中央布局，文档、历史、设置和 Outline 不受影响；
+- 当前 CTest 共 15 个目标，全部通过。
+
 ## 7. 缓存与“渲染是纯函数”
 
 实际使用的内容寻址缓存：
@@ -318,7 +328,7 @@ key = SHA256(
 
 结果：
 
-- 完整 AppImage：**34.4MB / 32.8MiB**；
+- 完整 AppImage：**34.9MB / 33.2MiB**；
 - AppDir（未压缩）：约 85MB；
 - 运行时渲染链（qjs + MathJax worker + Mermaid full worker）：约 5.4MB；
 - 不再包含 WebEngine；

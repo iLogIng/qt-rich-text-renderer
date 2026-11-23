@@ -23,6 +23,10 @@
     "tooltipText": "#e6edf3",
     "border": "#30363d"
   },
+  "layout": {
+    "apiVersion": 1,
+    "file": "layout.ui"
+  },
   "metrics": {
     "radius": 10,
     "spacing": 7

@@ -25,14 +25,14 @@
 | 依赖 | 要求 |
 |---|---|
 | 操作系统 | Linux x86_64；当前在 Fedora 上验证 |
-| Qt | 6.8 或更高，需 Widgets、Svg、SvgWidgets |
+| Qt | 6.8 或更高，需 Widgets、Svg、SvgWidgets、UiTools |
 | CMake | 3.21 或更高 |
 | 编译器 | 支持 C++20 |
 | QuickJS-ng | `third_party/quickjs-ng` 子模块，以静态库构建 |
 | Node.js / npm | 仅构建 renderer bundle 时需要 |
 | linuxdeploy / appimagetool | 可选，仅生成 AppImage 时需要 |
 
-开发环境使用 Qt 6.11.2、CMake 4.3.0、GCC 16.2.1、QuickJS-ng 0.18.0 和 Node.js 22。
+开发环境使用 Qt 6.11.2、CMake 4.3.0、GCC 16.2.1、QuickJS-ng 0.18.0 和 Node.js 22。Fedora 上需要安装 `qt6-qttools-devel` 以提供 `Qt6::UiTools`。
 
 ## 构建
 
@@ -151,11 +151,61 @@ Linux 上通常为：
 ~/.local/share/rich-text-renderer/rich-text-renderer/themes/<theme-id>/theme.json
 ```
 
-主题 JSON 只接受颜色、尺寸和 QSS 开关，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
+主题 JSON 只接受颜色、尺寸、QSS 开关和可选的静态 `.ui` 布局声明，不接受任意 QSS 或代码。用户主题默认启用 QSS；内置主题和显式设置 `"qss": false` 的主题只使用 QPalette。
 
-示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。
+示例主题见 `samples/themes/` 目录，目前包含 `warm-dark` 和 `aurora-dark`。复制到用户主题目录后，在 Settings 的 Appearance 页选择；Settings 中的 `Open themes folder` 会打开主题目录。`aurora-dark` 同时包含可选 `.ui` 中央布局。
 
-当前主题能力只覆盖颜色、字体、间距、控件外观和内置布局选项。第三方整体窗口布局替换暂不提供；QML 不进入当前实施范围。
+#### 可选 `.ui` 中央布局
+
+用户主题包可以包含一个静态 `layout.ui`：
+
+```text
+QStandardPaths::AppDataLocation/themes/<theme-id>/
+  theme.json
+  layout.ui
+```
+
+`theme.json` 通过布局 manifest 引用它：
+
+```json
+{
+  "layout": {
+    "apiVersion": 1,
+    "file": "layout.ui"
+  }
+}
+```
+
+布局只替换 `QMainWindow::centralWidget()` 的子树。主窗口、菜单、状态栏、Outline `QDockWidget`、文件加载、导航历史、设置、渲染 controller 和 worker 仍由 C++ 持有。内置主题可以不带 `.ui`；没有 `.ui` 时继续使用 C++ 默认中央布局。
+
+`.ui` 根控件必须是 `QWidget` 或 `QFrame`，`objectName` 为 `central.root`。必需插槽：
+
+- `central.toolbar.leading`：必须使用 `QHBoxLayout`；
+- `central.toolbar.trailing`：必须使用 `QHBoxLayout`；
+- `central.content`：承载 Preview/Source 标签组合。
+
+可选插槽：
+
+- `central.top`；
+- `central.bottom`；
+- `central.empty`。
+
+可选插槽没有内容时隐藏且不占空间。`central.preview` 和 `central.source` 是 C++ 标签页内部的稳定内容插槽；当前阶段由标签组合承载，`.ui` 不能单独拆出它们，也不能替换标签组合内部控制器。`central.*` 是保留命名空间，`.ui` 不得定义上述插槽之外的同前缀 `objectName`。
+
+`.ui` 只允许标准 Qt 控件和布局，例如 `QWidget`、`QFrame`、`QLabel`、`QPushButton`、`QToolButton`、`QCheckBox`、`QLineEdit`、`QComboBox`、`QGroupBox`、`QTabWidget`、`QSplitter`、`QScrollArea`、`QListWidget`、`QTreeWidget`，以及 `QHBoxLayout`、`QVBoxLayout`、`QGridLayout`、`QFormLayout`。以下内容会被拒绝：
+
+- 未知控件类和自定义控件；
+- `<customwidgets>`、`<resources>`、`<connections>`、`<buttongroups>`、`<actions>`；
+- `styleSheet` 属性或任意 QSS 注入；
+- `http/https`、`file:` 等外部 URL，以及 `src=`、`href=`、`style=` 等资源引用；
+- DTD、XML 实体、注释和 CDATA；
+- 主题包目录之外的布局文件或路径穿越。
+
+加载器还限制布局文件为 512KiB、4000 个 XML 元素、最大嵌套深度 64 和最多 300 个控件。`.ui` 缺失、解析失败、插槽缺失、版本错误或任何校验失败时，回退到 C++ 默认中央布局；主题颜色和 QSS 仍按主题 JSON 应用。布局文件路径无效时只拒绝布局，不回退整个主题。
+
+当前自定义控件策略采用 A：标准 Qt 控件 + 插槽宿主。应用预注册的自定义控件属于后续可选能力；主题携带 `.so` / `.dll` 的第三方编译控件明确不采用。
+
+当前不引入 QML，也不支持替换整个 `QMainWindow`。
 
 ## 支持的 Markdown
 
@@ -203,7 +253,7 @@ Markdown
 |---|---|---|
 | `rich-text-renderer-core` | Markdown 预处理、设置、链接、本地文件、历史、SVG 缓存、渲染服务与 worker | `Qt6::Core` |
 | `rich-text-renderer-document` | 文档构建、目录、Source 高亮、SVG 归一化与对象绘制、代码高亮 | `Qt6::Gui`、`Qt6::Svg` |
-| `rich-text-renderer-ui` | 主窗口、目录面板、设置对话框、链接与媒体交互、主题 | 前两个库、`Qt6::Widgets`、`Qt6::SvgWidgets` |
+| `rich-text-renderer-ui` | 主窗口、中央布局插槽、目录面板、设置对话框、链接与媒体交互、主题、安全 `.ui` 加载 | 前两个库、`Qt6::Widgets`、`Qt6::SvgWidgets`、`Qt6::UiTools` |
 | `rich-text-renderer` | 应用入口 | `rich-text-renderer-ui` |
 
 ### 文件加载与预览刷新
@@ -232,12 +282,13 @@ scripts/test-process-bound.sh
 scripts/test-idle.sh
 ```
 
-`scripts/test.sh` 运行渲染器 smoke test 和 14 个 CTest 目标，覆盖：
+`scripts/test.sh` 运行渲染器 smoke test 和 15 个 CTest 目标，覆盖：
 
 - 链接解析、链接交互和本地文件加载；
 - 导航历史；
 - 设置模板、用户覆盖、设置对话框和旧主题配置迁移；
 - 主题 JSON 加载、QSS token、用户主题、错误回退和内置主题；
+- 中央布局插槽、默认布局、空插槽零占位、主题 `.ui` 加载、白名单校验和失败回退；
 - Markdown 预处理、目录提取和文档渲染；
 - SVG 缓存、SVG 归一化和对象嵌入；
 - 启动、Outline、设置应用和加载后的完整文档布局；
@@ -278,7 +329,7 @@ APPIMAGE_RUNTIME=/path/to/runtime-x86_64 \
 scripts/package-appimage.sh
 ```
 
-脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.4MB / 32.8MiB。
+脚本使用 `--appimage-extract-and-run`，不要求宿主安装 FUSE。当前 Release AppImage 约 34.9MB / 33.2MiB。
 
 验证：
 
@@ -308,8 +359,9 @@ GitHub Actions 工作流位于 `.github/workflows/ci.yml`。
 src/app/                应用入口
 src/core/               设置、链接、文件、缓存、渲染服务与 worker
 src/document/           Markdown 文档构建、高亮、目录和 SVG 对象
-src/ui/                 主窗口、设置、媒体预览、主题与交互
+src/ui/                 主窗口、中央布局插槽、设置、媒体预览、主题与交互
 resources/              内置主题 JSON 和 QSS 模板
+samples/themes/         用户主题和静态 .ui 示例
 renderer/               MathJax / Mermaid 的 QuickJS bundle 与构建脚本
 third_party/quickjs-ng  QuickJS-ng 子模块
 config/                 settings.ini 默认模板

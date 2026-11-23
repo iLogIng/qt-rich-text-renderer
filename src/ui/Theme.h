@@ -10,6 +10,11 @@ struct ThemeSpec {
     bool dark = false;
     bool useQss = false;
 
+    QString packageDirectory;
+    QString layoutFile;
+    QString layoutError;
+    int layoutApiVersion = 0;
+
     QColor window;
     QColor windowText;
     QColor base;

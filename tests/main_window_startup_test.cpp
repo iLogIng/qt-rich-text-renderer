@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QLabel>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QSettings>
 #include <QTabWidget>
@@ -53,12 +54,59 @@ int main(int argc, char **argv)
     auto *outlineToggle =
         window.findChild<QToolButton *>(QStringLiteral("outlineToggleButton"));
     auto *outlineDock = window.findChild<QDockWidget *>(QStringLiteral("outlineDock"));
+    auto *centralRoot = window.findChild<QWidget *>(QStringLiteral("central.root"));
+    auto *toolbarLeading =
+        window.findChild<QWidget *>(QStringLiteral("central.toolbar.leading"));
+    auto *toolbarTrailing =
+        window.findChild<QWidget *>(QStringLiteral("central.toolbar.trailing"));
+    auto *centralContent = window.findChild<QWidget *>(QStringLiteral("central.content"));
+    auto *previewPage = window.findChild<QWidget *>(QStringLiteral("central.preview"));
+    auto *sourcePage = window.findChild<QWidget *>(QStringLiteral("central.source"));
+    auto *centralTop = window.findChild<QWidget *>(QStringLiteral("central.top"));
+    auto *centralBottom = window.findChild<QWidget *>(QStringLiteral("central.bottom"));
+    auto *centralEmpty = window.findChild<QWidget *>(QStringLiteral("central.empty"));
+    auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("documentTabs"));
+    auto *loadButton = window.findChild<QPushButton *>(QStringLiteral("loadButton"));
+    auto *renderButton = window.findChild<QPushButton *>(QStringLiteral("renderButton"));
+    auto *themeButton = window.findChild<QPushButton *>(QStringLiteral("themeButton"));
+    auto *settingsButton = window.findChild<QPushButton *>(QStringLiteral("settingsButton"));
 
     expect(source && history && back && forward && outline && outlineToggle && outlineDock,
            QStringLiteral("main window widgets found"));
-    if (!source || !history || !back || !forward || !outline || !outlineToggle || !outlineDock) {
+    expect(centralRoot && toolbarLeading && toolbarTrailing && centralContent && previewPage
+               && sourcePage && centralTop && centralBottom && centralEmpty && tabs,
+           QStringLiteral("central layout slots found"));
+    expect(loadButton && renderButton && themeButton && settingsButton,
+           QStringLiteral("toolbar buttons found"));
+    if (!source || !history || !back || !forward || !outline || !outlineToggle || !outlineDock
+        || !centralRoot || !toolbarLeading || !toolbarTrailing || !centralContent
+        || !previewPage || !sourcePage || !centralTop || !centralBottom || !centralEmpty
+        || !tabs || !loadButton || !renderButton || !themeButton || !settingsButton) {
         return 1;
     }
+
+    expect(source->parentWidget() == sourcePage,
+           QStringLiteral("source view is injected into central.source"));
+    expect(tabs->indexOf(previewPage) >= 0 && tabs->indexOf(sourcePage) >= 0,
+           QStringLiteral("preview and source pages are owned by the document tabs"));
+    expect(centralContent->isAncestorOf(tabs),
+           QStringLiteral("document tabs are injected into central.content"));
+    expect(!toolbarLeading->isHidden() && !toolbarTrailing->isHidden(),
+           QStringLiteral("toolbar slots are visible when populated"));
+    expect(toolbarLeading->isAncestorOf(loadButton)
+               && toolbarLeading->isAncestorOf(renderButton)
+               && toolbarLeading->isAncestorOf(themeButton)
+               && toolbarLeading->isAncestorOf(settingsButton),
+           QStringLiteral("toolbar buttons are injected into the leading slot"));
+    auto *statusLabel = window.findChild<QLabel *>(QStringLiteral("statusLabel"));
+    expect(statusLabel && toolbarTrailing->isAncestorOf(statusLabel),
+           QStringLiteral("status is injected into the trailing slot"));
+    expect(centralTop->isHidden() && centralBottom->isHidden() && centralEmpty->isHidden(),
+           QStringLiteral("optional empty slots are hidden"));
+    expect(centralTop->maximumSize() == QSize(0, 0)
+               && centralBottom->maximumSize() == QSize(0, 0)
+               && centralEmpty->maximumSize() == QSize(0, 0),
+           QStringLiteral("optional empty slots have zero size"));
 
     expect(outlineToggle->isChecked(), QStringLiteral("outline toggle starts checked"));
     expect(!outlineDock->isHidden(), QStringLiteral("outline starts visible"));
@@ -255,7 +303,7 @@ int main(int argc, char **argv)
         expect(customOutline->isHidden(), QStringLiteral("outline visibility setting is applied"));
         expect(!customOutlineToggle->isChecked(),
                QStringLiteral("outline toggle reflects hidden outline setting"));
-        const int sourceIndex = customTabs->indexOf(customSource);
+        const int sourceIndex = customTabs->indexOf(customSource->parentWidget());
         expect(sourceIndex >= 0 && !customTabs->isTabVisible(sourceIndex),
                QStringLiteral("source visibility setting is applied"));
     }

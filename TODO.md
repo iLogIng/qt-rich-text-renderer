@@ -4,7 +4,7 @@
 >
 > 记录日期：2026-11-18
 >
-> 最近更新：2026-11-22
+> 最近更新：2026-11-23
 >
 > 原则：不引入 QtWebEngine，不引入 QML/MarkQml UI 或渲染链路，不引入 Node 运行时；UI 采用 Widgets + QPalette/QSS，渲染链路保持 QuickJS + SVG。
 
@@ -35,49 +35,51 @@
 
 ##### A. 具名插槽与中央骨架
 
-- [ ] 在 C++ 中央内容骨架中定义稳定的插槽名和 `objectName`，至少覆盖：
+- [x] 在 C++ 中央内容骨架中定义稳定的插槽名和 `objectName`，至少覆盖：
+  - `central.root`
   - `central.toolbar.leading`
   - `central.toolbar.trailing`
+  - `central.content`
   - `central.preview`
   - `central.source`
   - `central.top`
   - `central.bottom`
   - `central.empty`
-- [ ] 插槽宿主使用普通 `QWidget` + 布局容器；空插槽默认隐藏，`sizePolicy` 不占位，避免留下视觉空洞
-- [ ] C++ 通过稳定插槽名注入现有工具栏按钮、`PreviewBrowser`、`QPlainTextEdit` 和媒体/状态组件，不改变控制器、信号槽和历史逻辑
-- [ ] 内置主题未提供 `.ui` 时，保持当前 C++ 中央布局和视觉不变
-- [ ] 增加测试：默认布局、插槽存在性、空插槽零占位、注入后控件类型和信号连接不变
+- [x] 插槽宿主使用普通 `QWidget` + 布局容器；空插槽默认隐藏，`sizePolicy` 不占位，避免留下视觉空洞。`central.preview` / `central.source` 是 `central.content` 内标签页的稳定内容宿主
+- [x] C++ 通过稳定插槽名注入现有工具栏按钮、`PreviewBrowser`、`QPlainTextEdit` 和媒体/状态组件，不改变控制器、信号槽和历史逻辑
+- [x] 内置主题未提供 `.ui` 时，保持当前 C++ 中央布局和视觉不变
+- [x] 增加测试：默认布局、插槽存在性、空插槽零占位、注入后控件类型和现有启动/加载/导航行为不变
 
 ##### B. 主题包 `.ui` 加载
 
-- [ ] 增加 `Qt6::UiTools` 依赖和 `QUiLoader` 子类；只在 UI 层引入，不进入 core/document 库
-- [ ] 主题 manifest 增加布局字段和版本字段，例如 `layoutFile`、`layoutApiVersion`；布局文件必须位于主题包目录内
-- [ ] 使用 `QUiLoader` 只加载 `QMainWindow::centralWidget()` 的中央内容骨架，不加载或替换 `QMainWindow`
-- [ ] 通过具名插槽把现有控件注入加载后的骨架；缺少必需插槽时视为无效主题
-- [ ] 用户主题目录允许携带 `layout.ui`；内置主题可以没有 `.ui`，没有时使用 C++ 默认布局
-- [ ] 增加测试：加载测试 `.ui`、缺少必需插槽、非法 XML、布局文件路径越界、内置主题无 `.ui`
+- [x] 增加 `Qt6::UiTools` 依赖和 `QUiLoader` 子类；只在 UI 层引入，不进入 core/document 库
+- [x] 主题 manifest 增加布局字段和版本字段，例如 `layoutFile`、`layoutApiVersion`；布局文件必须位于主题包目录内
+- [x] 使用 `QUiLoader` 只加载 `QMainWindow::centralWidget()` 的中央内容骨架，不加载或替换 `QMainWindow`
+- [x] 通过具名插槽把现有控件注入加载后的骨架；缺少必需插槽时视为无效主题
+- [x] 用户主题目录允许携带 `layout.ui`；内置主题可以没有 `.ui`，没有时使用 C++ 默认布局
+- [x] 增加测试：加载测试 `.ui`、缺少必需插槽、非法 XML、布局文件路径越界、内置主题无 `.ui`
 
 ##### C. 校验、安全与回退
 
-- [ ] 使用 `QUiLoader::createWidget()` 白名单，只允许标准 Qt 控件和当前阶段明确提供的插槽宿主
-- [ ] 禁止加载未知控件类、主题目录外的资源、`http/https` 外部 URL 和任意 `styleSheet` 属性注入
-- [ ] 限制 `.ui` 文件大小、控件数量、嵌套深度和资源路径；所有资源解析必须限制在主题包目录内
-- [ ] 校验必需插槽、对象名和布局版本；任何解析、校验或注入失败都回退到 C++ 默认中央布局
-- [ ] 回退时清理已创建的临时控件树，不能影响当前文档、历史、设置或渲染 worker
-- [ ] 增加测试：未知控件、外部 URL、样式表注入、超大 XML、缺失插槽、错误版本和回退路径
+- [x] 使用 `QUiLoader::createWidget()` 白名单，只允许标准 Qt 控件和当前阶段明确提供的插槽宿主
+- [x] 禁止加载未知控件类、主题目录外的资源、`http/https` 外部 URL 和任意 `styleSheet` 属性注入
+- [x] 限制 `.ui` 文件大小、控件数量、嵌套深度和资源路径；所有资源解析必须限制在主题包目录内
+- [x] 校验必需插槽、对象名和布局版本；任何解析、校验或注入失败都回退到 C++ 默认中央布局
+- [x] 回退时清理已创建的临时控件树，不能影响当前文档、历史、设置或渲染 worker
+- [x] 增加测试：未知控件、外部 URL、样式表注入、超大 XML、缺失插槽、错误版本和回退路径
 
 ##### 自定义控件接入形式
 
-- [ ] A. **标准 Qt 控件 + 插槽宿主**：当前采用。`.ui` 只能使用标准控件和应用提供的具名插槽容器；现有 Preview、Source、工具栏由 C++ 注入，不执行主题代码。
+- [x] A. **标准 Qt 控件 + 插槽宿主**：当前采用。`.ui` 只能使用标准控件和应用提供的具名插槽容器；现有 Preview、Source、工具栏由 C++ 注入，不执行主题代码。
 - [ ] B. **应用预注册的自定义控件**：未来可选。控件由应用编译并通过 `createWidget()` 注册，主题只能按稳定类名使用；需要独立的控件 API 和兼容性测试。
-- [ ] C. **主题携带的第三方编译控件**：当前不采用。主题包含 `.so` / `.dll` 并由应用动态加载，会引入二进制兼容、代码执行和安全风险，不在 `.ui` 静态主题体系内。
+- [x] C. **主题携带的第三方编译控件**：当前不采用。主题包含 `.so` / `.dll` 并由应用动态加载，会引入二进制兼容、代码执行和安全风险，不在 `.ui` 静态主题体系内。
 
 ##### 验收
 
-- [ ] C++ 默认中央布局、内置主题和现有功能测试不回归
-- [ ] 用户主题 `.ui` 可替换中央排列和插槽内容，但不改变主窗口、菜单、状态栏、Outline dock 和渲染控制器
-- [ ] 无效 `.ui` 自动回退默认布局，并记录可诊断错误
-- [ ] 更新 README、FOR_LOCVAS 和主题示例，明确主题包目录、插槽名、支持的控件和 `.ui` 边界
+- [x] C++ 默认中央布局、内置主题和现有功能测试不回归
+- [x] 用户主题 `.ui` 可替换中央排列和插槽内容，但不改变主窗口、菜单、状态栏、Outline dock 和渲染控制器
+- [x] 无效 `.ui` 自动回退默认布局，并记录可诊断错误
+- [x] 更新 README、FOR_LOCVAS 和主题示例，明确主题包目录、插槽名、支持的控件和 `.ui` 边界
 
 ### Defer Polish
 
@@ -361,7 +363,7 @@
 - [x] `AppSettings` 使用只读模板默认值 + QSettings 用户覆盖
 - [x] `config/settings.ini` 完整配置模板，打包进 AppImage
 - [x] Settings 对话框：Appearance / View / Preview / Advanced，支持字体大小、主题、目录和 Source 可见性
-- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`、`media-preview-test`、`theme-test`
+- [x] 模块测试：`link-resolver-test`、`link-handler-test`、`main-window-startup-test`、`app-settings-test`、`settings-dialog-test`、`markdown-preprocessor-test`、`markdown-outline-test`、`svg-cache-test`、`svg-sanitizer-test`、`document-rendering-test`、`navigation-history-test`、`local-file-loader-test`、`media-preview-test`、`theme-test`、`ui-layout-test`
 - [x] 启动默认空白，`Load` 打开文件选择器，`--file` 显式加载；应用代码不再硬编码 `sample.md` 路径
 - [x] `Load` 与 `--file` 统一经过 `loadFile()`、`openLocalFile()` 和加载后收尾
 - [x] 加载后强制完成整篇文档布局，修复长文档后续 block 零高度问题
