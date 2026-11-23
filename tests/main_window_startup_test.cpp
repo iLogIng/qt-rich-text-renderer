@@ -2,6 +2,7 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
+#include <QColor>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFile>
@@ -126,6 +127,14 @@ int main(int argc, char **argv)
 
     expect(outlineToggle->isChecked(), QStringLiteral("outline toggle starts checked"));
     expect(!outlineDock->isHidden(), QStringLiteral("outline starts visible"));
+    window.setDarkMode(true);
+    expect(outlineToggle->palette().color(QPalette::Button)
+               == QColor(QStringLiteral("#1e1e1e")),
+           QStringLiteral("dark outline toggle uses the dark tab background"));
+    window.setDarkMode(false);
+    expect(outlineToggle->palette().color(QPalette::Button)
+               == QApplication::palette().color(QPalette::Button),
+           QStringLiteral("light outline toggle follows the application palette"));
     outlineToggle->click();
     expect(outlineDock->isHidden() && !outlineToggle->isChecked(),
            QStringLiteral("outline toggle hides the fixed outline"));
