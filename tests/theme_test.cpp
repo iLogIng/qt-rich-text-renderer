@@ -1,3 +1,4 @@
+#include "CentralUiLayout.h"
 #include "Theme.h"
 
 #include <QApplication>
@@ -9,6 +10,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
+#include <QWidget>
 
 #include <algorithm>
 
@@ -32,6 +34,27 @@ bool writeFile(const QString &path, const QByteArray &data)
         return false;
     }
     return file.write(data) == data.size();
+}
+
+bool copyDirectory(const QString &sourcePath, const QString &targetPath)
+{
+    const QDir source(sourcePath);
+    if (!source.exists() || !QDir().mkpath(targetPath)) {
+        return false;
+    }
+
+    bool copied = true;
+    const QFileInfoList entries =
+        source.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QFileInfo &entry : entries) {
+        const QString target = QDir(targetPath).filePath(entry.fileName());
+        if (entry.isDir()) {
+            copied = copyDirectory(entry.absoluteFilePath(), target) && copied;
+        } else {
+            copied = QFile::copy(entry.absoluteFilePath(), target) && copied;
+        }
+    }
+    return copied;
 }
 
 } // namespace
@@ -303,6 +326,93 @@ int main(int argc, char **argv)
     expect(invalidSyntax.id == ThemeManager::fallbackThemeId(),
            QStringLiteral("invalid syntax color falls back to the default"));
 
+    const QString sampleSourceDirectory =
+        QStringLiteral(TEST_SOURCE_DIR) + QStringLiteral("/samples/themes/nixie-crt");
+    const QString sampleThemeId = QStringLiteral("nixie-crt");
+    const QString sampleThemeDirectory = QDir(userDirectory).filePath(sampleThemeId);
+    QDir(sampleThemeDirectory).removeRecursively();
+    expect(copyDirectory(sampleSourceDirectory, sampleThemeDirectory),
+           QStringLiteral("copy the nixie sample theme"));
+    error.clear();
+    const ThemeSpec nixie = ThemeManager::loadTheme(sampleThemeId, &error);
+    expect(error.isEmpty() && nixie.id == sampleThemeId,
+           QStringLiteral("nixie sample theme loads"));
+    expect(nixie.dark && nixie.useQss,
+           QStringLiteral("nixie sample theme is dark and uses QSS"));
+    expect(nixie.assetError.isEmpty() && nixie.layoutError.isEmpty(),
+           QStringLiteral("nixie sample theme accepts its asset and layouts"));
+    expect(nixie.uiFontFamily == QStringLiteral("Noto Sans Mono")
+               && nixie.previewFontFamily == QStringLiteral("Noto Sans Mono")
+               && nixie.codeFontFamily == QStringLiteral("Noto Sans Mono"),
+           QStringLiteral("nixie sample theme sets the mono families"));
+    expect(nixie.preview.maxTextWidth == 840
+               && nixie.preview.codeBackground == QColor(QStringLiteral("#160d07"))
+               && nixie.preview.codeBlockMargin == 6,
+           QStringLiteral("nixie sample theme sets the preview layout"));
+    expect(nixie.mermaid.name == QStringLiteral("base")
+               && nixie.mermaid.variables.size() == 8,
+           QStringLiteral("nixie sample theme sets all Mermaid variables"));
+    expect(nixie.assets.contains(QStringLiteral("nixie")),
+           QStringLiteral("nixie sample theme exposes its PNG asset"));
+    if (nixie.assets.contains(QStringLiteral("nixie"))) {
+        const ThemeAsset asset = nixie.assets.value(QStringLiteral("nixie"));
+        expect(asset.format == QStringLiteral("png") && asset.size == QSize(96, 34),
+               QStringLiteral("nixie sample asset is a 96x34 PNG"));
+    }
+    expect(nixie.slotStyles.size() == 9
+               && nixie.slotStyles.contains(QStringLiteral("top"))
+               && nixie.slotStyles.contains(QStringLiteral("bottom"))
+               && nixie.slotStyles.contains(QStringLiteral("empty"))
+               && nixie.slotStyles.contains(QStringLiteral("toolbarLeading"))
+               && nixie.slotStyles.contains(QStringLiteral("toolbarTrailing"))
+               && nixie.slotStyles.contains(QStringLiteral("content"))
+               && nixie.slotStyles.contains(QStringLiteral("preview"))
+               && nixie.slotStyles.contains(QStringLiteral("source"))
+               && nixie.slotStyles.contains(QStringLiteral("outline")),
+           QStringLiteral("nixie sample theme styles every layout slot"));
+    error.clear();
+    const QString nixieStyle = ThemeManager::buildStyleSheet(nixie, &error);
+    expect(error.isEmpty()
+               && nixieStyle.contains(QStringLiteral("QWidget[centralSlot=\"preview\"]"))
+               && nixieStyle.contains(QStringLiteral("QWidget[centralSlot=\"source\"]")),
+           QStringLiteral("nixie sample theme emits slot QSS"));
+    expect(nixie.layoutVariants.size() == 2,
+           QStringLiteral("nixie sample theme provides two layout variants"));
+    if (nixie.layoutVariants.size() == 2) {
+        const ThemeLayout &console = nixie.layoutVariants.at(0);
+        const ThemeLayout &dual = nixie.layoutVariants.at(1);
+        expect(console.id == QStringLiteral("console")
+                   && console.contentMode == QStringLiteral("tabs"),
+               QStringLiteral("nixie console variant uses tabs"));
+        expect(dual.id == QStringLiteral("dual")
+                   && dual.contentMode == QStringLiteral("slots"),
+               QStringLiteral("nixie dual variant uses slots"));
+
+        for (const ThemeLayout &variant : nixie.layoutVariants) {
+            ThemeSpec layoutTheme = nixie;
+            layoutTheme.layoutFile = variant.file;
+            layoutTheme.contentMode = variant.contentMode;
+            QWidget parent;
+            QString layoutError;
+            const CentralUiLayout layout =
+                CentralUiBuilder::loadTheme(layoutTheme, &parent, &layoutError);
+            expect(layout.isValid(),
+                   QStringLiteral("nixie %1 layout loads").arg(variant.id));
+            if (!layout.isValid()) {
+                continue;
+            }
+            if (variant.id == QStringLiteral("console")) {
+                expect(!layout.slotsMode && layout.content,
+                       QStringLiteral("nixie console layout uses the content slot"));
+            } else {
+                expect(layout.slotsMode && layout.preview && layout.source
+                           && layout.outline && !layout.content,
+                       QStringLiteral("nixie dual layout exposes preview, source and outline"));
+            }
+            delete layout.root;
+        }
+    }
+
     const QString invalidDirectory = QDir(userDirectory).filePath(QStringLiteral("invalid-theme"));
     expect(writeFile(QDir(invalidDirectory).filePath(QStringLiteral("theme.json")),
                      QByteArray("{ invalid json")),
@@ -319,6 +429,7 @@ int main(int argc, char **argv)
     QDir(invalidSlotDirectory).removeRecursively();
     QDir(invalidSyntaxDirectory).removeRecursively();
     QDir(invalidDirectory).removeRecursively();
+    QDir(sampleThemeDirectory).removeRecursively();
 
     if (failures == 0) {
         QTextStream(stdout) << "theme tests passed\n";

@@ -290,8 +290,9 @@ documentLayout()->documentSize();
 - `.ui` 只替换 `QMainWindow::centralWidget()` 子树，Outline dock、标签页、工具栏、历史、设置和渲染 controller 保持 C++ 管理；
 - 具名插槽通过 `centralSlot` 动态属性生成固定 QSS 规则，支持背景、边框、圆角和 padding；
 - `samples/themes/aurora-dark` 同时验证 QSS、插槽样式和静态 `.ui` 布局；
+- `samples/themes/nixie-crt` 是完整的暖橙色单色 CRT / 辉光管示例，覆盖全部颜色角色、字体族、代码和 Source 色板、Preview 阅读列与代码样式、8 个 Mermaid 颜色变量、PNG 标志、全部 9 个具名插槽样式以及 `console`/`dual` 两种手动布局；截图见 [nixie-console.png](assets/nixie-console.png) 和 [nixie-dual.png](assets/nixie-dual.png)；
 - `ui-layout-test` 覆盖有效布局、缺失插槽、未知控件、外部 URL、样式表注入、超大 XML、路径越界、错误版本、字号属性、tabs/slots 切换、Source 显隐、布局变体和失败回退；
-- `theme-test` 覆盖 Preview、Mermaid、图片资源和布局变体 schema；`svg-sanitizer-test` 和 `svg-cache-test` 覆盖 Mermaid 变量映射与缓存签名；
+- `theme-test` 覆盖 Preview、Mermaid、图片资源和布局变体 schema，并实际加载 `nixie-crt` 示例包及其两个 `.ui` 布局；`svg-sanitizer-test` 和 `svg-cache-test` 覆盖 Mermaid 变量映射与缓存签名；
 - 主题切换到内置主题时会重建默认中央布局，文档、历史、设置和 Outline 不受影响；
 - 内置 light/dark 与阶段改动前截图对比，仅状态栏计时文本和极少量抗锯齿像素不同；
 - 当前 CTest 共 15 个目标，全部通过；Mermaid smoke 24 个图类型 + 1 个主题变量检查全部通过。

@@ -178,6 +178,9 @@ add_executable(theme-test
     tests/theme_test.cpp
 )
 target_link_libraries(theme-test PRIVATE rich-text-renderer-ui)
+target_compile_definitions(theme-test PRIVATE
+    TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 add_executable(ui-layout-test
     tests/ui_layout_test.cpp
