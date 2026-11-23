@@ -14,6 +14,7 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QStringList>
+#include <QStyle>
 #include <QStyleFactory>
 
 namespace {
@@ -771,22 +772,84 @@ void ThemeManager::apply(const ThemeSpec &theme)
 {
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
 
-    QPalette palette;
-    palette.setColor(QPalette::Window, theme.window);
-    palette.setColor(QPalette::WindowText, theme.windowText);
-    palette.setColor(QPalette::Base, theme.base);
-    palette.setColor(QPalette::AlternateBase, theme.alternateBase);
-    palette.setColor(QPalette::ToolTipBase, theme.tooltipBase);
-    palette.setColor(QPalette::ToolTipText, theme.tooltipText);
-    palette.setColor(QPalette::Text, theme.text);
-    palette.setColor(QPalette::Button, theme.button);
-    palette.setColor(QPalette::ButtonText, theme.buttonText);
-    palette.setColor(QPalette::BrightText, theme.brightText);
-    palette.setColor(QPalette::Highlight, theme.highlight);
-    palette.setColor(QPalette::HighlightedText, theme.highlightedText);
-    palette.setColor(QPalette::Link, theme.link);
-    palette.setColor(QPalette::LinkVisited, theme.linkVisited);
-    palette.setColor(QPalette::PlaceholderText, theme.placeholder);
+    // Start from the Fusion light palette so switching from a dark theme back
+    // to a light theme cannot leak dark bevel roles into the new palette.
+    QPalette palette = QApplication::style()->standardPalette();
+
+    const auto setActiveAndInactive = [&palette](QPalette::ColorRole role, const QColor &color) {
+        palette.setColor(QPalette::Active, role, color);
+        palette.setColor(QPalette::Inactive, role, color);
+    };
+    const auto setAllGroups = [&palette](QPalette::ColorRole role, const QColor &color) {
+        palette.setColor(QPalette::Active, role, color);
+        palette.setColor(QPalette::Inactive, role, color);
+        palette.setColor(QPalette::Disabled, role, color);
+    };
+
+    setActiveAndInactive(QPalette::Window, theme.window);
+    setActiveAndInactive(QPalette::WindowText, theme.windowText);
+    setActiveAndInactive(QPalette::Base, theme.base);
+    setActiveAndInactive(QPalette::AlternateBase, theme.alternateBase);
+    setActiveAndInactive(QPalette::ToolTipBase, theme.tooltipBase);
+    setActiveAndInactive(QPalette::ToolTipText, theme.tooltipText);
+    setActiveAndInactive(QPalette::Text, theme.text);
+    setActiveAndInactive(QPalette::Button, theme.button);
+    setActiveAndInactive(QPalette::ButtonText, theme.buttonText);
+    setActiveAndInactive(QPalette::BrightText, theme.brightText);
+    setActiveAndInactive(QPalette::Highlight, theme.highlight);
+    setActiveAndInactive(QPalette::HighlightedText, theme.highlightedText);
+    setActiveAndInactive(QPalette::Link, theme.link);
+    setActiveAndInactive(QPalette::LinkVisited, theme.linkVisited);
+    setActiveAndInactive(QPalette::PlaceholderText, theme.placeholder);
+    setActiveAndInactive(QPalette::Accent, theme.highlight);
+
+    if (theme.dark) {
+        // Fusion paints grooves, frames and checked tool buttons from these
+        // bevel roles. Leaving them at the light default produces bright
+        // Outline buttons and edges in an otherwise dark window.
+        const QColor light = theme.button.lighter(130);
+        const QColor midlight = theme.button.lighter(115);
+        const QColor dark = theme.button.darker(130);
+        const QColor mid = theme.button.darker(115);
+        const QColor shadow = theme.button.darker(160);
+
+        setAllGroups(QPalette::Window, theme.window);
+        setAllGroups(QPalette::Base, theme.base);
+        setAllGroups(QPalette::AlternateBase, theme.alternateBase);
+        setAllGroups(QPalette::ToolTipBase, theme.tooltipBase);
+        setAllGroups(QPalette::ToolTipText, theme.tooltipText);
+        setAllGroups(QPalette::Button, theme.button);
+        setAllGroups(QPalette::BrightText, theme.brightText);
+        setAllGroups(QPalette::Highlight, theme.highlight);
+        setAllGroups(QPalette::HighlightedText, theme.highlightedText);
+        setAllGroups(QPalette::Accent, theme.highlight);
+        setAllGroups(QPalette::Light, light);
+        setAllGroups(QPalette::Midlight, midlight);
+        setAllGroups(QPalette::Dark, dark);
+        setAllGroups(QPalette::Mid, mid);
+        setAllGroups(QPalette::Shadow, shadow);
+
+        setAllGroups(QPalette::WindowText, theme.mutedText);
+        setAllGroups(QPalette::Text, theme.mutedText);
+        setAllGroups(QPalette::ButtonText, theme.mutedText);
+        setAllGroups(QPalette::Link, theme.mutedText);
+        setAllGroups(QPalette::LinkVisited, theme.mutedText);
+        setAllGroups(QPalette::PlaceholderText, theme.mutedText);
+
+        palette.setColor(QPalette::Active, QPalette::WindowText, theme.windowText);
+        palette.setColor(QPalette::Inactive, QPalette::WindowText, theme.windowText);
+        palette.setColor(QPalette::Active, QPalette::Text, theme.text);
+        palette.setColor(QPalette::Inactive, QPalette::Text, theme.text);
+        palette.setColor(QPalette::Active, QPalette::ButtonText, theme.buttonText);
+        palette.setColor(QPalette::Inactive, QPalette::ButtonText, theme.buttonText);
+        palette.setColor(QPalette::Active, QPalette::Link, theme.link);
+        palette.setColor(QPalette::Inactive, QPalette::Link, theme.link);
+        palette.setColor(QPalette::Active, QPalette::LinkVisited, theme.linkVisited);
+        palette.setColor(QPalette::Inactive, QPalette::LinkVisited, theme.linkVisited);
+        palette.setColor(QPalette::Active, QPalette::PlaceholderText, theme.placeholder);
+        palette.setColor(QPalette::Inactive, QPalette::PlaceholderText, theme.placeholder);
+    }
+
     QApplication::setPalette(palette);
 
     QString error;

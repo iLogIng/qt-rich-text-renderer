@@ -157,9 +157,16 @@ int main(int argc, char **argv)
     expect(qApp->styleSheet() == style, QStringLiteral("custom QSS is applied"));
     expect(QApplication::palette().color(QPalette::Window) == custom.window,
            QStringLiteral("custom palette is applied"));
+    expect(QApplication::palette().color(QPalette::Light).lightness() < 128,
+           QStringLiteral("dark palette sets dark bevel roles"));
+    expect(QApplication::palette().color(QPalette::Disabled, QPalette::Text)
+               == custom.mutedText,
+           QStringLiteral("dark palette sets disabled text"));
 
     ThemeManager::apply(light);
     expect(qApp->styleSheet().isEmpty(), QStringLiteral("built-in theme clears QSS"));
+    expect(QApplication::palette().color(QPalette::Light).lightness() > 128,
+           QStringLiteral("light palette restores light bevel roles"));
 
     const QVector<ThemeInfo> themes = ThemeManager::availableThemes();
     const bool hasCustom = std::any_of(

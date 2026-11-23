@@ -284,6 +284,7 @@ void MainWindow::createCentralUiWidgets()
     m_outlineToggleButton->setCheckable(true);
     m_outlineToggleButton->setAutoRaise(true);
     m_outlineToggleButton->setChecked(m_settingsData.outlineVisible);
+    applyOutlineTogglePalette();
     m_tabs->setCornerWidget(m_outlineToggleButton, Qt::TopLeftCorner);
 
     updateToolbarHeights();
@@ -484,6 +485,28 @@ void MainWindow::applyPreviewFont(int pointSize)
     font.setPointSize(pointSize);
     m_preview->setFont(font);
     m_preview->document()->setDefaultFont(font);
+}
+
+void MainWindow::applyOutlineTogglePalette()
+{
+    if (!m_outlineToggleButton) {
+        return;
+    }
+
+    QPalette palette = QApplication::palette();
+    if (m_theme.dark) {
+        // Fusion paints the checked corner tool button from the button and
+        // bevel roles. Match them to the dark tab background so the Outline
+        // toggle does not appear as a light chip beside Preview/Source.
+        const QColor background = m_theme.window;
+        palette.setColor(QPalette::Button, background);
+        palette.setColor(QPalette::Light, background);
+        palette.setColor(QPalette::Midlight, background);
+        palette.setColor(QPalette::Dark, background);
+        palette.setColor(QPalette::Mid, background);
+        palette.setColor(QPalette::Shadow, background);
+    }
+    m_outlineToggleButton->setPalette(palette);
 }
 
 void MainWindow::applySourceFont(int pointSize)
@@ -782,6 +805,7 @@ void MainWindow::setThemeId(const QString &id)
     if (previousCodeFamily != m_theme.codeFontFamily) {
         applySourceFont(m_settingsData.sourceFontPointSize);
     }
+    applyOutlineTogglePalette();
     if (m_preview) {
         m_preview->document()->setDocumentMargin(m_theme.documentMargin);
     }
