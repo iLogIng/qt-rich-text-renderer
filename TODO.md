@@ -81,6 +81,658 @@
 - [x] 无效 `.ui` 自动回退默认布局，并记录可诊断错误
 - [x] 更新 README、FOR_LOCVAS 和主题示例，明确主题包目录、插槽名、支持的控件和 `.ui` 边界
 
+### Theme & Layout Evolution
+
+> 状态：设计已记录，全部条目待实施。
+>
+> 本文描述 `rich-text-renderer` 在现有 QSS 主题和静态 `.ui` 中央布局之上的后续 UI 配置能力。编号 `T1`、`T2`、`T7` 等是稳定功能标识，不表示实施顺序；章节按实施顺序排列。
+>
+> 本路线继续使用 Qt Widgets、QPalette、QSS 模板和静态 `.ui`，不引入 QML、QtWebEngine、Node 运行时或主题提供的可执行代码。
+
+#### 术语展开
+
+- **QSS**：Qt Style Sheets，Qt Widgets 的样式表机制；本文只使用应用内置模板和固定选择器，不接受主题提供任意 QSS。
+- **`.ui`**：Qt Designer 生成的 XML 界面文件；本文只加载 `QMainWindow::centralWidget()` 子树中的静态控件树。
+- **Settings**：应用的 Settings 对话框及其持久化模型 `AppSettingsData`。
+- **主题包**：`QStandardPaths::AppDataLocation/themes/<theme-id>/` 目录，包含 `theme.json`、可选 `.ui` 和可选 PNG/JPEG 图片。
+- **插槽**：中央布局中由 C++ 识别并注入控件的具名容器，例如 `central.content`。
+- **动态属性**：通过 `QObject::setProperty()` 设置的 Qt 运行期属性，例如插槽上的 `centralSlot` 和图片宿主上的 `themeAsset`。
+- **资源宿主**：接收主题图片的 Qt 控件，例如 `QLabel`；**资源视口**指该控件布局后的内容矩形。
+- **tabs 模式**：Preview 和 Source 位于 C++ 管理的 `QTabWidget` 中，是当前默认模式。
+- **slots 模式**：Preview 和 Source 分别注入 `.ui` 提供的 `central.preview` / `central.source` 插槽。
+- **布局变体**：同一主题提供的多个命名 `.ui` 中央布局；`T8A` 指用户在 Settings 中手动选择，`T8B` 指按窗口宽度自动切换。
+
+#### 方案边界
+
+- 主题包目录为 `QStandardPaths::AppDataLocation/themes/<theme-id>/`，可包含 `theme.json`、可选的 `layout.ui` 和可选的静态图片资源。
+- 主窗口、菜单、状态栏、Outline `QDockWidget`、文件加载、导航历史、设置、渲染 controller 和渲染 worker 始终由 C++ 持有。
+- 主题只提供声明式数据：颜色、字体族、尺寸、静态 `.ui`、经校验的图片资源和布局变体声明；不提供任意 QSS、JavaScript、QML 或自定义控件代码。
+- 用户 Settings 始终是最终优先级；主题提供的是默认视觉，不得覆盖用户显式设置。
+- 内置 `light` / `dark` 主题必须保持当前默认视觉；新增字段缺失时使用当前硬编码默认值。
+
+#### 已确认的产品决策
+
+1. **字号由 Settings 唯一控制**：`AppSettingsData::uiFontPointSize`、`sourceFontPointSize` 等字号设置优先于主题。主题最多提供字体族、文档边距和布局间距，不提供字号字段，也不通过 QSS 或 Mermaid 变量覆盖字号。
+2. **Preview 正文宽度默认不限制**：`preview.maxTextWidth` 默认值为 `0`，表示沿用当前 `QTextBrowser` viewport 宽度。只有显式设置正整数时才启用居中阅读列。
+3. **Mermaid 分两步**：先实施 Mermaid 内置主题枚举（本文 `T4A`），稳定后再实施 Mermaid 主题颜色变量（本文 `T4B`）。不把 `T4B` 作为 `T4A` 的前置条件。
+4. **静态图片资源只承诺 PNG 和 JPEG**：不提供 SVG 主题资源支持，也不把 SVG 渲染作为本轮目标。图片在资源宿主的内容矩形中居中显示，不铺满、不拉伸；图片大于视口时只允许保持宽高比的等比缩小，不放大、不裁切。
+5. **Outline 按钮有明确落点**：直接 Preview/Source 插槽模式优先使用可选插槽 `central.outline`；缺失时回退到 `central.toolbar.trailing`。
+6. **布局变体先做手动选择**：本次执行以 `T8A`（手动选择命名布局）为准；`T8B`（按窗口宽度自动切换）只记录为后续候选，不进入本次范围。
+
+#### 实施顺序与阶段
+
+| 阶段 | 目标 | 实施顺序 |
+|---|---|---|
+| 阶段 1 | 主题表现力；不改变布局生命周期和渲染器 | `T1` 主题排版参数 → `T2` 语法高亮色板 → `T7` 具名插槽 QSS |
+| 阶段 2 | 阅读体验、Mermaid 主题和安全图片资源 | `T3` Preview 外观 → `T4` Mermaid 主题 → `T5` 安全本地图片资源 |
+| 阶段 3 | 内容布局自由度 | `T6` Preview/Source 直接插槽 → `T8A` 手动布局变体 |
+
+依赖关系：
+
+- `T1` 的字体族和文档边距会被 `T3` 使用；
+- `T2` 独立于布局和渲染器；
+- `T7` 为 `T6` 的 `central.preview` / `central.source` 插槽样式提供基础；
+- `T4A` 必须先于 `T4B`；
+- `T5` 依赖现有 `.ui` 加载器和主题包路径校验；
+- `T6` 依赖现有标签组合和 `T7` 的插槽属性；
+- `T8A` 依赖 `T6` 的 `contentMode` 和现有布局加载器。
+
+#### 实施清单
+
+- [ ] `T1` 主题排版参数
+- [ ] `T2` 语法高亮色板
+- [ ] `T7` 具名插槽 QSS
+- [ ] `T3` Preview 外观
+- [ ] `T4A` Mermaid 内置主题枚举
+- [ ] `T4B` Mermaid 主题颜色变量（`T4A` 稳定后）
+- [ ] `T5` 安全本地图片资源
+- [ ] `T6` Preview/Source 直接插槽
+- [ ] `T8A` 手动布局变体
+- [ ] `T8B` 按窗口宽度自动切换布局（后续候选，本次不执行）
+
+---
+
+#### T1 主题排版参数（实施顺序 1）
+
+**目标**
+
+让主题控制字体族、默认中央布局间距和 Preview 文档边距，同时保持所有字号由 Settings 控制。
+
+**建议 schema**
+
+```json
+{
+  "typography": {
+    "uiFontFamily": "Noto Sans",
+    "previewFontFamily": "Noto Serif",
+    "codeFontFamily": "JetBrains Mono"
+  },
+  "metrics": {
+    "spacing": 8,
+    "documentMargin": 16
+  }
+}
+```
+
+**行为**
+
+- `typography.uiFontFamily`：设置应用字体族；字号继续使用 `AppSettingsData::uiFontPointSize`。
+- `typography.previewFontFamily`：只影响 Preview 文档；字号继续使用 UI/预览字号设置。
+- `typography.codeFontFamily`：影响 Source 视图；Preview 代码块的字体族在 `T3` 的文档后处理中应用。
+- `metrics.spacing`：作为 C++ 默认中央骨架的间距默认值；`.ui` 布局中显式设置的 margin/spacing 优先。
+- `metrics.documentMargin`：设置 Preview `QTextDocument` 的 margin；默认保持当前值 12。
+- 字段缺失或为空字符串时使用当前默认值，不改变内置主题视觉。
+
+**不做**
+
+- 不增加主题字号字段；
+- 不允许 QSS 覆盖字号；
+- 不允许 `.ui` 通过 `font/pointsize` 等属性覆盖应用、Preview 或 Source 字号；字号必须继承 Settings；
+- 不允许主题包携带字体文件；只能使用系统已安装字体，缺失时回退到应用默认字体。
+
+**涉及模块**
+
+- `src/ui/Theme.h` / `src/ui/Theme.cpp`：schema、校验、默认值；
+- `src/ui/MainWindow.cpp`：应用 UI/Preview/Source 字体和文档边距；
+- `src/ui/CentralUiLayout.cpp`：默认中央骨架使用 `metrics.spacing`；
+- `tests/theme_test.cpp`、`tests/main_window_startup_test.cpp`：解析、回退和视觉行为。
+
+**验收**
+
+- 内置 light/dark 截图与当前版本一致；
+- Settings 修改字号仍立即生效，主题字体族不会改变字号；
+- 非法字体族/尺寸值有明确错误并回退；
+- `.ui` 布局的显式间距不被 `metrics.spacing` 覆盖。
+
+---
+
+#### T2 语法高亮色板（实施顺序 2）
+
+**目标**
+
+让每个主题拥有独立的代码高亮和 Markdown Source 高亮颜色，不再只依赖 `dark` 布尔值。
+
+**当前基线**
+
+- `CodeHighlighter` 有 7 类字符格式：keyword、string、number、comment、preprocessor、type、function。
+- `MarkdownSourceHighlighter` 有 9 类字符格式：heading、bold、emphasis、inlineCode、link、quote、marker、fence、math。
+- 两者当前都只接受 `bool dark`。
+
+**建议 schema**
+
+```json
+{
+  "syntax": {
+    "code": {
+      "keyword": "#cf8e6d",
+      "string": "#6aab73",
+      "number": "#2aacb8",
+      "comment": "#7a7a7a",
+      "preprocessor": "#b5a642",
+      "type": "#56a8f5",
+      "function": "#56a8f5"
+    },
+    "source": {
+      "heading": "#8ab4f8",
+      "bold": "#e6e6e6",
+      "emphasis": "#e6e6e6",
+      "inlineCode": "#d7ba7d",
+      "link": "#8ab4f8",
+      "quote": "#9a9a9a",
+      "marker": "#c586c0",
+      "fence": "#6aab73",
+      "math": "#b5a642"
+    }
+  }
+}
+```
+
+**设计**
+
+- 在 document 层定义 `SyntaxPalette` 和 `MarkdownSourcePalette`，不引入 UI 依赖。
+- `CodeHighlighter` / `MarkdownSourceHighlighter` 改为接受 palette；`dark` 只作为缺失字段时的默认选择。
+- 主题切换时重新应用 palette 并 `rehighlight()`；不需要重新运行 MathJax/Mermaid。
+- 缺失字段回退到当前浅色/深色硬编码值；非法颜色按主题 schema 错误处理。
+- 不改变粗体、斜体、字号和代码块背景；背景属于 `T3`。
+
+**涉及模块**
+
+- `src/document/CodeHighlighter.*`、`src/document/MarkdownSourceHighlighter.*`；
+- `src/ui/Theme.*`、`src/ui/MainWindow.cpp`；
+- `tests/document_rendering_test.cpp`、`tests/theme_test.cpp`。
+
+**验收**
+
+- light/dark 默认高亮颜色与当前一致；
+- 自定义色板在 Preview 和 Source 中都生效；
+- 主题切换后无需重新渲染文档即可更新高亮；
+- 非法颜色可诊断并回退。
+
+---
+
+#### T7 具名插槽 QSS（实施顺序 3）
+
+**目标**
+
+让主题分别控制 `central.top`、`central.bottom`、`central.empty`、`central.toolbar.leading`、`central.toolbar.trailing` 和 `central.content` 的背景、边框、圆角和 padding；后续 `T6` 再扩展到 `central.preview` / `central.source`。
+
+**当前基线**
+
+- QSS 模板主要按控件类型选择，例如 `QPushButton`、`QTabWidget`、`QScrollBar`。
+- 插槽宿主没有可用于 QSS 的稳定样式属性。
+- 插槽名包含点号，直接写 `#central.top` 作为 QSS ID 选择器不可靠。
+
+**设计**
+
+- 为每个插槽宿主设置动态属性：
+
+```cpp
+slot->setProperty("centralSlot", "top");
+```
+
+- QSS 使用属性选择器：
+
+```css
+QWidget[centralSlot="top"] {
+    background: #202124;
+    border-bottom: 1px solid #3c4043;
+}
+```
+
+- 主题 JSON 只提供结构化样式值，不提供任意 QSS：
+
+```json
+{
+  "slots": {
+    "top": {
+      "background": "#202124",
+      "borderColor": "#3c4043",
+      "borderWidth": 1,
+      "radius": 8,
+      "padding": 8
+    },
+    "bottom": {
+      "background": "#18191c"
+    },
+    "toolbarLeading": {
+      "background": "#11161a"
+    },
+    "toolbarTrailing": {
+      "background": "#11161a"
+    },
+    "content": {
+      "borderColor": "#30363d",
+      "borderWidth": 1
+    }
+  }
+}
+```
+
+**允许的样式字段**
+
+- `background`：颜色；
+- `borderColor`：颜色；
+- `borderWidth`：0–8 的整数；
+- `radius`：0–32 的整数；
+- `padding`：0–32 的整数。
+
+**实现规则**
+
+- `ThemeManager` 生成固定选择器规则并追加到 QSS 模板；
+- 不接受任意选择器、伪状态、渐变字符串或未校验的值；
+- 插槽属性必须在 QSS 应用前设置，或在设置后执行 `style()->unpolish/polish`；
+- 没有 `slots` 字段时完全不生成额外规则，内置主题视觉不变；
+- `central.preview` / `central.source` 的选择器在 `T6` 完成后加入同一体系。
+
+**验收**
+
+- 默认布局和内置主题无视觉回归；
+- 顶部/底部/工具栏/内容区可分别设置背景和边框；
+- 空插槽仍然隐藏且零占位；
+- 生成的 QSS 不包含主题提供的任意选择器或未校验文本。
+
+---
+
+#### T3 Preview 外观（实施顺序 4）
+
+**目标**
+
+在 `T1` 的字体族和文档边距基础上，增加可控的阅读版式。
+
+**建议 schema**
+
+```json
+{
+  "preview": {
+    "maxTextWidth": 0,
+    "codeBackground": "#161b22",
+    "codeBlockMargin": 8
+  }
+}
+```
+
+**行为**
+
+- `maxTextWidth` 默认 `0`，表示沿用当前 viewport 宽度；
+- `maxTextWidth > 0` 时，文档文本按该宽度居中显示，左右保留对称空白；
+- `codeBackground` 设置 Preview 内代码块背景；
+- `codeBlockMargin` 设置代码块上下间距；
+- `paragraphSpacing` 作为后续可选子项，只有在标题、列表、代码块视觉回归稳定后才加入，不与首版验收绑定；
+- Preview 背景继续使用主题 palette 的 `Base`/`Window` 颜色，不新增重复背景字段。
+
+**实现**
+
+- 在 `MainWindow::forcePreviewLayout()` 中同时计算 viewport 可用宽度和 `maxTextWidth`；
+- 通过文档文本宽度和 viewport margins 实现居中；滚动条仍位于窗口右侧；
+- 在 `m_preview->setMarkdown()` 后遍历 block，识别 `QTextFormat::BlockCodeLanguage`，合并 `QTextBlockFormat` 设置背景和 margin；
+- 修改 block format 时必须保留代码语言、字符格式和 SVG 对象；
+- 主题切换后重新应用并重新渲染当前文档。
+
+**Qt 限制**
+
+- 不支持浏览器式圆角、阴影、复杂边框和任意 CSS；
+- 不支持背景图片作为 Preview 页面背景；
+- 代码块圆角不进入本轮承诺。
+
+**验收**
+
+- 默认 `maxTextWidth=0` 时布局与当前一致；
+- 居中宽度在 resize、主题切换和 anchor 定位后仍然正确；
+- 代码块背景不影响语法高亮和 SVG；
+- 内置 light/dark 截图无意外差异。
+
+---
+
+#### T4 Mermaid 主题（实施顺序 5）
+
+**目标**
+
+先让 Mermaid 使用可配置的内置主题，再在稳定后让主题颜色与 SVG 归一化一致。
+
+##### T4A Mermaid 内置主题枚举
+
+**schema**
+
+```json
+{
+  "mermaid": {
+    "theme": "default"
+  }
+}
+```
+
+允许值：`default`、`dark`、`forest`、`neutral`、`base`。
+
+**实现**
+
+- `ThemeSpec` 增加 `mermaidTheme`；
+- `RendererService::renderMermaid()` 接收主题字符串；
+- worker 调用 `mermaid.initialize({ theme })`；
+- 缓存 key 包含 Mermaid 主题；
+- 渲染器版本升级，避免旧缓存串色；
+- `SvgSanitizer` 暂时保留现有深/浅色修正，文档中说明颜色可能与 Mermaid 主题不完全一致。
+
+##### T4B Mermaid 主题颜色变量
+
+**前置条件**：`T4A` 已稳定并通过 Mermaid smoke 与缓存测试。
+
+**schema**
+
+```json
+{
+  "mermaid": {
+    "theme": "base",
+    "variables": {
+      "primaryColor": "#2dd4bf",
+      "lineColor": "#8b949e",
+      "textColor": "#e6edf3"
+    }
+  }
+}
+```
+
+**实现**
+
+- 只允许 Mermaid 主题变量白名单中的颜色键，值必须解析为合法 `QColor`；
+- 不允许 `fontFamily`、`fontSize` 等排版变量，字号由 Settings 控制；
+- `RendererService` 和 worker 协议传递 `themeVariables`；
+- `SvgCache` key 使用稳定的主题签名；
+- `SvgSanitizer` 接受主题颜色，不再只按 `dark` 硬编码；
+- 颜色值严格校验，非法值回退并记录错误；
+- 增加缓存命中/失效和主题切换测试。
+
+**验收**
+
+- `T4A` 的枚举主题可加载、可缓存、可切换；
+- `T4B` 的不同变量生成不同缓存 key；
+- 主题切换后 Mermaid SVG 与 Preview 前景/强调色一致；
+- 不引入主题字号覆盖。
+
+---
+
+#### T5 安全本地图片资源（实施顺序 6）
+
+**目标**
+
+允许用户主题包提供静态 PNG/JPEG 图片，用于 Logo、顶部装饰或静态图标；不提供 SVG 资源承诺。
+
+**资源 manifest**
+
+```json
+{
+  "assets": {
+    "logo": "assets/logo.png",
+    "badge": "assets/badge.jpg"
+  }
+}
+```
+
+**`.ui` 使用方式**
+
+```xml
+<widget class="QLabel" name="themeLogo">
+  <property name="themeAsset" stdset="0">
+    <string>logo</string>
+  </property>
+</widget>
+```
+
+**设计规则**
+
+- `.ui` 不直接写图片路径，只写 manifest 中的逻辑资源 ID；
+- 第一版只允许三种资源宿主：
+  - `QLabel`：设置 pixmap；
+  - `QToolButton`：设置 icon；
+  - `QPushButton`：设置 icon；
+- `QLabel` 的图片在资源宿主的内容矩形中居中显示；`QToolButton` / `QPushButton` 由 Qt 按按钮规则居中绘制 icon；
+- 不提供铺满、非等比拉伸或 `scaledContents` 拉伸模式；资源注入时强制 `QLabel::setScaledContents(false)` 并设置居中对齐；
+- 图片大于资源视口时只允许保持宽高比的等比缩小，不放大、不裁切；
+- 资源缺失、ID 未知或宿主不支持时，布局校验失败并回退 C++ 默认中央布局。
+
+**资源校验**
+
+- 只允许 PNG、JPEG；
+- 不允许 SVG、GIF、APNG、动画或多帧图片；
+- 文件大小上限 2MB；
+- 解码尺寸上限 4096×4096；
+- 路径必须是主题包内相对路径；
+- 规范化路径和符号链接解析后必须仍位于主题包目录；
+- 解码前检查格式和尺寸，解码后再验证有效图像；
+- 不读取外部 URL、`qrc` 资源或主题包外文件。
+
+**涉及模块**
+
+- `src/ui/Theme.*`：资源 manifest、路径和格式校验；
+- `src/ui/CentralUiLayout.*`：`themeAsset` 属性收集和图片注入；
+- 资源加载测试、路径越界测试和图片格式测试。
+
+**验收**
+
+- PNG/JPEG 资源可显示并被居中；
+- 图片不会因宿主变大而拉伸；
+- SVG、动画、超大文件、越界路径和未知 ID 被拒绝；
+- 资源失败不会影响文档、历史、设置或 worker。
+
+---
+
+#### T6 Preview / Source 直接插槽（实施顺序 7）
+
+**目标**
+
+让用户主题的 `.ui` 可以分别摆放 Preview 和 Source，而不是只能移动包含两者的 C++ 标签组合。
+
+**当前结构**
+
+```text
+central.content
+  └── C++ QTabWidget
+        ├── central.preview
+        └── central.source
+```
+
+**目标结构（slots 模式）**
+
+```text
+central.preview     central.source
+```
+
+主题可以把两个插槽：
+
+- 左右分栏；
+- 上下排列；
+- 放进自己的 `QTabWidget`；
+- 放进 `QSplitter`；
+- 只显示其中一个。
+
+**manifest**
+
+```json
+{
+  "layout": {
+    "apiVersion": 1,
+    "file": "layout.ui",
+    "contentMode": "slots"
+  }
+}
+```
+
+`contentMode` 取值：
+
+- `tabs`：当前模式，默认值；
+- `slots`：直接注入 Preview/Source 两个插槽。
+
+**插槽契约**
+
+`tabs` 模式必需：
+
+- `central.toolbar.leading`
+- `central.toolbar.trailing`
+- `central.content`
+
+`slots` 模式必需：
+
+- `central.toolbar.leading`
+- `central.toolbar.trailing`
+- `central.preview`
+- `central.source`
+
+`slots` 模式不得同时定义 `central.content`，避免出现两套内容宿主。新增的可选 `central.outline` 插槽与现有插槽使用相同的宿主类型规则：只允许普通 `QWidget` 或 `QFrame`。
+
+**Outline 按钮**
+
+- `tabs` 模式继续使用 C++ 标签页 corner widget；
+- `slots` 模式优先使用可选插槽 `central.outline`；
+- 缺失 `central.outline` 时，把 Outline 切换按钮追加到 `central.toolbar.trailing`；
+- 不因自定义布局丢失 Outline 显隐能力。
+
+**Source 可见性**
+
+- `view.sourceVisible=false` 时：
+  - `tabs` 模式隐藏 Source 标签页；
+  - `slots` 模式隐藏 `central.source` 宿主；
+  - 如果 Source 宿主位于 `QTabWidget` 页面内部，需要找到最近祖先 `QTabWidget` 并隐藏对应 tab，避免留下空标签页。
+
+**生命周期**
+
+- 切换主题或 `contentMode` 时，先把 Preview/Source 从旧宿主移出，再注入新布局；
+- 切回 `tabs` 模式时重新加入 C++ 标签页；
+- 文档、历史、Source 高亮、Outline 状态和设置不得丢失；
+- 失败时回退到 `tabs` 模式，再回退 C++ 默认布局。
+
+**验收**
+
+- `slots` 模式可左右分栏或上下排列；
+- `tabs` 模式保持当前行为；
+- Source 显隐、Outline 按钮和主题切换无回归；
+- 默认主题和内置主题不启用 `slots` 模式。
+
+---
+
+#### T8A 手动布局变体（实施顺序 8）
+
+**目标**
+
+同一主题提供多个命名中央布局，由用户手动选择；本次不实现按窗口宽度自动切换。
+
+**manifest**
+
+```json
+{
+  "layouts": {
+    "apiVersion": 1,
+    "variants": [
+      {
+        "id": "wide",
+        "file": "wide.ui",
+        "contentMode": "tabs"
+      },
+      {
+        "id": "compact",
+        "file": "compact.ui",
+        "contentMode": "slots"
+      }
+    ]
+  }
+}
+```
+
+**规则**
+
+- `layout` 单布局和 `layouts` 多变体互斥，同时出现时视为无效主题；
+- 每个 variant 必须有唯一 `id`、合法的 `.ui` 路径和 `contentMode`；
+- 每个 variant 独立执行现有 `.ui` 白名单、插槽和路径校验；
+- Settings 增加布局变体选择，保存到 `AppSettingsData::layoutId`；
+- 主题的默认 variant 是 manifest 中的第一个 variant；
+- 主题切换时如果当前 `layoutId` 不存在，回退到该主题的第一个 variant；
+- variant 加载失败时回退到该主题的默认 variant，再回退 C++ 默认中央布局；
+- 本次不根据窗口宽度自动切换，不引入 resize 重建逻辑。
+
+**T8B 后续候选（本次不实施）**
+
+按窗口宽度选择 variant，需要额外处理：
+
+- 断点选择、防抖和滞后区间；
+- resize 期间避免反复重建；
+- 焦点、滚动位置和当前标签状态恢复；
+- 主题切换与窗口 resize 的叠加；
+- variant 预校验和失败回退。
+
+**验收**
+
+- 用户可以手动切换主题内的命名布局；
+- 布局切换不丢失文档、历史、设置和 Outline 状态；
+- 无效 variant 有诊断并回退；
+- 内置主题没有 `layouts` 时行为不变。
+
+---
+
+#### 通用 schema 与错误处理
+
+- 新增主题字段全部为可选；`schemaVersion` 保持 `1`，旧主题继续可加载。
+- 新增字段缺失时使用当前内置默认值；内置 light/dark 视觉不变。
+- 主题 JSON 结构或类型错误：`ThemeManager::loadTheme()` 返回错误并回退默认主题。
+- `.ui`、资源或布局 variant 校验错误：回退 C++ 默认中央布局；主题颜色和 QSS 仍按主题 JSON 应用。
+- 所有新增颜色必须是合法 `QColor`；所有尺寸必须是限定范围内的整数；所有资源路径和布局路径必须在主题包目录内。
+- 不把用户提供的字符串直接插入 QSS、Shell、JavaScript 或 HTML。
+- 所有新增能力必须保留现有 `QTextDocument` + QuickJS + SVG 渲染链路。
+
+#### 模块边界
+
+| 能力 | 主要模块 | 约束 |
+|---|---|---|
+| `T1` 排版 | `src/ui/Theme.*`、`MainWindow`、`CentralUiLayout` | 字号仍由 `AppSettingsData` 控制 |
+| `T2` 语法色板 | `src/document/CodeHighlighter.*`、`src/document/MarkdownSourceHighlighter.*` | document 层不依赖 UI |
+| `T7` 插槽 QSS | `src/ui/Theme.*`、`src/ui/CentralUiLayout.*` | 固定选择器和校验 token |
+| `T3` Preview 外观 | `MainWindow`、Preview 文档处理 | 不引入浏览器式 CSS 承诺 |
+| `T4` Mermaid | `src/core/RendererService.*`、worker、`src/document/SvgSanitizer.*` | 缓存 key 和 sanitizer 同步更新 |
+| `T5` 图片资源 | `src/ui/Theme.*`、`CentralUiLayout` | 仅主题包内 PNG/JPEG |
+| `T6` 直接插槽 | `MainWindow`、`CentralUiLayout` | 保留 tabs 默认模式和回退 |
+| `T8A` 布局变体 | `Theme`、`CentralUiLayout`、`MainWindow`、Settings | 仅手动选择，不自动 resize |
+
+#### 测试矩阵
+
+- 主题 schema：缺失字段、非法颜色、非法尺寸、旧主题兼容；
+- 内置主题：light/dark 截图和现有 CTest 不回归；
+- 语法色板：代码/Source 格式颜色和主题切换；
+- 插槽 QSS：生成规则、空插槽零占位、默认布局无变化；
+- Preview：文档边距、最大宽度、代码块背景、resize 和 anchor；
+- Mermaid：`T4A` 主题枚举、`T4B` 变量、缓存 key、sanitizer；
+- 资源：PNG/JPEG 有效加载、居中、越界、超大、SVG/动画拒绝；
+- 直接插槽：tabs/slots 切换、Source 显隐、Outline 落点；
+- 布局变体：手动选择、无效 variant、主题切换和状态保持；
+- 每个阶段执行 Release、`-Wall -Wextra -Wpedantic -Werror`、全量 CTest 和 AppImage 验证。
+
+#### 当前非目标
+
+- QML、Qt Quick、QtWebEngine；
+- 任意用户 QSS、任意 HTML、任意 JavaScript；
+- 第三方编译控件、主题 `.so` / `.dll`；
+- SVG 主题图片资源；
+- 自动按窗口宽度切换布局（`T8B`）；
+- 整个 `QMainWindow`、菜单、状态栏和 Outline dock 的替换；
+- 主题覆盖字号；
+- 外部图片、网络 URL 和主题包外资源。
+
 ### Defer Polish
 
 > 原有 Polish 顺序暂后置；以下是“从验证版本到可日常使用”的建议顺序，汇总自下面的 P0/P1/P2；不替代详细清单。

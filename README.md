@@ -207,6 +207,8 @@ QStandardPaths::AppDataLocation/themes/<theme-id>/
 
 当前不引入 QML，也不支持替换整个 `QMainWindow`。
 
+后续的排版参数、语法高亮色板、插槽 QSS、Preview 外观、Mermaid 主题、静态 PNG/JPEG 资源、Preview/Source 直接插槽和手动布局变体设计见 [TODO.md](TODO.md) 的 **Theme & Layout Evolution** 一节；这些能力尚未实现。
+
 ## 支持的 Markdown
 
 | 能力 | 说明 |
