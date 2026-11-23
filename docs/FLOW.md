@@ -1,6 +1,6 @@
 # 程序流程图
 
-> 对应代码：`src/main.cpp`、`src/MainWindow.cpp`、`src/AppSettings.cpp`、`src/RendererService.cpp`、`src/RendererWorker.cpp`、`src/MarkdownPreprocessor.cpp`、`src/MarkdownDocumentBuilder.cpp`、`src/MarkdownOutline.cpp`、`src/OutlinePanel.cpp`、`src/SettingsDialog.cpp`、`src/SvgObjectHandler.cpp`
+> 对应代码：`src/app/main.cpp`、`src/ui/MainWindow.cpp`、`src/core/AppSettings.cpp`、`src/core/RendererService.cpp`、`src/core/RendererWorker.cpp`、`src/core/MarkdownPreprocessor.cpp`、`src/document/MarkdownDocumentBuilder.cpp`、`src/document/MarkdownOutline.cpp`、`src/ui/OutlinePanel.cpp`、`src/ui/SettingsDialog.cpp`、`src/ui/Theme.cpp`、`src/document/SvgObjectHandler.cpp`
 >
 > 本文件只放流程图；架构与模块说明见 [README.md](../README.md)、[ADR-0001](ADR-0001-rendering-pipeline.md)。
 
@@ -358,3 +358,31 @@ flowchart LR
 ```
 
 > 进程数上限 2；空闲 60s 退出；worker 有 RLIMIT_AS / RLIMIT_CPU 与请求超时。
+
+---
+
+## 7. UI 主题
+
+```mermaid
+flowchart TD
+    A["AppSettingsData::themeId"] --> B["ThemeManager::loadTheme()"]
+    B --> C{"内置 light/dark?"}
+    C -- 是 --> D["Qt 资源中的 theme JSON"]
+    C -- 否 --> E["AppDataLocation/themes/&lt;id&gt;/theme.json"]
+    D --> F["ThemeSpec"]
+    E --> F
+    F --> G["QPalette"]
+    F --> H{"useQss?"}
+    H -- 是 --> I["QSS 模板 token 替换"]
+    H -- 否 --> J["清空 QSS"]
+    G --> K["QApplication"]
+    I --> K
+    J --> K
+```
+
+- 用户主题只提供 JSON token，不直接提供任意 QSS 或代码；
+- 内置主题保持原有 QPalette 视觉，不启用 QSS；
+- 用户主题默认启用 QSS，由固定模板生成；
+- 主题缺失或校验失败时回退到 `light`；
+- 代码高亮、Source 高亮和 Mermaid 仍使用主题的 `dark` 标志；
+- 当前不加载 `.ui` 布局，也不引入 QML。

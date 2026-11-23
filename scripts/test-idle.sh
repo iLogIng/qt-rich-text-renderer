@@ -8,6 +8,11 @@ CACHE="$HOME/.cache/rich-text-renderer/rich-text-renderer"
 RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rich-text-renderer-idle.XXXXXX")"
 CONFIG="$RUN_DIR/config"
 LOG="$RUN_DIR/idle.log"
+cat > "$RUN_DIR/idle.md" <<'MD'
+# Idle worker check
+
+$1 + 1$
+MD
 
 cleanup() {
   if [[ -n "${app_pid:-}" ]]; then
@@ -20,7 +25,7 @@ trap cleanup EXIT
 rm -rf "$CACHE"
 
 XDG_CONFIG_HOME="$CONFIG" RICH_TEXT_RENDER_IDLE_MS=2000 QT_QPA_PLATFORM=offscreen ./build/rich-text-renderer \
-  --file tests/sources/bench.md --screenshot "$RUN_DIR/idle.png" \
+  --file "$RUN_DIR/idle.md" --screenshot "$RUN_DIR/idle.png" \
   >"$LOG" 2>&1 &
 app_pid=$!
 
