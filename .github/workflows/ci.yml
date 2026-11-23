@@ -86,7 +86,7 @@ jobs:
       - name: Install test dependencies
         run: |
           dnf install -y \
-            cmake qt6-qtbase-gui qt6-qtsvg qt6-qttools-libs-designer \
+            cmake qt6-qtbase-gui qt6-qtsvg qt6-qttools \
             python3 findutils
 
       - name: Download build artifact
