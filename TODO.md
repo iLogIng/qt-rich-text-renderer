@@ -4,7 +4,7 @@
 >
 > 记录日期：2026-11-18
 >
-> 最近更新：2026-11-23
+> 最近更新：2026-11-24
 >
 > 原则：不引入 QtWebEngine，不引入 QML/MarkQml UI 或渲染链路，不引入 Node 运行时；UI 采用 Widgets + QPalette/QSS，渲染链路保持 QuickJS + SVG。
 
@@ -12,7 +12,7 @@
 
 ### QSS UI Polish
 
-> 当前项目仍是 `rich-text-renderer`，作为 locvas 的技术选型与 spike 验证。QSS/UI 工作不改变 `QTextDocument` + QuickJS 渲染管线，不引入 QML。
+> 当前项目是独立的 `rich-text-renderer`，不以 locvas 产品实现为目标。QSS/UI 工作不改变 `QTextDocument` + QuickJS 渲染管线，不引入 QML。
 
 - [x] 在引入 QSS 前整理 `src/` 下平铺的源文件：按现有 `core`、`document`、`ui` 边界移动到子目录，只更新 CMake 源列表和 include 路径，保持行为与测试不变
 - [x] 设计主题 JSON schema、`ThemeSpec` 和 `ThemeManager`；内置 `light` / `dark` 主题必须保持当前视觉
@@ -21,7 +21,7 @@
 - [x] Settings 的 Appearance 页提供主题选择、字号/密度、主题目录入口和加载失败回退
 - [x] 决定代码高亮、Source 高亮、MathJax 和 Mermaid 如何消费主题语义；首版使用主题的 `dark` 标志，代码和 Source 独立色板已在后续 `T2` 完成
 - [ ] 增加主题加载、校验、回退、设置迁移、QSS token 替换和视觉回归测试（主题/回退/QSS 测试已完成，golden 视觉回归待补）
-- [x] 更新 README、FOR_LOCVAS 和 FOR_LOCVAS_IF_QML，记录 QSS 主题入口、用户主题目录、.ui 边界和当前非目标
+- [x] 更新 README 和主题示例，记录 QSS 主题入口、用户主题目录、.ui 边界和当前非目标
 
 #### XML Static UI Polish
 
@@ -79,7 +79,7 @@
 - [x] C++ 默认中央布局、内置主题和现有功能测试不回归
 - [x] 用户主题 `.ui` 可替换中央排列和插槽内容，但不改变主窗口、菜单、状态栏、Outline dock 和渲染控制器
 - [x] 无效 `.ui` 自动回退默认布局，并记录可诊断错误
-- [x] 更新 README、FOR_LOCVAS 和主题示例，明确主题包目录、插槽名、支持的控件和 `.ui` 边界
+- [x] 更新 README 和主题示例，明确主题包目录、插槽名、支持的控件和 `.ui` 边界
 
 ### Theme & Layout Evolution
 

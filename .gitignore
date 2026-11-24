@@ -9,3 +9,7 @@ base-x86_64.AppImage
 renderer/node_modules/
 renderer/dist/
 third_party/quickjs-ng/build/
+
+# Local planning docs for separate locvas work. Not part of this repository.
+/ABOUT_LLMOQRE.md
+/FOR_LOCVAS*.md

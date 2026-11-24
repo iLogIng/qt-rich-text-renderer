@@ -2,9 +2,18 @@
 
 面向本地 Markdown 文件的 Qt6 桌面阅读器。应用使用 `QTextDocument` 排版文档，通过 QuickJS-ng worker 运行 MathJax 与 Mermaid，将公式和图表渲染为 SVG 后嵌入预览；运行时不依赖 QtWebEngine，也不需要 Node.js。
 
-本仓库同时是 locvas 本地 Markdown 富文本渲染能力的参考实现。locvas 相关的行为契约、资源约束和验收条件见 [FOR_LOCVAS.md](FOR_LOCVAS.md)。
+本项目是独立的 Qt6 Markdown 阅读器与富文本渲染参考实现，不包含 locvas 产品代码，也不以 locvas 为发布目标。
 
 ![rich-text-renderer 深色模式界面](docs/assets/app-dark.png)
+
+## 项目边界
+
+本仓库只维护 `rich-text-renderer` 本身：本地 Markdown 阅读、MathJax/Mermaid 渲染、主题和打包。
+
+- 不实现 locvas 的会话、消息、数据存储或业务逻辑；
+- 不把 locvas 产品功能反向加入本仓库；
+- locvas / LLMQore 相关评估材料属于本地规划文档，不纳入版本控制；
+- 本仓库的渲染层可以独立复用，但复用方应维护自己的产品层。
 
 ## 功能
 
@@ -597,8 +606,6 @@ dist/                   生成的 AppImage（gitignored）
 
 ## 文档
 
-- [FOR_LOCVAS.md](FOR_LOCVAS.md)：渲染契约、资源约束与验收条件
-- [FOR_LOCVAS_IF_QML.md](FOR_LOCVAS_IF_QML.md)：Widgets/QSS 当前决策、QML 对比与 UI 自由度边界
 - [docs/FLOW.md](docs/FLOW.md)：启动、渲染、缓存、链接和预览流程
 - [docs/RESULTS.md](docs/RESULTS.md)：渲染结果、性能数据和已知限制
 - [docs/ADR-0001-rendering-pipeline.md](docs/ADR-0001-rendering-pipeline.md)：渲染路线说明
